@@ -1,0 +1,6 @@
+RewriteEngine On
+Options -Indexes
+
+RewriteRule ^includes(?:/|$) - [F,L,NC]
+RewriteRule ^scripts(?:/|$) - [F,L,NC]
+RewriteRule ^tests/.*\.(?:php|sh)$ - [F,L,NC]

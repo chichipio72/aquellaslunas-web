@@ -1,0 +1,45 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs and runtime artifacts
+*.log
+logs/
+*.pid
+*.tmp
+*.temp
+/tmp/
+tmp/
+
+# Store source and generated data
+/storage/tienda/originales/*
+/storage/tienda/catalogo/*
+/assets/images/tienda/previews/*
+
+# Eclipse visibility maps are generated/downloaded assets deployed from this tree.
+/assets/images/eclipses/*
+!/assets/images/eclipses/.gitkeep
+
+# Cache and local tool output
+.cache/
+coverage/
+.phpunit.result.cache
+__pycache__/
+*.py[cod]
+
+# Editor and IDE metadata
+.vscode/*
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+web-produccion.zip

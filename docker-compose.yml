@@ -1,0 +1,50 @@
+name: web-astro
+
+services:
+  web:
+    container_name: web-astro
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ASTRONOMY_API_BASE_URL: http://host.docker.internal:18000
+      ASTRONOMY_SHOW_TIMINGS: ${ASTRONOMY_SHOW_TIMINGS:-false}
+      ALTITUDE_PROFILE_INTERVAL_MINUTES: ${ALTITUDE_PROFILE_INTERVAL_MINUTES:-15}
+      SUPERMOON_MIN_APPARENT_SIZE_PERCENT: ${SUPERMOON_MIN_APPARENT_SIZE_PERCENT:-}
+      MOONRISE_NOTICE_MAX_MINUTES: ${MOONRISE_NOTICE_MAX_MINUTES:-}
+      MOBILE_SWIPE_NAVIGATION_ENABLED: ${MOBILE_SWIPE_NAVIGATION_ENABLED:-}
+      MOBILE_SWIPE_NAVIGATION_HINT_ENABLED: ${MOBILE_SWIPE_NAVIGATION_HINT_ENABLED:-}
+      MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED: ${MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED:-}
+      STORE_ORIGINALS_PATH: ${STORE_ORIGINALS_PATH:-/srv/proyectos/astronomia/web/storage/tienda/originales}
+      STORE_PREVIEWS_PATH: ${STORE_PREVIEWS_PATH:-/srv/proyectos/astronomia/web/assets/images/tienda/previews}
+      STORE_CATALOG_PATH: ${STORE_CATALOG_PATH:-/srv/proyectos/astronomia/web/storage/tienda/catalogo}
+      STORE_DB_HOST: ${STORE_DB_HOST:-167.250.5.41}
+      STORE_DB_PORT: ${STORE_DB_PORT:-3306}
+      STORE_DB_NAME: ${STORE_DB_NAME:-aquellaslunascom_tienda_dev}
+      STORE_DB_USER: ${STORE_DB_USER:-}
+      STORE_DB_PASSWORD: ${STORE_DB_PASSWORD:-}
+      STORE_ADMIN_USER: ${STORE_ADMIN_USER:-}
+      STORE_ADMIN_PASSWORD_HASH: ${STORE_ADMIN_PASSWORD_HASH:-}
+      STORE_INITIAL_PRICE: ${STORE_INITIAL_PRICE:-}
+      STORE_PREVIEW_TIENDA_MAX_SIZE: ${STORE_PREVIEW_TIENDA_MAX_SIZE:-800}
+      STORE_PREVIEW_TIENDA_JPEG_QUALITY: ${STORE_PREVIEW_TIENDA_JPEG_QUALITY:-72}
+      STORE_PREVIEW_CONTENIDO_MAX_SIZE: ${STORE_PREVIEW_CONTENIDO_MAX_SIZE:-400}
+      STORE_PREVIEW_CONTENIDO_JPEG_QUALITY: ${STORE_PREVIEW_CONTENIDO_JPEG_QUALITY:-72}
+      STORE_DOWNLOAD_EXPIRY_HOURS: ${STORE_DOWNLOAD_EXPIRY_HOURS:-72}
+      STORE_DOWNLOAD_MAX_COUNT: ${STORE_DOWNLOAD_MAX_COUNT:-5}
+      MERCADO_PAGO_MODE: ${MERCADO_PAGO_MODE:-test}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN:-}
+      MERCADO_PAGO_PUBLIC_KEY: ${MERCADO_PAGO_PUBLIC_KEY:-}
+      MERCADO_PAGO_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET:-}
+      MERCADO_PAGO_SUCCESS_URL: ${MERCADO_PAGO_SUCCESS_URL:-https://aquellaslunas.com.ar/astro/tienda/pago-exitoso.php}
+      MERCADO_PAGO_PENDING_URL: ${MERCADO_PAGO_PENDING_URL:-https://aquellaslunas.com.ar/astro/tienda/pago-pendiente.php}
+      MERCADO_PAGO_FAILURE_URL: ${MERCADO_PAGO_FAILURE_URL:-https://aquellaslunas.com.ar/astro/tienda/pago-fallido.php}
+      MERCADO_PAGO_NOTIFICATION_URL: ${MERCADO_PAGO_NOTIFICATION_URL:-https://aquellaslunas.com.ar/astro/webhooks/mercado-pago.php}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "18080:80"
+    volumes:
+      - .:/var/www/html
+      - .:/srv/proyectos/astronomia/web

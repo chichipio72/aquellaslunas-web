@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pruebas de cancelación del swipe</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script>
+    window.matchMedia = function (query) {
+      return { matches: query.indexOf('max-width') !== -1 || query.indexOf('pointer: coarse') !== -1 };
+    };
+  </script>
+  <script src="../assets/js/mobile-swipe-navigation.js" defer></script>
+  <script src="mobile-swipe-navigation.test.js" defer></script>
+</head>
+<body data-mobile-swipe-navigation="enabled"
+      data-swipe-section="Prueba"
+      data-swipe-next-url="siguiente.php"
+      data-swipe-previous-url="anterior.php"
+      data-swipe-hint-enabled="false"
+      data-swipe-diagnostics-enabled="true">
+  <main><h1>Pruebas del gesto cancelado</h1><ol id="results"></ol></main>
+</body>
+</html>
