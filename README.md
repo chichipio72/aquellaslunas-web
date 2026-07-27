@@ -216,23 +216,11 @@ El diagnóstico debe permanecer desactivado en producción salvo durante una rev
 
 El panel del swipe requiere simultáneamente `ASTRONOMY_SHOW_TIMINGS=true` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa fuente Touch/Pointer, movimientos, coordenadas, deltas, `touch-action`, exclusiones, resultado y destino. En ese modo un gesto aceptado no navega automáticamente; el botón **Ir al destino detectado** usa la URL exacta conservada. Con cualquiera de las dos opciones en falso el panel no se renderiza y la navegación es inmediata, sin afectar timings, reloj simulado ni aviso inicial.
 
-## Reloj simulado de diagnóstico
+## Reloj simulado local
 
-Cuando el diagnóstico de tiempos está habilitado mediante `ASTRONOMY_SHOW_TIMINGS=true` o `astronomy_show_timings => true`, también se habilitan pruebas temporales mediante un parámetro ISO 8601 con zona explícita, por ejemplo:
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control de desarrollo del encabezado. El helper `includes/current-datetime.php` centraliza el instante mediante `get_current_datetime()` y persiste en sesión una fecha y hora local. La portada, consultas astronómicas, filtros de eventos pasados, fechas predeterminadas y marcadores usan ese valor; **Usar hora real** lo elimina.
 
-```text
-http://localhost:18080/index.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/eventos.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/sol-y-luna.php?debug_now=2026-07-29T18:15:00-03:00
-```
-
-El helper `includes/current-datetime.php` centraliza el instante mediante `get_current_datetime()`. Cuando el valor es válido, la portada, consultas astronómicas, filtros de eventos pasados, fechas predeterminadas y marcador diario usan el instante simulado. Una barra superior permite avanzar o retroceder una hora o un día y volver al reloj real. Los valores inválidos se ignoran.
-
-`astronomyInternalUrl()` propaga el mismo valor por el menú, enlaces internos y URLs anterior/siguiente de swipe, combina parámetros existentes sin duplicar `debug_now` y conserva fragmentos. Las cuatro secciones mantienen la simulación; **Hora real** es la acción que la elimina.
-
-El valor debe incluir `Z` o un offset. En offsets positivos, el signo `+` debe codificarse como `%2B` dentro de una URL, por ejemplo `2026-07-29T18:15:00%2B02:00`.
-
-Cuando el diagnóstico está deshabilitado, `debug_now` se ignora completamente aunque aparezca en la URL y no se muestra la barra de simulación. Como producción mantiene normalmente `astronomy_show_timings => false`, continúa usando siempre el reloj real.
+El valor se interpreta nuevamente en la zona de la ubicación activa, por lo que un cambio de ubicación conserva la fecha y hora local elegidas. Producción debe omitir la opción o configurarla en `false`: en ese estado no se renderiza ni acepta el modo de prueba, incluso si llega `debug_now` o existe una cookie anterior.
 
 ## Compatibilidad con PHP del hosting
 

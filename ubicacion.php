@@ -46,7 +46,7 @@ $pageSeo = aquellasLunasSeoPage('Configurar ubicación | Aquellas Lunas', 'Eleg�
         <div class="container location-container">
             <header class="location-heading">
                 <p class="eyebrow">Ubicación global</p>
-                <h1>Configurá tu cielo local</h1>
+                <h1><?= htmlspecialchars(astronomySiteSectionLabel('location')) ?></h1>
             </header>
             <?php if ($message !== ''): ?><p class="status-info<?= $messageIsError ? ' is-error' : '' ?>" role="status"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
             <form id="location-search-form" class="location-search">

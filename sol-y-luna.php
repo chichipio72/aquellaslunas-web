@@ -213,11 +213,11 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     <?php renderAstronomySiteHeader('sun_moon', $location); ?>
 
     <main class="page">
-        <div class="container">
-            <section class="hero" aria-labelledby="hero-title">
-                <p class="eyebrow">Sol y Luna</p>
-                <h1 id="hero-title">Vista de los próximos días</h1>
-                <p class="hero-subtitle">Consulta los horarios solares y lunares con una vista diaria y una barra de 24 horas para el cielo local.</p>
+        <div class="container public-page-container">
+            <section class="hero atmosphere-card--solar" aria-labelledby="hero-title">
+                <p class="eyebrow">HORARIOS Y FASES</p>
+                <h1 id="hero-title"><?= htmlspecialchars(astronomySiteSectionLabel('sun_moon')) ?></h1>
+                <p class="hero-subtitle">Consultá salidas, puestas, fases y visibilidad día por día.</p>
 
                 <form id="range-form" method="get"></form>
 

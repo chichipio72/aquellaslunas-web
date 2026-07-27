@@ -7,16 +7,16 @@ require_once __DIR__ . '/asset-url.php';
 function astronomySiteSections(): array
 {
     $sections = [
-        'home' => ['id' => 'home', 'label' => 'Inicio', 'url' => 'index.php', 'order' => 10, 'menu_enabled' => true, 'swipe_enabled' => true],
-        'tonight' => ['id' => 'tonight', 'label' => 'Esta noche', 'url' => 'cielo-de-esta-noche.php', 'order' => 15, 'menu_enabled' => true, 'swipe_enabled' => true],
-        'sun_moon' => ['id' => 'sun_moon', 'label' => 'Sol y Luna', 'url' => 'sol-y-luna.php', 'order' => 20, 'menu_enabled' => true, 'swipe_enabled' => true],
-        'planner' => ['id' => 'planner', 'label' => 'Planificador', 'url' => 'planificador.php', 'order' => 30, 'menu_enabled' => true, 'swipe_enabled' => true],
-        'events' => ['id' => 'events', 'label' => 'Eventos', 'url' => 'eventos.php', 'order' => 40, 'menu_enabled' => true, 'swipe_enabled' => true],
-        'eclipses' => ['id' => 'eclipses', 'label' => 'Eclipses', 'url' => 'eclipses.php', 'order' => 42, 'menu_enabled' => true, 'swipe_enabled' => false],
-        'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 45, 'menu_enabled' => false, 'swipe_enabled' => false],
-        // Ocultación temporal mientras la tienda continúa en pruebas; la URL directa se conserva.
-        'gallery' => ['id' => 'gallery', 'label' => 'Galería', 'url' => 'galeria.php', 'order' => 50, 'menu_enabled' => false, 'swipe_enabled' => false],
-        'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 60, 'menu_enabled' => true, 'swipe_enabled' => false],
+        'home' => ['id' => 'home', 'label' => 'Inicio', 'url' => 'index.php', 'order' => 10, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 10],
+        'today' => ['id' => 'today', 'label' => 'El cielo hoy', 'url' => 'cielo-de-hoy.php', 'order' => 15, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 20],
+        'tonight' => ['id' => 'tonight', 'label' => 'El cielo esta noche', 'url' => 'cielo-de-esta-noche.php', 'order' => 18, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 30],
+        'sun_moon' => ['id' => 'sun_moon', 'label' => 'Calendario solar y lunar', 'url' => 'sol-y-luna.php', 'order' => 20, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 40],
+        'events' => ['id' => 'events', 'label' => 'Eventos lunares', 'url' => 'eventos.php', 'order' => 30, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 50],
+        'eclipses' => ['id' => 'eclipses', 'label' => 'Eclipses', 'url' => 'eclipses.php', 'order' => 40, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 60],
+        'planner' => ['id' => 'planner', 'label' => 'Planificador', 'url' => 'planificador.php', 'order' => 50, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 70],
+        'gallery' => ['id' => 'gallery', 'label' => 'Galería', 'url' => 'galeria.php', 'order' => 60, 'menu_enabled' => false, 'swipe_enabled' => false],
+        'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 70, 'menu_enabled' => true, 'swipe_enabled' => false],
+        'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 80, 'menu_enabled' => true, 'swipe_enabled' => false],
     ];
     uasort($sections, static fn(array $first, array $second): int => $first['order'] <=> $second['order']);
     return $sections;
@@ -25,6 +25,12 @@ function astronomySiteSections(): array
 function astronomySiteSection(string $sectionId): ?array
 {
     return astronomySiteSections()[$sectionId] ?? null;
+}
+
+function astronomySiteSectionLabel(string $sectionId): string
+{
+    $section = astronomySiteSection($sectionId);
+    return $section !== null ? (string) $section['label'] : '';
 }
 
 function astronomySiteSectionUrl(string $sectionId): string
@@ -100,6 +106,7 @@ function astronomyMobileSwipeContext(string $currentSectionId): ?array
         astronomySiteSections(),
         static fn(array $section): bool => $section['swipe_enabled'] === true
     ));
+    usort($swipeSections, static fn(array $first, array $second): int => ($first['swipe_order'] ?? $first['order']) <=> ($second['swipe_order'] ?? $second['order']));
     $currentIndex = null;
     foreach ($swipeSections as $index => $section) {
         if ($section['id'] === $currentSectionId) {

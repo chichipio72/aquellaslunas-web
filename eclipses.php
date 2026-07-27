@@ -9,6 +9,7 @@ require_once __DIR__ . '/includes/asset-url.php';
 require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
+require_once __DIR__ . '/includes/astronomy-icon.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -576,11 +577,11 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     <?php renderAstronomySiteHeader('eclipses', $location); ?>
 
     <main class="page eclipses-page">
-        <div class="container eclipses-container">
-            <section class="hero eclipses-hero" aria-labelledby="eclipses-title">
-                <p class="eyebrow">Eclipses</p>
-                <h1 id="eclipses-title">Eclipses para tu cielo local</h1>
-                <p class="hero-subtitle">Buscá eclipses solares y lunares por rango de fechas, tipo y visibilidad desde tu ubicación activa.</p>
+        <div class="container public-page-container eclipses-container">
+            <section class="hero eclipses-hero atmosphere-card--night" aria-labelledby="eclipses-title">
+                <p class="eyebrow">SOL Y LUNA JUNTOS</p>
+                <h1 id="eclipses-title"><?= htmlspecialchars(astronomySiteSectionLabel('eclipses')) ?></h1>
+                <p class="hero-subtitle">Consultá fechas, tipos y visibilidad desde tu ubicación.</p>
 
                 <form id="eclipses-query-form" class="eclipses-controls" method="get">
                     <?php renderAstronomyDebugClockInput(); ?>
@@ -646,6 +647,7 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                             <li class="eclipse-item<?= $isVisible ? '' : ' eclipse-item--not-visible' ?>">
                                 <button type="button" class="eclipse-item-trigger" data-eclipse-modal-open data-template-id="<?= htmlspecialchars($templateId) ?>" aria-label="Abrir detalle de <?= htmlspecialchars($typeLabel) ?> del <?= htmlspecialchars($dateLabel) ?>">
                                     <div class="eclipse-item-head">
+                                        <?php renderAstronomyIcon(['type' => 'eclipse', 'subtype' => (string) ($event['subtype'] ?? '')], $latitude, 'eclipse-item-icon'); ?>
                                         <h3><?= htmlspecialchars($typeLabel) ?></h3>
                                         <span class="eclipse-time" aria-label="Hora local del máximo"><?= htmlspecialchars($timeLabel) ?></span>
                                     </div>

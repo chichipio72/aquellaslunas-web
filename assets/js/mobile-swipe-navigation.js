@@ -12,7 +12,10 @@
   const diagnosticsEnabled = body.dataset.swipeDiagnosticsEnabled === 'true';
   const exclusionRules = [
     'a', 'button', 'input', 'select', 'textarea', '[contenteditable]',
-    'iframe', '[data-swipe-navigation-ignore]'
+    'iframe', '[data-swipe-navigation-ignore]', 'dialog', '[role="dialog"]',
+    '[role="tablist"]', '[role="tabpanel"]', '.leaflet-container', '.location-map',
+    '[data-altitude-profile]', '.home-altitude-profile', '.modal', '.carousel',
+    '.table-scroll', 'table', 'input[type="range"]'
   ];
   const hintStorageKey = 'aquellas-lunas-mobile-swipe-hint-seen-v1';
   let pointerGesture = null;
@@ -136,12 +139,6 @@
     return null;
   }
 
-  function containerCanConsumeGesture(container, horizontalDelta) {
-    return horizontalDelta < 0
-      ? container.scrollLeft < container.scrollWidth - container.clientWidth - 1
-      : container.scrollLeft > 1;
-  }
-
   function removeHint() {
     if (hint) hint.remove();
     hint = null;
@@ -191,11 +188,9 @@
       deltaX: Math.round(horizontalDelta), deltaY: Math.round(verticalDelta),
       duration: Math.round(duration) + ' ms', direction: direction
     });
-    if (currentGesture.scrollContainers.some(function (container) {
-      return containerCanConsumeGesture(container, horizontalDelta);
-    })) {
+    if (currentGesture.scrollContainers.length > 0) {
       updateDiagnostics({
-        exclusionRule: 'overflow-x auto/scroll, scrollWidth > clientWidth y desplazamiento disponible hacia ' + direction
+        exclusionRule: 'contenedor con desplazamiento horizontal'
       });
       return reportResult('rechazado', 'contenedor con scroll horizontal', null);
     }
@@ -227,7 +222,7 @@
     const point = eventPoint(event);
     updateDiagnostics({ pointerdown: 'sí', pointerType: event.pointerType, pointerId: event.pointerId, exclusionRule: null });
     reportTouchActions(event.target);
-    if (navigationStarted) return reportResult('rechazado', 'navegación bloqueada', null);
+    if (navigationStarted || body.classList.contains('site-menu-open')) return reportResult('rechazado', 'navegación bloqueada', null);
     if (!mobileViewport.matches) return reportResult('rechazado', 'viewport demasiado ancho', null);
     if (event.pointerType !== 'touch' || !event.isPrimary) return reportResult('rechazado', 'no es touch', null);
     if (point === null) return reportResult('rechazado', 'coordenadas iniciales inválidas', null);
@@ -277,7 +272,7 @@
 
   gestureDetector.addEventListener('touchstart', function (event) {
     if (isDiagnosticsPanelTarget(event.target)) return;
-    if (navigationStarted || touchGesture || !mobileViewport.matches) return;
+    if (navigationStarted || body.classList.contains('site-menu-open') || touchGesture || !mobileViewport.matches) return;
     updateDiagnostics({ exclusionRule: null });
     const exclusionRule = matchingExclusionRule(event.target);
     if (exclusionRule !== null) {

@@ -33,7 +33,7 @@ $pageSeo = aquellasLunasSeoPage('Acerca de Aquellas Lunas', 'La historia y el pr
             <article class="card about-content">
                 <header class="about-heading">
                     <p class="eyebrow">Acerca del sitio</p>
-                    <h1>¿Qué es Aquellas Lunas?</h1>
+                    <h1><?= htmlspecialchars(astronomySiteSectionLabel('about')) ?></h1>
                 </header>
 
                 <p>Aquellas Lunas nació como una cuenta de Instagram dedicada a compartir fotografías de la Luna. Con el tiempo se fue formando una comunidad de personas que disfrutan mirar el cielo y que, además de las imágenes, empezaron a hacer siempre las mismas preguntas.</p>

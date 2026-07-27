@@ -2,35 +2,185 @@
 
 require_once __DIR__ . '/api-client.php';
 
-function astronomyDebugClockValue(): ?string
+const ASTRONOMY_SIMULATED_TIME_SESSION_KEY = 'astronomy_simulated_local_time';
+const ASTRONOMY_SIMULATED_TIME_COOKIE = 'astronomy_simulated_local_time';
+
+function astronomyLocalTimeSimulationEnabled(): bool
 {
-    if (!astronomyTimingsEnabled()) {
+    static $enabled = null;
+    if ($enabled !== null) {
+        return $enabled;
+    }
+    $environmentValue = getenv('LOCAL_TIME_SIMULATION_ENABLED');
+    if (is_string($environmentValue) && trim($environmentValue) !== '') {
+        return $enabled = filter_var($environmentValue, FILTER_VALIDATE_BOOLEAN) === true;
+    }
+    $productionConfig = loadAstronomyProductionConfig();
+    return $enabled = filter_var(
+        $productionConfig['local_time_simulation_enabled'] ?? false,
+        FILTER_VALIDATE_BOOLEAN
+    ) === true;
+}
+
+function astronomyTimeSimulationSession(): bool
+{
+    if (!astronomyLocalTimeSimulationEnabled()) {
+        return false;
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return true;
+    }
+    session_name('aquellas_lunas_local');
+    $configuredSavePath = trim((string) session_save_path());
+    if ($configuredSavePath === '' || !is_dir($configuredSavePath) || !is_writable($configuredSavePath)) {
+        session_save_path(sys_get_temp_dir());
+    }
+    session_set_cookie_params([
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure' => false,
+        'path' => '/',
+    ]);
+    return session_start();
+}
+
+function astronomyValidLocalWallTime(string $date, string $time): ?string
+{
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !preg_match('/^\d{2}:\d{2}$/', $time)) {
         return null;
     }
-    $value = isset($_GET['debug_now']) ? trim((string) $_GET['debug_now']) : '';
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d H:i', $date . ' ' . $time, new DateTimeZone('UTC'));
+    $errors = DateTimeImmutable::getLastErrors();
+    if ($parsed === false || (is_array($errors) && (($errors['warning_count'] ?? 0) > 0 || ($errors['error_count'] ?? 0) > 0))) {
+        return null;
+    }
+    return $parsed->format('Y-m-d H:i') === $date . ' ' . $time ? $date . ' ' . $time : null;
+}
+
+function astronomyTimeSimulationRedirect(): never
+{
+    $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $path = parse_url($requestUri, PHP_URL_PATH);
+    $query = $_GET;
+    unset($query['debug_now']);
+    $target = (is_string($path) && $path !== '' ? $path : '/')
+        . ($query !== [] ? '?' . http_build_query($query) : '');
+    header('Location: ' . $target, true, 303);
+    exit;
+}
+
+function astronomyStoreSimulatedLocalWallTimeCookie(?string $value): void
+{
+    if (!astronomyLocalTimeSimulationEnabled()) {
+        return;
+    }
+    $options = [
+        'expires' => $value === null ? time() - 3600 : time() + 60 * 60 * 24 * 30,
+        'path' => '/',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
+    setcookie(ASTRONOMY_SIMULATED_TIME_COOKIE, $value ?? '', $options);
+    if ($value === null) {
+        unset($_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE]);
+    } else {
+        $_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE] = $value;
+    }
+}
+
+function astronomyBootstrapTimeSimulation(): void
+{
+    if (!astronomyLocalTimeSimulationEnabled()) {
+        return;
+    }
+    $sessionStarted = astronomyTimeSimulationSession();
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        return;
+    }
+    if (($_POST['site_time_reset'] ?? '') === '1') {
+        if ($sessionStarted) {
+            unset($_SESSION[ASTRONOMY_SIMULATED_TIME_SESSION_KEY]);
+            session_write_close();
+        }
+        astronomyStoreSimulatedLocalWallTimeCookie(null);
+        astronomyTimeSimulationRedirect();
+    }
+    if (isset($_POST['site_time_date'], $_POST['site_time_clock'])) {
+        $value = astronomyValidLocalWallTime(trim((string) ($_POST['site_time_date'] ?? '')), trim((string) ($_POST['site_time_clock'] ?? '')));
+        $shiftDays = filter_var($_POST['site_time_shift'] ?? null, FILTER_VALIDATE_INT);
+        if ($value !== null && in_array($shiftDays, [-7, -1, 1, 7], true)) {
+            $value = (new DateTimeImmutable($value, new DateTimeZone('UTC')))
+                ->modify(($shiftDays > 0 ? '+' : '') . $shiftDays . ' days')
+                ->format('Y-m-d H:i');
+        }
+        if ($value !== null) {
+            if ($sessionStarted) {
+                $_SESSION[ASTRONOMY_SIMULATED_TIME_SESSION_KEY] = $value;
+            }
+            astronomyStoreSimulatedLocalWallTimeCookie($value);
+        }
+        if ($sessionStarted) {
+            session_write_close();
+        }
+        astronomyTimeSimulationRedirect();
+    }
+}
+
+astronomyBootstrapTimeSimulation();
+
+function astronomySimulatedLocalWallTime(): ?string
+{
+    if (!astronomyLocalTimeSimulationEnabled()) {
+        return null;
+    }
+    $cookieValue = $_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE] ?? null;
+    if (is_string($cookieValue) && strlen($cookieValue) === 16) {
+        $validCookie = astronomyValidLocalWallTime(substr($cookieValue, 0, 10), substr($cookieValue, 11, 5));
+        if ($validCookie === $cookieValue) {
+            return $cookieValue;
+        }
+    }
+    if (!astronomyTimeSimulationSession()) {
+        return null;
+    }
+    $value = $_SESSION[ASTRONOMY_SIMULATED_TIME_SESSION_KEY] ?? null;
+    return is_string($value) && astronomyValidLocalWallTime(substr($value, 0, 10), substr($value, 11, 5)) === $value
+        ? $value
+        : null;
+}
+
+function astronomyDebugClockValue(): ?string
+{
+    $localValue = astronomySimulatedLocalWallTime();
+    if ($localValue !== null) {
+        return $localValue;
+    }
+    if (!astronomyLocalTimeSimulationEnabled()) {
+        return null;
+    }
+    $value = trim((string) ($_GET['debug_now'] ?? ''));
     if ($value === '' || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/', $value)) {
         return null;
     }
-    $parsed = date_parse($value);
-    if (($parsed['error_count'] ?? 1) !== 0 || ($parsed['warning_count'] ?? 1) !== 0 || ($parsed['is_localtime'] ?? false) !== true) {
-        return null;
-    }
     try {
-        new DateTimeImmutable($value);
-    } catch (Exception $exception) {
+        return (new DateTimeImmutable($value))->format(DateTimeInterface::ATOM);
+    } catch (Exception) {
         return null;
     }
-    return $value;
 }
 
 function get_current_datetime(string $timezoneName): DateTimeImmutable
 {
     $timezone = new DateTimeZone($timezoneName);
-    $debugValue = astronomyDebugClockValue();
-    if ($debugValue === null) {
-        return new DateTimeImmutable('now', $timezone);
+    $localValue = astronomySimulatedLocalWallTime();
+    if ($localValue !== null) {
+        return new DateTimeImmutable($localValue, $timezone);
     }
-    return (new DateTimeImmutable($debugValue))->setTimezone($timezone);
+    $legacyValue = astronomyDebugClockValue();
+    return $legacyValue !== null
+        ? (new DateTimeImmutable($legacyValue))->setTimezone($timezone)
+        : new DateTimeImmutable('now', $timezone);
 }
 
 function astronomyCurrentDateTimeIsSimulated(): bool
@@ -40,11 +190,10 @@ function astronomyCurrentDateTimeIsSimulated(): bool
 
 function astronomyInternalUrl(string $url): string
 {
-    $debugValue = astronomyDebugClockValue();
+    $debugValue = astronomySimulatedLocalWallTime() === null ? astronomyDebugClockValue() : null;
     if ($debugValue === null) {
         return $url;
     }
-
     $parts = parse_url($url);
     if ($parts === false) {
         return $url;
@@ -55,54 +204,21 @@ function astronomyInternalUrl(string $url): string
     }
     $query['debug_now'] = $debugValue;
     $queryString = http_build_query($query);
-    $path = (string) ($parts['path'] ?? '');
-    $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
-    return $path . ($queryString !== '' ? '?' . $queryString : '') . $fragment;
+    return (string) ($parts['path'] ?? '') . ($queryString !== '' ? '?' . $queryString : '')
+        . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
 }
 
 function astronomyDebugClockUrl(?DateTimeImmutable $dateTime): string
 {
-    $requestUri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '/';
-    $path = parse_url($requestUri, PHP_URL_PATH);
-    $path = is_string($path) && $path !== '' ? $path : '/';
-    $query = $_GET;
-    if ($dateTime === null) {
-        unset($query['debug_now']);
-    } else {
-        $query['debug_now'] = $dateTime->format(DateTimeInterface::ATOM);
-    }
-    $queryString = http_build_query($query);
-    return $path . ($queryString !== '' ? '?' . $queryString : '');
+    return astronomyInternalUrl((string) ($_SERVER['REQUEST_URI'] ?? '/'));
 }
 
 function renderAstronomyDebugClock(DateTimeImmutable $currentDateTime): void
 {
-    if (!astronomyCurrentDateTimeIsSimulated()) {
-        return;
-    }
-    $controls = [
-        '−1 día' => $currentDateTime->modify('-1 day'),
-        '−1 hora' => $currentDateTime->modify('-1 hour'),
-        '+1 hora' => $currentDateTime->modify('+1 hour'),
-        '+1 día' => $currentDateTime->modify('+1 day'),
-    ];
-    ?>
-    <aside class="debug-clock" aria-label="Controles del reloj simulado">
-        <div class="container debug-clock__inner">
-            <strong>Modo simulación: <?= htmlspecialchars($currentDateTime->format('d/m/Y H:i')) ?></strong>
-            <nav aria-label="Cambiar hora simulada">
-                <?php foreach ($controls as $label => $target): ?><a href="<?= htmlspecialchars(astronomyDebugClockUrl($target), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label) ?></a><?php endforeach; ?>
-                <a href="<?= htmlspecialchars(astronomyDebugClockUrl(null), ENT_QUOTES, 'UTF-8') ?>">Hora real</a>
-            </nav>
-        </div>
-    </aside>
-    <?php
+    // El control persistente vive en el encabezado compartido.
 }
 
 function renderAstronomyDebugClockInput(): void
 {
-    $value = astronomyDebugClockValue();
-    if ($value !== null) {
-        ?><input type="hidden" name="debug_now" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>"><?php
-    }
+    // La sesión local evita propagar parámetros por formularios.
 }

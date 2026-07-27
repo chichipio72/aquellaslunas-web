@@ -8,6 +8,12 @@
   const CACHE_PREFIX = 'aquellas-lunas-cloud-cover-v4:';
   const memoryCache = new Map();
   const pendingRequests = new Map();
+  const siteNowMs = () => {
+    const configured = globalThis.siteTimeContext?.simulated
+      ? Date.parse(globalThis.siteTimeContext.now || '')
+      : NaN;
+    return Number.isFinite(configured) ? configured : Date.now();
+  };
 
   const locationConfig = (body) => {
     const latitude = Number(body?.dataset?.cloudCoverLatitude);
@@ -103,7 +109,7 @@
       fetchImpl = globalThis.fetch,
       storage = globalThis.sessionStorage,
       timeoutMs = 5000,
-      nowMs = Date.now(),
+      nowMs = siteNowMs(),
     } = {},
   ) => {
     const key = cacheKey(config);
@@ -319,7 +325,7 @@
 
   const loadCloudCover = async ({
     root = document,
-    nowMs = Date.now(),
+    nowMs = siteNowMs(),
     fetchImpl = globalThis.fetch,
     storage = globalThis.sessionStorage,
     timeoutMs = 5000,

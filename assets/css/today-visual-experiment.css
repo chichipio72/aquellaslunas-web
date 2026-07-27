@@ -1,0 +1,149 @@
+.today-visual-experiment .today-light-band--night { fill: #020611; opacity: .86; }
+.today-visual-experiment .today-light-band--astronomical { fill: #0b1428; opacity: .74; }
+.today-visual-experiment .today-light-band--nautical { fill: #182b4b; opacity: .62; }
+.today-visual-experiment .today-light-band--civil { fill: #3b516e; opacity: .48; }
+.today-visual-experiment .today-light-band--day { fill: #71869f; opacity: .42; }
+.today-visual-experiment .today-light-band--blue { fill: #568bc0; opacity: .16; }
+.today-visual-experiment .today-light-band--golden { fill: #d4a25e; opacity: .14; }
+
+.today-visual-experiment .today-light-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .8rem;
+  margin-top: .45rem;
+  color: var(--muted);
+  font-size: .66rem;
+}
+
+.today-visual-experiment .today-light-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+}
+
+.today-visual-experiment .today-light-legend i {
+  width: .65rem;
+  height: .42rem;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: .12rem;
+}
+
+.today-visual-experiment .today-light-legend__day i { background: rgba(113, 134, 159, .72); }
+.today-visual-experiment .today-light-legend__twilight i { background: rgba(59, 81, 110, .76); }
+.today-visual-experiment .today-light-legend__night i { background: rgba(2, 6, 17, .94); }
+.today-visual-experiment .today-light-legend__blue i { background: rgba(86, 139, 192, .52); }
+.today-visual-experiment .today-light-legend__golden i { background: rgba(212, 162, 94, .5); }
+
+.today-visual-experiment .today-period-row {
+  padding-left: .75rem;
+  border-left: 3px solid transparent;
+  border-radius: .25rem;
+}
+
+.today-visual-experiment .today-period-row--blue {
+  border-left-color: #568bc0;
+  background: rgba(86, 139, 192, .07);
+}
+
+.today-visual-experiment .today-period-row--golden {
+  border-left-color: #d4a25e;
+  background: rgba(212, 162, 94, .07);
+}
+
+.today-visual-experiment .today-period-row--astronomical {
+  border-left-color: #0b1428;
+  background: rgba(11, 20, 40, .24);
+}
+
+.today-visual-experiment .today-period-row--nautical {
+  border-left-color: #182b4b;
+  background: rgba(24, 43, 75, .18);
+}
+
+.today-visual-experiment .today-period-row--civil {
+  border-left-color: #3b516e;
+  background: rgba(59, 81, 110, .12);
+}
+
+.today-visual-experiment .today-venus-help {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.today-visual-experiment .today-venus-opportunity,
+.today-visual-experiment .today-event-editorial {
+  color: var(--muted);
+  font-size: .84rem;
+  line-height: 1.5;
+}
+
+.today-visual-experiment .today-venus-opportunity {
+  margin-top: .9rem;
+  padding-left: .75rem;
+  border-left: 2px solid #d4a25e;
+}
+
+.today-visual-experiment .today-cloud-hours {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: .55rem;
+  overflow: visible;
+  padding: .35rem 0 .8rem;
+}
+
+.today-visual-experiment .today-cloud-hours > span {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 2.8rem auto;
+  place-items: center;
+  gap: .25rem;
+  padding: .55rem .3rem;
+}
+
+.today-visual-experiment .today-cloud-hours img {
+  width: min(100%, 3.6rem);
+  height: 2.8rem;
+  display: block;
+  object-fit: contain;
+}
+
+.today-visual-experiment .today-cloud-hours strong,
+.today-visual-experiment .today-cloud-hours small {
+  line-height: 1.2;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .today-visual-experiment .today-cloud-hours {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .today-visual-experiment .today-light-legend {
+    gap: .3rem .55rem;
+    font-size: .6rem;
+  }
+
+  .today-visual-experiment .today-period-row {
+    padding-left: .6rem;
+  }
+
+  .today-visual-experiment .today-cloud-hours {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+  }
+
+  .today-visual-experiment .today-cloud-hours > span {
+    grid-template-rows: auto 2.5rem auto;
+    padding: .5rem;
+  }
+
+  .today-visual-experiment .today-cloud-hours img {
+    width: 3.2rem;
+    height: 2.5rem;
+  }
+}

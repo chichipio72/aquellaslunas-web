@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" role="img" aria-label="Cielo mayormente nublado">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#384d70"/><stop offset="1" stop-color="#1a2639"/></linearGradient></defs>
+  <rect width="64" height="48" rx="10" fill="url(#sky)"/>
+  <path d="M9 27c0-4 3-7 7-7 2-6 6-9 12-9 6 0 10 3 12 8 7 0 11 4 11 9 0 5-4 8-10 8H17c-5 0-8-4-8-9z" fill="#879bb8"/>
+  <path d="M18 34c-3 0-5-2-5-5 0-2 2-4 4-4 1-4 5-6 9-6 4 0 7 2 8 6 4 0 7 2 7 5 0 2-2 4-6 4z" fill="#bdc8d8" opacity=".78"/>
+  <path d="M9 39h46" stroke="#94a5bf" stroke-opacity=".26"/>
+</svg>

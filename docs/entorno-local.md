@@ -35,6 +35,8 @@ La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-prof
 
 `MOBILE_SWIPE_NAVIGATION_ENABLED` habilita el recorrido táctil móvil entre Inicio, Esta noche, Sol y Luna, Planificador y Eventos. `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` controla por separado el aviso inicial guardado en `localStorage`. Ambas usan `true` de forma predeterminada. `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED` controla únicamente el panel visual y usa `false`: incluso en modo timings, el swipe navega automáticamente mientras esa opción siga apagada.
 
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita exclusivamente en la instalación local el control «Modo de prueba» del encabezado. La fecha y hora se guardan en una sesión PHP y se interpretan como hora local de la ubicación activa; al cambiar de zona horaria se conserva la hora de pared elegida. Con la opción ausente o en `false`, el servidor no inicia esta sesión, no renderiza el control e ignora `debug_now`.
+
 La referencia completa de prioridad, claves externas y validación está en [configuracion.md](configuracion.md). La arquitectura funcional está en [arquitectura.md](arquitectura.md).
 
 ## Analytics local
@@ -242,16 +244,7 @@ Los nombres de portada son `moon instant`, `daily`, `home phases` y `home upcomi
 
 ### Reloj simulado
 
-La misma condición normalizada que habilita timings habilita `debug_now`; no existe una segunda bandera. Ejemplos:
-
-```text
-http://localhost:18080/index.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/eventos.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/sol-y-luna.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/acerca-del-sitio.php?debug_now=2026-07-29T18:15:00-03:00
-```
-
-Sólo se aceptan datetimes ISO 8601 válidos y conscientes de zona (`Z` u offset). La barra superior permite ±1 hora, ±1 día y volver a la hora real. `get_current_datetime()` aplica la simulación a consultas, fechas predeterminadas, descarte de eventos pasados y marcadores; cookies, timeouts y mediciones siguen usando tiempo real. `astronomyInternalUrl()` lo conserva en menú, enlaces internos y swipe, combinándolo con otros parámetros y fragmentos. En los perfiles no se crea el temporizador por minuto. Con timings deshabilitados el parámetro se ignora y la barra no se renderiza.
+`LOCAL_TIME_SIMULATION_ENABLED=true` muestra en el encabezado los campos de fecha y hora, **Aplicar** y, cuando corresponde, **Usar hora real**. `get_current_datetime()` aplica el valor guardado en sesión a consultas, fechas predeterminadas, descarte de eventos pasados y marcadores; cookies, timeouts y mediciones siguen usando tiempo real. En los perfiles simulados no se crea el temporizador por minuto.
 
 ## Presentación de eventos
 
@@ -499,6 +492,6 @@ return [
 
 CSS, JavaScript y miniaturas lunares locales usan `includes/asset-url.php` para agregar una versión basada en `filemtime()`. No se deshabilita la caché de estáticos: al modificar un archivo cambia su URL y el navegador solicita la versión nueva.
 
-Producción no usa `.env` ni Docker. Mantiene normalmente `astronomy_show_timings => false`; por eso no muestra diagnósticos, ignora `debug_now` y usa siempre la hora real. Habilitar timings en producción habilita también el reloj simulado y debe reservarse para una comprobación controlada.
+Producción no usa `.env` ni Docker y mantiene `local_time_simulation_enabled => false` —o simplemente omite la clave—. Por eso no inicia la sesión local, no renderiza el control, ignora `debug_now` y usa siempre la hora real, independientemente de la configuración de métricas.
 
 Analytics no distingue entornos y también se carga en producción con el mismo ID. En el hosting, las páginas viven bajo `/astro/`; assets y endpoints del mismo origen deben resolver bajo ese prefijo.

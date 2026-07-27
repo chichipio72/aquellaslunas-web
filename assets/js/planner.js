@@ -173,11 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
   form.elements.time.addEventListener('input', updateDirty);
 
   const zonedNow = () => {
+    const effectiveNow = globalThis.siteTimeContext?.simulated
+      ? new Date(globalThis.siteTimeContext.now)
+      : new Date();
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
       timeZone: timezone,
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).formatToParts(new Date()).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+    }).formatToParts(effectiveNow).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
     return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
   };
   featuredDate?.addEventListener('change', () => {

@@ -42,10 +42,11 @@ $base = [
 
 $duringNight = new DateTimeImmutable('2026-07-25T19:30:00-03:00');
 $summary = astronomyTonightSummaryPresentation($base, $duringNight, $timezone);
-tonightAssert($summary['title'] === 'Esta noche se verán 3 planetas', 'Falló el plural con varios planetas.');
+tonightAssert($summary['title'] === 'Esta noche se verán 2 planetas', 'Falló el plural con varios planetas.');
 tonightAssert(str_contains($summary['text'], 'Venus está visible ahora hacia el oeste, hasta las 20:50.'), 'Falló visible_now.');
 tonightAssert(str_contains($summary['text'], 'Saturno aparecerá desde las 00:35.'), 'Falló visible_later después de medianoche.');
-tonightAssert(str_contains($summary['text'], 'Mercurio fue visible hasta las 19:10.'), 'Se perdió visible_earlier útil.');
+tonightAssert(!str_contains($summary['text'], 'Mercurio'), 'Se mostró un planeta cuya ventana ya terminó.');
+tonightAssert(!str_contains($summary['text'], 'fue visible'), 'Se generó una frase histórica.');
 tonightAssert(!str_contains($summary['text'], 'Marte'), 'Se mostró not_visible_tonight.');
 
 $beforeNight = astronomyTonightSummaryPresentation(
@@ -173,6 +174,33 @@ tonightAssert(array_keys($fullSections) === ['Estrellas'], 'No se ocultaron las 
 tonightAssert(
     array_column($fullSections['Estrellas'], 'name') === ['Sirio', 'Vega'],
     'Se alteró el orden recibido o se mostró una estrella no observable.'
+);
+
+$temporalData = [
+    'night' => [
+        'start' => '2026-07-25T18:35:00-03:00',
+        'end' => '2026-07-26T07:25:00-03:00',
+    ],
+    'planets' => [
+        ['id' => 'ended', 'name' => 'Terminó', 'visibility_start' => '2026-07-25T18:40:00-03:00', 'visibility_end' => '2026-07-25T19:00:00-03:00'],
+        ['id' => 'current', 'name' => 'Actual', 'visibility_start' => '2026-07-25T19:00:00-03:00', 'visibility_end' => '2026-07-26T02:00:00-03:00'],
+        ['id' => 'later', 'name' => 'Posterior', 'visibility_start' => '2026-07-26T03:00:00-03:00', 'visibility_end' => '2026-07-26T07:25:00-03:00'],
+    ],
+];
+$prepared = astronomyTonightPreparedSections(
+    $temporalData,
+    new DateTimeImmutable('2026-07-25T23:00:00-03:00'),
+    $timezone
+);
+tonightAssert(
+    array_column($prepared['planets'], 'id') === ['current', 'later'],
+    'No se filtró una ventana terminada o se alteró el próximo orden útil.'
+);
+tonightAssert($prepared['planets'][0]['_effective_status'] === 'visible_now', 'No se recalculó visible_now.');
+tonightAssert($prepared['planets'][1]['_effective_status'] === 'visible_later', 'No se recalculó visible_later.');
+tonightAssert(
+    !str_contains(astronomyTonightNaturalSentence($prepared['planets'][0], $temporalData, new DateTimeImmutable('2026-07-25T23:00:00-03:00'), $timezone), 'Fue'),
+    'La redacción local volvió a producir pasado.'
 );
 
 echo "Presentación de esta noche: escenarios completos e incompletos OK\n";

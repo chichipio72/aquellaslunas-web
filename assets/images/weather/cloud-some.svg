@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" role="img" aria-label="Cielo con algunas nubes">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#345582"/><stop offset="1" stop-color="#18283f"/></linearGradient></defs>
+  <rect width="64" height="48" rx="10" fill="url(#sky)"/>
+  <circle cx="43" cy="17" r="7" fill="#dfb967"/>
+  <path d="M15 34c-4 0-6-2-6-5s2-5 5-5c1-5 5-8 10-8 5 0 9 3 10 7 5 0 8 2 8 6 0 3-3 5-7 5z" fill="#aebed5"/>
+  <path d="M9 38h46" stroke="#8da4c9" stroke-opacity=".3"/>
+</svg>

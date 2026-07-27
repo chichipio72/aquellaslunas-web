@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" role="img" aria-label="Cielo cubierto">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#39465c"/><stop offset="1" stop-color="#1c2533"/></linearGradient></defs>
+  <rect width="64" height="48" rx="10" fill="url(#sky)"/>
+  <path d="M5 22c0-4 3-7 8-7 2-5 6-8 12-8 6 0 10 3 12 8 7 0 12 4 12 9 0 4-4 7-10 7H14c-6 0-9-4-9-9z" fill="#75869f"/>
+  <path d="M12 34c0-4 3-7 7-7 2-4 6-6 10-6 5 0 8 2 10 6 6 0 10 3 10 7 0 4-4 6-9 6H20c-5 0-8-2-8-6z" fill="#a4b0c2"/>
+  <path d="M9 42h46" stroke="#aeb8c7" stroke-opacity=".22"/>
+</svg>

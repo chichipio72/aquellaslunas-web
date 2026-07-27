@@ -54,18 +54,14 @@ $pageSeo = aquellasLunasSeoPage(
     <?php renderAstronomyDebugClock($now); ?>
     <?php renderAstronomySiteHeader('planner', $location); ?>
     <main class="page planner-page">
-        <div class="container planner-container">
-            <header class="planner-heading">
-                <p class="eyebrow">Planificador</p>
-                <h1>Direcciones del Sol y la Luna</h1>
+        <div class="container public-page-container planner-container">
+            <header class="hero planner-heading atmosphere-card--mixed">
+                <p class="eyebrow">PLANIFICACIÓN FOTOGRÁFICA</p>
+                <h1><?= htmlspecialchars(astronomySiteSectionLabel('planner')) ?></h1>
+                <p class="hero-subtitle">Prepará tus fotos con las direcciones del Sol y la Luna para el lugar y momento elegidos.</p>
             </header>
             <section class="card planner-controls" aria-labelledby="planner-controls-title">
-                <h2 id="planner-controls-title" class="visually-hidden">Fecha, hora y ubicación</h2>
-                <div class="planner-location">
-                    <span>Ubicación</span>
-                    <strong><?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?></strong>
-                    <a href="<?= htmlspecialchars(astronomyInternalUrl('ubicacion.php'), ENT_QUOTES, 'UTF-8') ?>">Cambiar ubicación</a>
-                </div>
+                <h2 id="planner-controls-title" class="visually-hidden">Fecha y hora</h2>
                 <form id="planner-form"
                     data-latitude="<?= htmlspecialchars((string) $location['latitude'], ENT_QUOTES, 'UTF-8') ?>"
                     data-longitude="<?= htmlspecialchars((string) $location['longitude'], ENT_QUOTES, 'UTF-8') ?>"

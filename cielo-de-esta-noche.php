@@ -17,7 +17,7 @@ sendDynamicNoCacheHeaders();
 $location = astronomyLocationContext();
 $timezoneName = $location['timezone'];
 $now = get_current_datetime($timezoneName);
-$date = $now->format('Y-m-d');
+$date = ((int) $now->format('H') < 12 ? $now->modify('-1 day') : $now)->format('Y-m-d');
 $tonightData = null;
 $apiErrorMessage = null;
 
@@ -34,15 +34,37 @@ try {
     );
     if ($tonightData === null) {
         $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';
+    } else {
+        $nightEnd = astronomyTonightDateTime($tonightData['night']['end'] ?? null, $timezoneName);
+        $nightStart = astronomyTonightDateTime($tonightData['night']['start'] ?? null, $timezoneName);
+        if (($nightEnd !== null && $nightEnd < $now) || ($nightStart !== null && $date < $now->format('Y-m-d') && $nightStart > $now)) {
+            $date = $now->format('Y-m-d');
+            $tonightData = astronomyTonightRequest(
+                $apiConfig['base_url'],
+                $location,
+                $date,
+                'full',
+                'tonight full next',
+                12
+            );
+        }
     }
 } catch (RuntimeException $exception) {
     $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';
     error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
 }
 
-$sections = $tonightData !== null ? astronomyTonightSections($tonightData) : [];
+$sections = $tonightData !== null ? astronomyTonightPreparedSections($tonightData, $now, $timezoneName) : [];
+$highlights = astronomyTonightHighlights($sections);
+$featuredStars = $sections['stars'] ?? [];
+usort($featuredStars, static fn(array $a, array $b): int => ((float) ($a['magnitude'] ?? 99)) <=> ((float) ($b['magnitude'] ?? 99)));
+$featuredStars = array_slice($featuredStars, 0, 3);
+$featuredStarIds = array_column($featuredStars, 'id');
+$remainingStars = array_values(array_filter($sections['stars'] ?? [], static fn(array $star): bool => !in_array($star['id'] ?? null, $featuredStarIds, true)));
+$nightStartLabel = $tonightData !== null ? astronomyTonightTime($tonightData['night']['start'] ?? null, $timezoneName) : null;
+$nightEndLabel = $tonightData !== null ? astronomyTonightTime($tonightData['night']['end'] ?? null, $timezoneName) : null;
 $pageSeo = aquellasLunasSeoPage(
-    'El cielo de esta noche | Aquellas Lunas',
+    'El cielo esta noche | Aquellas Lunas',
     'Planetas, Luna, estrellas y otros objetos visibles esta noche desde tu ubicación.',
     '/cielo-de-esta-noche.php',
     'article'
@@ -69,16 +91,14 @@ $pageSeo = aquellasLunasSeoPage(
     <?php renderAstronomySiteHeader('tonight', $location); ?>
 
     <main class="page tonight-page">
-        <div class="container tonight-container">
-            <header class="hero tonight-hero">
-                <p class="eyebrow">Esta noche</p>
-                <h1>El cielo desde tu ubicación</h1>
-                <?php if ($tonightData !== null): ?>
-                    <p class="tonight-window"><?= htmlspecialchars(astronomyTonightWindowLabel($tonightData, $timezoneName)) ?></p>
-                    <p class="tonight-state"><?= htmlspecialchars(astronomyTonightTemporalState($tonightData, $now, $timezoneName)) ?></p>
-                    <p class="tonight-location">Horarios para <?= htmlspecialchars($location['name']) ?> · <?= htmlspecialchars($timezoneName) ?></p>
+        <div class="container public-page-container tonight-container">
+            <header class="hero tonight-hero atmosphere-card--night">
+                <p class="eyebrow">OBSERVACIÓN NOCTURNA</p>
+                <h1><?= htmlspecialchars(astronomySiteSectionLabel('tonight')) ?></h1>
+                <?php if ($nightStartLabel !== null && $nightEndLabel !== null): ?>
+                    <p class="hero-subtitle">Planetas y estrellas que podrás ver desde tu ubicación de <?= htmlspecialchars($nightStartLabel) ?> a <?= htmlspecialchars($nightEndLabel) ?>.</p>
                 <?php else: ?>
-                    <p class="hero-subtitle">Planetas, Luna, estrellas y otros objetos para la noche local seleccionada.</p>
+                    <p class="hero-subtitle">Planetas y estrellas que podrás ver desde tu ubicación durante la noche seleccionada.</p>
                 <?php endif; ?>
             </header>
 
@@ -108,29 +128,52 @@ $pageSeo = aquellasLunasSeoPage(
                     <p class="tonight-empty" role="status">No hay objetos observables para mostrar durante esta noche.</p>
                 <?php else: ?>
                     <div class="tonight-sections">
-                        <?php foreach ($sections as $sectionTitle => $objects): ?>
-                        <?php $sectionId = 'tonight-' . substr(md5($sectionTitle), 0, 10); ?>
-                        <section class="tonight-section" aria-labelledby="<?= $sectionId ?>">
-                            <h2 id="<?= $sectionId ?>"><?= htmlspecialchars($sectionTitle) ?></h2>
-                            <div class="tonight-object-list">
-                                <?php foreach ($objects as $object): ?>
-                                    <?php
-                                    $visibilityText = astronomyTonightObjectSentence($object, $timezoneName);
-                                    $moonProximity = astronomyTonightMoonProximity($object);
-                                    $constellationName = astronomyTonightConstellationName($object);
-                                    ?>
-                                    <article class="tonight-object">
-                                        <h3>
-                                            <span><?= htmlspecialchars((string) $object['name']) ?></span>
-                                            <?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?>
-                                        </h3>
-                                        <?php if ($visibilityText !== ''): ?><p class="tonight-object__visibility"><?= htmlspecialchars($visibilityText) ?></p><?php endif; ?>
-                                        <?php if ($moonProximity !== null): ?><p class="tonight-object__moon"><?= htmlspecialchars($moonProximity) ?></p><?php endif; ?>
-                                    </article>
-                                <?php endforeach; ?>
-                            </div>
-                        </section>
-                        <?php endforeach; ?>
+                        <?php if ($highlights !== []): ?><section class="tonight-section tonight-highlights" aria-labelledby="tonight-highlights-title">
+                            <h2 id="tonight-highlights-title">Lo mejor para mirar esta noche</h2>
+                            <div class="tonight-object-list tonight-object-list--highlights"><?php foreach ($highlights as $object): $constellationName = astronomyTonightConstellationName($object); ?>
+                                <article class="tonight-object tonight-object--highlight">
+                                    <span class="tonight-moment tonight-moment--<?= htmlspecialchars($object['_moment']) ?>"><?= htmlspecialchars(astronomyTonightMomentLabel($object)) ?></span>
+                                    <h3><span><?= htmlspecialchars((string) $object['name']) ?></span><?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?></h3>
+                                    <p><?= htmlspecialchars(astronomyTonightNaturalSentence($object, $tonightData, $now, $timezoneName)) ?></p>
+                                </article>
+                            <?php endforeach; ?></div>
+                        </section><?php endif; ?>
+
+                        <?php if (($sections['planets'] ?? []) !== []): ?><section class="tonight-section tonight-planets" aria-labelledby="tonight-planets-title">
+                            <h2 id="tonight-planets-title">Planetas</h2>
+                            <div class="tonight-object-list"><?php foreach ($sections['planets'] as $object): $constellationName = astronomyTonightConstellationName($object); ?>
+                                <article class="tonight-object tonight-object--planet">
+                                    <span class="tonight-moment tonight-moment--<?= htmlspecialchars($object['_moment']) ?>"><?= htmlspecialchars(astronomyTonightMomentLabel($object)) ?></span>
+                                    <h3><span><?= htmlspecialchars((string) $object['name']) ?></span><?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?></h3>
+                                    <p><?= htmlspecialchars(astronomyTonightNaturalSentence($object, $tonightData, $now, $timezoneName)) ?></p>
+                                </article>
+                            <?php endforeach; ?></div>
+                        </section><?php endif; ?>
+
+                        <?php if ($featuredStars !== []): ?><section class="tonight-section" aria-labelledby="tonight-stars-featured-title">
+                            <h2 id="tonight-stars-featured-title">Estrellas destacadas</h2>
+                            <div class="tonight-object-list tonight-object-list--stars"><?php foreach ($featuredStars as $object): $constellationName = astronomyTonightConstellationName($object); ?>
+                                <article class="tonight-object">
+                                    <span class="tonight-moment tonight-moment--<?= htmlspecialchars($object['_moment']) ?>"><?= htmlspecialchars(astronomyTonightMomentLabel($object)) ?></span>
+                                    <h3><span><?= htmlspecialchars((string) $object['name']) ?></span><?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?></h3>
+                                    <p><?= htmlspecialchars(astronomyTonightNaturalSentence($object, $tonightData, $now, $timezoneName)) ?></p>
+                                </article>
+                            <?php endforeach; ?></div>
+                        </section><?php endif; ?>
+
+                        <?php if ($remainingStars !== []): ?><details class="tonight-more-stars">
+                            <summary>Resto de las estrellas visibles <span><?= count($remainingStars) ?></span></summary>
+                            <div class="tonight-compact-list"><?php foreach ($remainingStars as $object): $constellationName = astronomyTonightConstellationName($object); ?>
+                                <article><h3><span><?= htmlspecialchars((string) $object['name']) ?></span><?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?></h3><p><?= htmlspecialchars(astronomyTonightNaturalSentence($object, $tonightData, $now, $timezoneName)) ?></p></article>
+                            <?php endforeach; ?></div>
+                        </details><?php endif; ?>
+
+                        <?php $otherObjects = array_merge($sections['moon'] ?? [], $sections['deep_sky'] ?? []); if ($otherObjects !== []): ?><section class="tonight-section" aria-labelledby="tonight-other-title">
+                            <h2 id="tonight-other-title">Otros objetos</h2>
+                            <div class="tonight-compact-list"><?php foreach ($otherObjects as $object): $constellationName = astronomyTonightConstellationName($object); ?>
+                                <article><h3><span><?= htmlspecialchars((string) $object['name']) ?></span><?php if ($constellationName !== null): ?><span class="tonight-object__constellation">(<?= htmlspecialchars($constellationName) ?>)</span><?php endif; ?></h3><p><?= htmlspecialchars(astronomyTonightNaturalSentence($object, $tonightData, $now, $timezoneName)) ?></p></article>
+                            <?php endforeach; ?></div>
+                        </section><?php endif; ?>
                     </div>
                 <?php endif; ?>
             <?php endif; ?>

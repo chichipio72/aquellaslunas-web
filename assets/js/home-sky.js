@@ -106,7 +106,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     render(series) {
-      const width = this.target === 'moon' ? 520 : 320;
+      const requestedWidth = Number(this.container.dataset.profileWidth);
+      const width = Number.isFinite(requestedWidth) && requestedWidth >= 320 && requestedWidth <= 800
+        ? requestedWidth
+        : (this.target === 'moon' ? 520 : 320);
       const plot = { left: 8, right: width - 8, top: 8, bottom: 116 };
       const altitudes = series.flatMap((item) => item.points.map((point) => point.altitude));
       const minimum = Math.max(-90, Math.min(-10, Math.floor(Math.min(...altitudes) / 10) * 10 - 5));
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
       this.container.setAttribute('aria-busy', 'false');
       this.status.textContent = '';
       this.updateMarker();
-      if (!this.container.dataset.debugNow) {
+      if (!this.container.dataset.debugNow && !globalThis.siteTimeContext?.simulated) {
         this.timer = window.setInterval(() => this.updateMarker(), 60000);
       }
     }
@@ -179,7 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const labels = ROLE_LABELS[this.target];
       const slotWidth = width / series.length;
       series.forEach((item, index) => {
-        const start = this.target === 'moon' ? 18 + index * slotWidth : 18 + index * 100;
+        const start = this.target === 'moon' || this.container.dataset.profileWidth
+          ? 18 + index * slotWidth
+          : 18 + index * 100;
         svg.append(svgElement('line', {
           class: `altitude-profile-legend-line altitude-profile-line--${item.role}`,
           x1: start, x2: start + 18, y1: 151, y2: 151,
@@ -193,7 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateMarker() {
       if (!this.marker || !this.todayPoints || !this.scales) return;
       try {
-        const simulated = this.container.dataset.debugNow;
+        const simulated = this.container.dataset.debugNow
+          || (globalThis.siteTimeContext?.simulated ? globalThis.siteTimeContext.now : '');
         const instant = simulated ? new Date(simulated) : new Date();
         const parts = clockParts(instant, this.container.dataset.timezone);
         const localDate = `${parts.year}-${parts.month}-${parts.day}`;

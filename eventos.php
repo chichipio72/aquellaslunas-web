@@ -11,6 +11,7 @@ require_once __DIR__ . '/includes/asset-url.php';
 require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
+require_once __DIR__ . '/includes/astronomy-icon.php';
 sendDynamicNoCacheHeaders();
 
 $availableTypes = ['moon_phase', 'apsis', 'conjunction', 'earthshine', 'libration', 'eclipse'];
@@ -31,32 +32,6 @@ function eventsGroupDate(?DateTimeImmutable $date): string
         return 'Fecha no disponible';
     }
     return $date->format('d/m/Y');
-}
-
-function eventsTypeMetadata(array $event): array
-{
-    $type = is_string($event['type'] ?? null) ? $event['type'] : 'unknown';
-    $subtype = is_string($event['subtype'] ?? null) ? $event['subtype'] : '';
-    return match ($type) {
-        'moon_phase' => ['☾', 'Fase lunar'],
-        'apsis' => ['↕', 'Ápside lunar'],
-        'conjunction' => ['⋯', 'Conjunción'],
-        'earthshine' => ['◐', 'Luz cenicienta'],
-        'eclipse' => match ($subtype) {
-            'solar_eclipse' => ['☀', 'Eclipse solar'],
-            'lunar_eclipse' => ['🌙', 'Eclipse lunar'],
-            default => ['◑', 'Eclipse'],
-        },
-        'libration' => match ($subtype) {
-            'libration_east' => ['◯→', 'Libración favorable hacia el este'],
-            'libration_west' => ['←◯', 'Libración favorable hacia el oeste'],
-            'libration_north' => ['↑◯', 'Libración favorable hacia el norte'],
-            'libration_south' => ['↓◯', 'Libración favorable hacia el sur'],
-            default => ['◯↔', 'Libración lunar'],
-        },
-        'full_moon_observation' => ['☾', 'Observación de Luna llena'],
-        default => ['·', 'Evento lunar'],
-    };
 }
 
 $location = astronomyLocationContext();
@@ -104,13 +79,13 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
         $response = $requestResult['body'];
         $httpCode = $requestResult['http_code'];
         if ($response === false || $httpCode !== 200) {
-            $apiErrorMessage = 'No se pudieron cargar las efemérides en este momento.';
+            $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
             error_log('Aquellas Lunas API events request failed with HTTP status ' . $httpCode . '.');
             astronomyApiRecordValidation('events', null, false);
         } else {
             $decoded = json_decode($response, true);
             if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded) || !is_array($decoded['items'] ?? null)) {
-                $apiErrorMessage = 'No se pudieron cargar las efemérides en este momento.';
+                $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
                 error_log('Aquellas Lunas API events invalid response: ' . json_last_error_msg());
                 astronomyApiRecordValidation('events', false, false);
             } else {
@@ -122,12 +97,12 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
                 });
                 astronomyApiRecordValidation('events', true, true);
                 if ($items === []) {
-                    $emptyMessage = 'No se encontraron efemérides para este período y estos filtros.';
+                    $emptyMessage = 'No se encontraron eventos lunares para este período y estos filtros.';
                 }
             }
         }
     } catch (RuntimeException $exception) {
-        $apiErrorMessage = 'No se pudieron cargar las efemérides en este momento.';
+        $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
         error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
     }
 }
@@ -142,7 +117,7 @@ foreach ($items as $event) {
     $key = $date?->format('Y-m-d') ?? 'unknown';
     $groups[$key][] = $event;
 }
-$pageSeo = aquellasLunasSeoPage('Eventos lunares | Aquellas Lunas', 'Efemérides lunares por fecha, ubicación y tipo de evento.', '/eventos.php', 'article');
+$pageSeo = aquellasLunasSeoPage('Eventos lunares | Aquellas Lunas', 'Eventos lunares por fecha, ubicación y tipo.', '/eventos.php', 'article');
 if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));
@@ -170,11 +145,11 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     <?php renderAstronomySiteHeader('events', $location); ?>
 
     <main class="page events-page">
-        <div class="container events-container">
-            <section class="hero events-hero" aria-labelledby="events-title">
-                <p class="eyebrow">Eventos</p>
-                <h1 id="events-title">Efemérides lunares</h1>
-                <p class="hero-subtitle">Fases, eclipses, distancias, conjunciones, libraciones destacadas y ventanas de luz cenicienta para tu cielo local.</p>
+        <div class="container public-page-container events-container">
+            <section class="hero events-hero atmosphere-card--night" aria-labelledby="events-title">
+                <p class="eyebrow">LA LUNA COMO PROTAGONISTA</p>
+                <h1 id="events-title"><?= htmlspecialchars(astronomySiteSectionLabel('events')) ?></h1>
+                <p class="hero-subtitle">Fases, conjunciones, libraciones y otros momentos destacados.</p>
 
                 <form id="events-query-form" class="events-controls" method="get">
                     <?php renderAstronomyDebugClockInput(); ?>
@@ -190,7 +165,7 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                     <button class="button button-primary events-submit" type="submit">Consultar</button>
                 </form>
 
-                <p id="events-loading" class="events-status" role="status" aria-live="polite" hidden>Cargando efemérides…</p>
+                <p id="events-loading" class="events-status" role="status" aria-live="polite" hidden>Cargando eventos lunares…</p>
                 <?php if ($locationMessage !== ''): ?><p class="card-note status-info" role="status"><?= htmlspecialchars($locationMessage) ?></p><?php endif; ?>
                 <?php if ($apiErrorMessage !== null): ?><div class="api-error-notice" data-api-error role="alert"><p><?= htmlspecialchars($apiErrorMessage) ?> Reintentá en unos segundos.</p><button type="button" class="button compact-secondary-button" data-api-retry>Reintentar</button></div><?php endif; ?>
             </section>
@@ -206,7 +181,8 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                             <?php foreach ($events as $eventIndex => $event): ?>
                                 <?php
                                 $eventType = is_string($event['type'] ?? null) ? $event['type'] : 'unknown';
-                                [$symbol, $accessibleType] = eventsTypeMetadata($event);
+                                $iconKey = astronomyIconKey($event);
+                                $accessibleType = astronomyIconLabel($iconKey);
                                 $presentation = astronomyEventPresentation($event, $timezoneName);
                                 $publicDetails = is_array($presentation['public_details'] ?? null) ? $presentation['public_details'] : [];
                                 $contactPoints = is_array($presentation['contact_points'] ?? null) ? $presentation['contact_points'] : [];
@@ -215,12 +191,12 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                                 $popoverId = 'event-technical-' . substr(md5($key . '-' . $eventIndex . '-' . ($event['datetime'] ?? '')), 0, 12);
                                 ?>
                                 <article class="event-card event-card--<?= htmlspecialchars((string) ($event['type'] ?? 'unknown')) ?>"<?= $eventDateTime !== null ? ' data-cloud-cover-event="' . htmlspecialchars($eventDateTime->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
-                                    <span class="event-symbol" aria-hidden="true"><?= htmlspecialchars($symbol) ?></span>
+                                    <?php renderAstronomyIcon($event, $latitude, 'event-symbol'); ?>
                                     <div class="event-content">
                                         <div class="event-heading"><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['show_time']): ?><time><?= htmlspecialchars($presentation['time_label']) ?></time><?php endif; ?></div>
                                         <?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?>
                                         <?php $cloudPopoverId = 'event-cloud-cover-' . substr(md5($key . '-' . $eventIndex . '-' . ($event['datetime'] ?? '')), 0, 12); ?>
-                                        <?php if ($eventDateTime !== null): ?><p class="event-cloud-cover" data-cloud-cover-value hidden><span data-cloud-cover-text></span> <button type="button" class="cloud-cover-info" data-cloud-cover-info popovertarget="<?= $cloudPopoverId ?>" aria-label="Ver distribución de las nubes" hidden>☁️</button><span id="<?= $cloudPopoverId ?>" class="cloud-cover-popover" data-cloud-cover-popover popover role="dialog" aria-labelledby="<?= $cloudPopoverId ?>-title"><strong id="<?= $cloudPopoverId ?>-title">Distribución de las nubes</strong><span data-cloud-cover-layers></span><span>Las bajas suelen tapar más el cielo. Las altas pueden ser finas y dejar ver la Luna, aunque con menos contraste. Los porcentajes de las capas no se suman entre sí.</span></span></p><?php endif; ?>
+                                        <?php if ($eventDateTime !== null): ?><p class="event-cloud-cover" data-cloud-cover-value hidden><span data-cloud-cover-text></span> <button type="button" class="cloud-cover-info" data-cloud-cover-info popovertarget="<?= $cloudPopoverId ?>" aria-label="Ver distribución de las nubes" hidden>Nubes</button><span id="<?= $cloudPopoverId ?>" class="cloud-cover-popover" data-cloud-cover-popover popover role="dialog" aria-labelledby="<?= $cloudPopoverId ?>-title"><strong id="<?= $cloudPopoverId ?>-title">Distribución de las nubes</strong><span data-cloud-cover-layers></span><span>Las bajas suelen tapar más el cielo. Las altas pueden ser finas y dejar ver la Luna, aunque con menos contraste. Los porcentajes de las capas no se suman entre sí.</span></span></p><?php endif; ?>
                                         <?php if ($publicDetails !== []): ?>
                                             <dl class="event-facts">
                                                 <?php foreach ($publicDetails as $entry): ?>

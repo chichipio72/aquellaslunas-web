@@ -38,7 +38,8 @@ Las vistas públicas invocan el encabezado común con la marca **Aquellas Lunas*
 
 - `api-config.php`: carga y valida configuración.
 - `api-client.php`: cURL, reintento controlado, métricas y cabeceras dinámicas sin caché.
-- `current-datetime.php`: reloj real/simulado y URLs internas con `debug_now`.
+- `current-datetime.php`: reloj editorial real/simulado. En el entorno local habilitado persiste una fecha y hora de pared en sesión; producción usa siempre el reloj real.
+- `astronomy-icon.php`: mapeo visual compartido para fases y eventos secundarios. Traduce `moon_phase/new_moon|first_quarter|full_moon|last_quarter`, `earthshine`, `conjunction`, `libration_*`, `apsis/perigee|apogee` y cualquier `eclipse` a clases `astro-icon--*`; los tipos desconocidos usan `astro-icon--generic`. Recibe la latitud para orientar los cuartos y la luz cenicienta según hemisferio.
 - `site-sections.php`: registro, menú y contexto de swipe resuelto por PHP.
 - `tonight.php`: contrato tolerante y presentación compartida de visibilidad nocturna.
 - `location-context.php`: lectura, validación, fallback y guardado de ubicación.

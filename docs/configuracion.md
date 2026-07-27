@@ -18,6 +18,7 @@ El archivo externo está fuera de `public_html`. `loadAstronomyProductionConfig(
 | `ASTRONOMY_REVERSE_GEOCODER_URL` | — | URL de Nominatim | URL HTTPS | geocodificación inversa server-side |
 | `ASTRONOMY_REVERSE_GEOCODER_USER_AGENT` | — | identificación de Aquellas Lunas | texto | `User-Agent` para Nominatim |
 | `ASTRONOMY_SHOW_TIMINGS` | `astronomy_show_timings` | `false` | booleano mediante `filter_var` | tiempos, `debug_now` y requisito del panel swipe |
+| `LOCAL_TIME_SIMULATION_ENABLED` | `local_time_simulation_enabled` | `false` | booleano mediante `filter_var` | control y sesión local de simulación temporal |
 | `ALTITUDE_PROFILE_INTERVAL_MINUTES` | `altitude_profile_interval_minutes` | `15` | entero 5–60 | Sol y Luna, mismo intervalo |
 | `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` | `supermoon_min_apparent_size_percent` | `105` | número finito 90–120 | clasificación editorial de Luna llena |
 | `MOONRISE_NOTICE_MAX_MINUTES` | `moonrise_notice_max_minutes` | `120` | entero 1–1440 | ventana de aviso de salida |
@@ -154,19 +155,10 @@ Los cuatro cargadores de previews resuelven por separado tamaño y calidad de ti
 
 `loadStoreDownloadExpiryHours()` y `loadStoreDownloadMaxCount()` aplican entorno → configuración externa → 72/5 y validan los rangos de la tabla. Estos valores sólo crean permisos en `descargas`; todavía no existe un endpoint público para consumirlos.
 
-Producción normalmente mantiene timings y diagnóstico visual del swipe en falso. Timings por sí solo muestra métricas y habilita `debug_now`, pero no altera el swipe. El panel y la pausa de navegación requieren además `mobile_swipe_navigation_debug_enabled => true`; debe activarse sólo durante una revisión controlada.
+Producción normalmente mantiene timings, diagnóstico visual del swipe y simulación temporal en falso. Timings muestra métricas pero no habilita por sí solo el reloj simulado. El panel y la pausa de navegación requieren además `mobile_swipe_navigation_debug_enabled => true`.
 
 ## Reloj simulado
 
-`debug_now` sólo se acepta si timings está habilitado. Debe ser ISO 8601 con `Z` u offset explícito:
+El reloj sólo se habilita con `LOCAL_TIME_SIMULATION_ENABLED=true` o `local_time_simulation_enabled => true`. El encabezado guarda fecha y hora local en una sesión PHP; no es necesario propagar parámetros. **Usar hora real** elimina la simulación. Con la bandera apagada, `debug_now`, sesiones previas y formularios de simulación se ignoran.
 
-```text
-http://localhost:18080/index.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/sol-y-luna.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/eventos.php?debug_now=2026-07-29T18:15:00-03:00
-http://localhost:18080/acerca-del-sitio.php?debug_now=2026-07-29T18:15:00-03:00
-```
-
-Para offsets positivos, codificar `+` como `%2B`. `astronomyInternalUrl()` combina la simulación con query strings existentes, reemplaza una copia previa sin duplicarla y conserva `#fragmentos`. Menú, enlaces internos relevantes, destinos swipe y formularios que navegan entre estas páginas reutilizan ese helper. **Hora real** elimina sólo `debug_now`.
-
-Con simulación, consultas, fechas, salida lunar y marcadores usan el instante indicado. Los perfiles se solicitan una vez y el marcador no crea temporizador. Con reloj real el marcador se recalcula cada minuto sin volver a pedir las series.
+Con simulación, consultas, fechas predeterminadas, selección editorial y marcadores usan el instante indicado. Los perfiles se solicitan una vez y el marcador no crea temporizador. Cachés, logs, sesiones y expiraciones de seguridad conservan el reloj real.

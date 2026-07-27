@@ -63,12 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.setAttribute('aria-hidden', 'true');
     panel.classList.remove('is-open');
     backdrop.hidden = true;
+    document.body.classList.remove('site-menu-open');
   };
   const open = () => {
     toggle.setAttribute('aria-expanded', 'true');
     panel.setAttribute('aria-hidden', 'false');
     panel.classList.add('is-open');
     backdrop.hidden = false;
+    document.body.classList.add('site-menu-open');
     panel.querySelector('a, button')?.focus();
   };
   toggle.addEventListener('click', () => toggle.getAttribute('aria-expanded') === 'true' ? close() : open());
