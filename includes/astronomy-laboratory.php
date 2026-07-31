@@ -36,25 +36,25 @@ function astronomyLaboratoryFieldDefinitions(): array
         'diferencia_salida_sol_min' => ['label' => 'Diferencia de salida del Sol (min)', 'short_label' => 'Diferencia de salida', 'type' => 'number', 'scale_group' => 'difference_minutes', 'unit' => ' min', 'body' => 'sun', 'group' => 'differences', 'sql' => '`diferencia_salida_sol_min`'],
         'diferencia_puesta_sol_min' => ['label' => 'Diferencia de puesta del Sol (min)', 'short_label' => 'Diferencia de puesta', 'type' => 'number', 'scale_group' => 'difference_minutes', 'unit' => ' min', 'body' => 'sun', 'group' => 'differences', 'sql' => '`diferencia_puesta_sol_min`'],
 
-        'amplitud_salida_luna' => ['label' => 'Amplitud de salida de la Luna (°)', 'short_label' => 'Amplitud de salida', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'amplitudes', 'sql' => '(`azimut_salida_luna` - 90)'],
-        'amplitud_puesta_luna' => ['label' => 'Amplitud de puesta de la Luna (°)', 'short_label' => 'Amplitud de puesta', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'amplitudes', 'sql' => '(`azimut_puesta_luna` - 270)'],
-        'amplitud_salida_sol' => ['label' => 'Amplitud de salida del Sol (°)', 'short_label' => 'Amplitud de salida', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'amplitudes', 'sql' => '(`azimut_salida_sol` - 90)'],
-        'amplitud_puesta_sol' => ['label' => 'Amplitud de puesta del Sol (°)', 'short_label' => 'Amplitud de puesta', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'amplitudes', 'sql' => '(`azimut_puesta_sol` - 270)'],
+        'amplitud_salida_luna' => ['label' => 'Amplitud de salida de la Luna (°)', 'short_label' => 'Amplitud de salida', 'type' => 'number', 'scale_group' => 'signed_angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'amplitudes', 'sql' => '(`azimut_salida_luna` - 90)'],
+        'amplitud_puesta_luna' => ['label' => 'Amplitud de puesta de la Luna (°)', 'short_label' => 'Amplitud de puesta', 'type' => 'number', 'scale_group' => 'signed_angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'amplitudes', 'sql' => '(`azimut_puesta_luna` - 270)'],
+        'amplitud_salida_sol' => ['label' => 'Amplitud de salida del Sol (°)', 'short_label' => 'Amplitud de salida', 'type' => 'number', 'scale_group' => 'signed_angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'amplitudes', 'sql' => '(`azimut_salida_sol` - 90)'],
+        'amplitud_puesta_sol' => ['label' => 'Amplitud de puesta del Sol (°)', 'short_label' => 'Amplitud de puesta', 'type' => 'number', 'scale_group' => 'signed_angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'amplitudes', 'sql' => '(`azimut_puesta_sol` - 270)'],
 
         'azimut_salida_luna' => ['label' => 'Azimut de salida de la Luna (°)', 'short_label' => 'Azimut de salida', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'azimuths', 'sql' => '`azimut_salida_luna`'],
         'azimut_puesta_luna' => ['label' => 'Azimut de puesta de la Luna (°)', 'short_label' => 'Azimut de puesta', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'azimuths', 'sql' => '`azimut_puesta_luna`'],
         'azimut_salida_sol' => ['label' => 'Azimut de salida del Sol (°)', 'short_label' => 'Azimut de salida', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'azimuths', 'sql' => '`azimut_salida_sol`'],
         'azimut_puesta_sol' => ['label' => 'Azimut de puesta del Sol (°)', 'short_label' => 'Azimut de puesta', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'sun', 'group' => 'azimuths', 'sql' => '`azimut_puesta_sol`'],
 
-        'distancia_luna_km' => ['label' => 'Distancia de la Luna (km)', 'short_label' => 'Distancia', 'type' => 'number', 'scale_group' => 'distance_km', 'unit' => ' km', 'body' => 'moon', 'group' => 'other', 'sql' => '`distancia_luna_km`'],
+        'distancia_luna_km' => ['label' => 'Distancia de la Luna (km)', 'short_label' => 'Distancia', 'type' => 'number', 'scale_group' => 'lunar_distance_km', 'unit' => ' km', 'body' => 'moon', 'group' => 'other', 'sql' => '`distancia_luna_km`'],
         'iluminacion_porc' => ['label' => 'Iluminación lunar (%)', 'short_label' => 'Iluminación', 'type' => 'number', 'scale_group' => 'percentage', 'unit' => '%', 'body' => 'moon', 'group' => 'other', 'sql' => '`iluminacion_porc`'],
         'dia_ciclo_lunar' => ['label' => 'Día del ciclo lunar', 'short_label' => 'Día del ciclo lunar', 'type' => 'number', 'scale_group' => 'cycle_days', 'body' => 'moon', 'group' => 'other', 'sql' => '`dia_ciclo_lunar`'],
-        'latitud_ecliptica_luna' => ['label' => 'Latitud eclíptica de la Luna (°)', 'short_label' => 'Latitud eclíptica', 'type' => 'number', 'scale_group' => 'angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'other', 'sql' => '`latitud_ecliptica_luna`'],
+        'latitud_ecliptica_luna' => ['label' => 'Latitud eclíptica de la Luna (°)', 'short_label' => 'Latitud eclíptica', 'type' => 'number', 'scale_group' => 'signed_angle_degrees', 'unit' => '°', 'body' => 'moon', 'group' => 'other', 'sql' => '`latitud_ecliptica_luna`'],
         'tiempo_luna_sobre_horizonte' => ['label' => 'Tiempo de la Luna sobre el horizonte', 'short_label' => 'Tiempo sobre el horizonte', 'type' => 'time_duration', 'scale_group' => 'time_duration', 'body' => 'moon', 'group' => 'other', 'sql' => astronomyLaboratoryMoonHorizonDurationSql()],
         'superluna_llena' => ['label' => 'Superluna llena', 'short_label' => 'Superluna llena', 'type' => 'event_marker', 'scale_group' => null, 'body' => 'moon', 'group' => 'other', 'event' => 'supermoon'],
         'miniluna_llena' => ['label' => 'Miniluna llena', 'short_label' => 'Miniluna llena', 'type' => 'event_marker', 'scale_group' => null, 'body' => 'moon', 'group' => 'other', 'event' => 'minimoon'],
 
-        'distancia_sol_km' => ['label' => 'Distancia del Sol (km)', 'short_label' => 'Distancia', 'type' => 'number', 'scale_group' => 'distance_km', 'unit' => ' km', 'body' => 'sun', 'group' => 'other', 'sql' => '`distancia_sol_km`'],
+        'distancia_sol_km' => ['label' => 'Distancia del Sol (km)', 'short_label' => 'Distancia', 'type' => 'number', 'scale_group' => 'solar_distance_km', 'unit' => ' km', 'body' => 'sun', 'group' => 'other', 'sql' => '`distancia_sol_km`'],
         'duracion_dia' => ['label' => 'Duración del día', 'short_label' => 'Duración del día', 'type' => 'time_duration', 'scale_group' => 'time_duration', 'body' => 'sun', 'group' => 'other', 'sql' => 'CASE WHEN `hora_salida_sol` IS NULL OR `hora_puesta_sol` IS NULL THEN NULL ELSE CAST(MOD(TIME_TO_SEC(`hora_puesta_sol`) - TIME_TO_SEC(`hora_salida_sol`) + 86400, 86400) AS DECIMAL(20,10)) / 86400 END'],
         'duracion_noche' => ['label' => 'Duración de la noche', 'short_label' => 'Duración de la noche', 'type' => 'time_duration', 'scale_group' => 'time_duration', 'body' => 'sun', 'group' => 'other', 'sql' => 'CASE WHEN `hora_salida_sol` IS NULL OR `hora_puesta_sol` IS NULL THEN NULL ELSE 1 - (CAST(MOD(TIME_TO_SEC(`hora_puesta_sol`) - TIME_TO_SEC(`hora_salida_sol`) + 86400, 86400) AS DECIMAL(20,10)) / 86400) END'],
         'fraccion_anio_tropico' => ['label' => 'Fracción del año trópico', 'short_label' => 'Fracción del año trópico', 'type' => 'number', 'scale_group' => 'fraction', 'body' => 'sun', 'group' => 'other', 'sql' => '`fraccion_anio_tropico`'],
@@ -94,14 +94,16 @@ function astronomyLaboratoryFieldUnits(array $fields): array
 function astronomyLaboratoryScaleGroups(): array
 {
     return [
-        'distance_km' => ['label' => 'Distancia (km)'],
-        'percentage' => ['label' => 'Porcentaje (%)', 'min' => -2, 'max' => 102, 'data_min' => 0, 'data_max' => 100, 'interval' => 25],
-        'time_fraction' => ['label' => 'Hora', 'min' => -0.02, 'max' => 1.02, 'data_min' => 0, 'data_max' => 1, 'interval' => 0.25, 'formatter' => 'HH:MM'],
-        'time_duration' => ['label' => 'Duración', 'min' => -0.02, 'max' => 1.02, 'data_min' => 0, 'data_max' => 1, 'interval' => 0.25, 'formatter' => 'HH:MM'],
-        'angle_degrees' => ['label' => 'Ángulo (°)'],
-        'difference_minutes' => ['label' => 'Diferencia (min)'],
-        'cycle_days' => ['label' => 'Días'],
-        'fraction' => ['label' => 'Fracción', 'min' => -0.02, 'max' => 1.02, 'data_min' => 0, 'data_max' => 1, 'interval' => 0.25],
+        'lunar_distance_km' => ['label' => 'Distancia lunar (km)', 'unit' => 'km', 'format' => 'integer', 'center_zero' => false, 'steps' => [500, 1000, 2000, 5000, 10000], 'intervals' => 8],
+        'solar_distance_km' => ['label' => 'Distancia Tierra–Sol (km)', 'unit' => 'km', 'format' => 'integer', 'center_zero' => false, 'steps' => [100000, 250000, 500000, 1000000, 2000000], 'intervals' => 8],
+        'percentage' => ['label' => 'Porcentaje (%)', 'unit' => '%', 'format' => 'number', 'center_zero' => false, 'steps' => [5, 10, 20, 25], 'natural_min' => 0, 'natural_max' => 100, 'intervals' => 8],
+        'time_fraction' => ['label' => 'Hora', 'unit' => 'hora', 'format' => 'HH:MM', 'center_zero' => false, 'steps' => [0.0104166666666667, 0.0208333333333333, 0.0416666666666667, 0.0833333333333333, 0.125, 0.25], 'natural_min' => 0, 'natural_max' => 1, 'intervals' => 8],
+        'time_duration' => ['label' => 'Duración', 'unit' => 'hora', 'format' => 'HH:MM', 'center_zero' => false, 'steps' => [0.0104166666666667, 0.0208333333333333, 0.0416666666666667, 0.0833333333333333, 0.125, 0.25], 'natural_min' => 0, 'natural_max' => 1, 'intervals' => 8],
+        'angle_degrees' => ['label' => 'Ángulo (°)', 'unit' => '°', 'format' => 'number', 'center_zero' => false, 'steps' => [1, 2, 5, 10, 15, 20, 30, 45], 'natural_min' => 0, 'natural_max' => 360, 'intervals' => 8],
+        'signed_angle_degrees' => ['label' => 'Ángulo respecto de cero (°)', 'unit' => '°', 'format' => 'number', 'center_zero' => true, 'steps' => [1, 2, 5, 10, 15, 20, 30, 45], 'intervals' => 8],
+        'difference_minutes' => ['label' => 'Diferencia (min)', 'unit' => 'min', 'format' => 'number', 'center_zero' => true, 'steps' => [1, 2, 5, 10, 15, 30, 60], 'intervals' => 8],
+        'cycle_days' => ['label' => 'Días', 'unit' => 'días', 'format' => 'number', 'center_zero' => false, 'steps' => [0.25, 0.5, 1, 2, 5, 10], 'natural_min' => 0, 'intervals' => 8],
+        'fraction' => ['label' => 'Fracción', 'unit' => 'fracción', 'format' => 'number', 'center_zero' => false, 'steps' => [0.01, 0.02, 0.05, 0.1, 0.2, 0.25], 'natural_min' => 0, 'natural_max' => 1, 'intervals' => 8],
     ];
 }
 

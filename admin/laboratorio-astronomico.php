@@ -105,7 +105,10 @@ $extremaClientVariables = array_map(
                 </div>
                 <fieldset data-analysis-daily>
                     <legend>Variables</legend>
-                    <p class="astronomy-laboratory__filter-help" data-scale-group-help aria-live="polite">Podés seleccionar varias variables de hasta cuatro grupos de escala. Las variables del mismo grupo comparten eje.</p>
+                    <div class="astronomy-laboratory__filter-toolbar">
+                        <p class="astronomy-laboratory__filter-help" data-scale-group-help aria-live="polite">Podés seleccionar varias variables de hasta cuatro grupos de escala. Las variables del mismo grupo comparten eje.</p>
+                        <button type="button" class="compact-secondary-button" data-clear-selection="campos[]">Deseleccionar todo</button>
+                    </div>
                     <div class="astronomy-laboratory__bodies">
                     <?php foreach (['moon' => 'Luna', 'sun' => 'Sol'] as $body => $bodyLabel): ?>
                         <section class="astronomy-laboratory__body astronomy-laboratory__body--<?= $body ?>" aria-labelledby="astronomy-laboratory-<?= $body ?>">
@@ -127,6 +130,18 @@ $extremaClientVariables = array_map(
                             <?php endforeach; ?>
                         </section>
                     <?php endforeach; ?>
+                    </div>
+                </fieldset>
+                <fieldset class="astronomy-laboratory__relation" data-analysis-daily>
+                    <legend>Análisis de relación <span>Experimental</span></legend>
+                    <div class="astronomy-laboratory__relation-methods">
+                        <label class="astronomy-laboratory__relation-toggle"><input type="checkbox" name="relacion_producto" value="product" data-relation-toggle><span><strong>Coincidencia / oposición</strong><small>Mismo lado u lados opuestos de sus valores medios.</small></span></label>
+                        <label class="astronomy-laboratory__relation-toggle"><input type="checkbox" name="relacion_promedio" value="average" data-relation-toggle><span><strong>Refuerzo positivo / negativo</strong><small>Proximidad conjunta a máximos o mínimos.</small></span></label>
+                    </div>
+                    <p class="astronomy-laboratory__filter-help" data-relation-help aria-live="polite"></p>
+                    <div class="astronomy-laboratory__relation-selectors" data-relation-selectors hidden>
+                        <label>Variable A<select name="variable_relacion_a" data-relation-variable="a"></select></label>
+                        <label>Variable B<select name="variable_relacion_b" data-relation-variable="b"></select></label>
                     </div>
                 </fieldset>
                 <fieldset class="astronomy-laboratory__extrema-controls" data-analysis-extrema hidden>
@@ -161,7 +176,10 @@ $extremaClientVariables = array_map(
                 </fieldset>
                 <fieldset data-analysis-daily>
                     <legend>Fases lunares</legend>
-                    <p class="astronomy-laboratory__filter-help">Sin selección se incluyen todas las fechas. Podés elegir varias fases.</p>
+                    <div class="astronomy-laboratory__filter-toolbar">
+                        <p class="astronomy-laboratory__filter-help">Sin selección se incluyen todas las fechas. Podés elegir varias fases.</p>
+                        <button type="button" class="compact-secondary-button" data-clear-selection="fases[]">Deseleccionar todo</button>
+                    </div>
                     <div class="astronomy-laboratory__fields astronomy-laboratory__phases">
                     <?php foreach ($phases as $phase): ?>
                         <label><input type="checkbox" name="fases[]" value="<?= htmlspecialchars($phase, ENT_QUOTES, 'UTF-8') ?>"><span><?= htmlspecialchars($phase, ENT_QUOTES, 'UTF-8') ?></span></label>
@@ -176,6 +194,14 @@ $extremaClientVariables = array_map(
                 <div><h2 id="astronomy-laboratory-chart-title">Serie temporal</h2><p data-astronomy-laboratory-count>Sin datos consultados.</p></div>
                 <p class="astronomy-laboratory__loading" role="status" aria-live="polite" data-astronomy-laboratory-loading hidden>Cargando datos…</p>
             </div>
+            <ul class="astronomy-laboratory__chart-help" aria-label="Controles del gráfico">
+                <li><strong>Rueda:</strong> zoom horizontal</li>
+                <li><strong>Arrastrar:</strong> mover en el tiempo</li>
+                <li><strong>Shift + rueda:</strong> zoom vertical</li>
+                <li><strong>Shift + arrastrar:</strong> mover eje Y activo</li>
+                <li><strong>Clic en línea o eje:</strong> seleccionar eje Y</li>
+                <li><strong>Doble clic en eje:</strong> restablecerlo</li>
+            </ul>
             <p class="store-admin-alert" role="alert" data-astronomy-laboratory-error hidden></p>
             <dl class="astronomy-laboratory__extrema-summary" data-extrema-summary hidden></dl>
             <div class="astronomy-laboratory__chart" role="img" aria-label="Gráfico temporal de datos astronómicos" data-astronomy-laboratory-chart></div>

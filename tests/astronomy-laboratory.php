@@ -79,18 +79,18 @@ $scales = astronomyLaboratoryFieldScales([
 ]);
 astronomyLaboratoryAssert(
     $scales === [
-        'distancia_luna_km' => 'distance_km',
-        'distancia_sol_km' => 'distance_km',
+        'distancia_luna_km' => 'lunar_distance_km',
+        'distancia_sol_km' => 'solar_distance_km',
         'iluminacion_porc' => 'percentage',
         'hora_salida_luna' => 'time_fraction',
         'duracion_dia' => 'time_duration',
-        'amplitud_salida_sol' => 'angle_degrees',
+        'amplitud_salida_sol' => 'signed_angle_degrees',
     ],
     'La asignación central de escalas es incorrecta.'
 );
 astronomyLaboratoryAssert(
     astronomyLaboratorySelectedScaleGroups(array_keys($scales))
-        === ['distance_km', 'percentage', 'time_fraction', 'time_duration', 'angle_degrees'],
+        === ['lunar_distance_km', 'solar_distance_km', 'percentage', 'time_fraction', 'time_duration', 'signed_angle_degrees'],
     'No se deduplicaron correctamente los grupos de escala.'
 );
 $pairs = astronomyLaboratoryLayoutPairs([
@@ -108,11 +108,13 @@ astronomyLaboratoryAssert(
 );
 $scaleGroups = astronomyLaboratoryScaleGroups();
 astronomyLaboratoryAssert(
-    $scaleGroups['percentage']['min'] === -2
-        && $scaleGroups['percentage']['max'] === 102
-        && $scaleGroups['percentage']['data_min'] === 0
-        && $scaleGroups['percentage']['data_max'] === 100,
-    'El eje porcentual no conserva margen visual y límites de datos.'
+    $scaleGroups['percentage']['intervals'] === 8
+        && $scaleGroups['percentage']['natural_min'] === 0
+        && $scaleGroups['percentage']['natural_max'] === 100
+        && $scaleGroups['signed_angle_degrees']['center_zero'] === true
+        && $scaleGroups['lunar_distance_km']['steps'] === [500, 1000, 2000, 5000, 10000]
+        && $scaleGroups['solar_distance_km']['steps'][0] === 100000,
+    'Los metadatos centralizados de escala son incorrectos.'
 );
 
 fwrite(STDOUT, "astronomy laboratory tests: ok\n");

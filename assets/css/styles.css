@@ -4482,8 +4482,89 @@ body :is(
   font-size: .9rem;
 }
 
+.astronomy-laboratory__filter-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .6rem 1rem;
+  margin: -.35rem 0 .75rem;
+}
+
+.astronomy-laboratory__filter-toolbar .astronomy-laboratory__filter-help {
+  margin: 0;
+}
+
+.astronomy-laboratory__filter-toolbar .compact-secondary-button {
+  flex: 0 0 auto;
+}
+
 .astronomy-laboratory__filter-help.is-warning {
   color: #ffd28f;
+  font-weight: 700;
+}
+
+.astronomy-laboratory__relation {
+  display: grid;
+  gap: .65rem;
+  padding: .85rem 1rem !important;
+  border: 1px solid rgba(142, 180, 255, .18) !important;
+  border-radius: .75rem;
+  background: rgba(50, 69, 112, .09);
+}
+
+.astronomy-laboratory__relation legend {
+  margin: 0;
+}
+
+.astronomy-laboratory__relation legend span {
+  margin-left: .4rem;
+  color: #9eaccb;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.astronomy-laboratory__relation-toggle {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  color: #dce5fa;
+  font-weight: 700;
+}
+
+.astronomy-laboratory__relation-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem 1.25rem;
+}
+
+.astronomy-laboratory__relation-toggle > span {
+  display: grid;
+  gap: .12rem;
+}
+
+.astronomy-laboratory__relation-toggle small {
+  color: #9eaccb;
+  font-size: .75rem;
+  font-weight: 400;
+}
+
+.astronomy-laboratory__relation .astronomy-laboratory__filter-help {
+  margin: 0;
+}
+
+.astronomy-laboratory__relation-selectors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.astronomy-laboratory__relation-selectors label {
+  display: grid;
+  gap: .35rem;
+  color: #b9c6e3;
+  font-size: .82rem;
   font-weight: 700;
 }
 
@@ -4637,6 +4718,41 @@ body :is(
   background: rgba(2, 6, 14, .55);
 }
 
+.astronomy-laboratory__chart.is-panning-y-axis {
+  cursor: ns-resize;
+}
+
+.astronomy-laboratory__chart-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem 1rem;
+  margin: .65rem 0 .25rem;
+  padding: .45rem .7rem;
+  border: 1px solid rgba(145, 166, 210, .14);
+  border-radius: .55rem;
+  color: #9eaccb;
+  background: rgba(9, 16, 31, .45);
+  font-size: .78rem;
+  line-height: 1.35;
+  list-style: none;
+}
+
+.astronomy-laboratory__chart-help li {
+  white-space: nowrap;
+}
+
+.astronomy-laboratory__chart-help strong {
+  color: #b9c6e3;
+  font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+  .astronomy-laboratory__chart-help {
+    gap: .2rem .7rem;
+    font-size: .73rem;
+  }
+}
+
 .astronomy-laboratory__back {
   justify-self: start;
 }
@@ -4664,6 +4780,19 @@ body :is(
 }
 
 @media (max-width: 44rem) {
+  .astronomy-laboratory__relation-selectors {
+    grid-template-columns: 1fr;
+  }
+
+  .astronomy-laboratory__filter-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .astronomy-laboratory__filter-toolbar .compact-secondary-button {
+    align-self: flex-start;
+  }
+
   .astronomy-laboratory__fields,
   .astronomy-laboratory__phases {
     grid-template-columns: 1fr;
