@@ -147,11 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const cloudHours = document.querySelector('[data-today-cloud-hours]');
-  const categoryFor = (value) => (
-    value <= 20
-      ? ['clear', 'Despejado']
-      : (value <= 50 ? ['some', 'Algunas nubes'] : (value <= 80 ? ['mostly', 'Mayormente nublado'] : ['overcast', 'Cubierto']))
-  );
   const renderCloudHours = () => {
     if (!cloudHours) return false;
     let decorated = 0;
@@ -163,18 +158,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const match = block.textContent.match(/(\d{1,3})\s*%/);
       if (!match) return;
       const value = Math.max(0, Math.min(100, Number(match[1])));
-      const category = categoryFor(value);
+      const category = globalThis.AstronomyCloudCover?.cloudCategory(value);
+      if (!category) return;
       const hour = block.querySelector('strong')?.textContent?.trim() || 'Horario';
       const percentage = block.querySelector('small');
       if (!percentage) return;
       const image = document.createElement('img');
-      image.src = `assets/images/weather/cloud-${category[0]}.svg`;
+      image.src = `assets/images/weather/cloud-${category.key}.svg`;
       image.alt = '';
       image.width = 64;
       image.height = 48;
       block.insertBefore(image, percentage);
-      block.title = `${category[1]}: ${value} % de cobertura`;
-      block.setAttribute('aria-label', `${hour}. ${category[1]}. ${value} % de cobertura.`);
+      block.title = `${category.label}: ${value} % de cobertura`;
+      block.setAttribute('aria-label', `${hour}. ${category.label}. ${value} % de cobertura.`);
       decorated += 1;
     });
     return decorated > 0;

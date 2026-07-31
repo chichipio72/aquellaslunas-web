@@ -21,6 +21,7 @@ $pageSeo = aquellasLunasSeoPage(
     'Fotografías de la Luna disponibles en la tienda de Aquellas Lunas.',
     '/galeria.php'
 );
+$pageSeo['robots'] = 'noindex, nofollow';
 $galleryPhotos = [];
 $galleryError = false;
 

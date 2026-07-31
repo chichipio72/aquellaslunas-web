@@ -11,6 +11,7 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/tonight.php';
+require_once __DIR__ . '/includes/explore-sky.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -19,6 +20,7 @@ $timezoneName = $location['timezone'];
 $now = get_current_datetime($timezoneName);
 $date = ((int) $now->format('H') < 12 ? $now->modify('-1 day') : $now)->format('Y-m-d');
 $tonightData = null;
+$tonightEvents = [];
 $apiErrorMessage = null;
 
 try {
@@ -49,12 +51,38 @@ try {
             );
         }
     }
+    if ($tonightData !== null) {
+        $eventsQuery = http_build_query([
+            'start_date' => $date,
+            'days' => 2,
+            'latitude' => $location['latitude'],
+            'longitude' => $location['longitude'],
+            'timezone' => $timezoneName,
+            'types' => 'moon_phase,conjunction,eclipse,earthshine,full_moon_observation,apsis,libration',
+            'max_difference_minutes' => 70,
+        ]);
+        $eventsResult = astronomyApiRequest(
+            $apiConfig['base_url'] . '/v1/astronomy/events?' . $eventsQuery,
+            'tonight lunar events',
+            20
+        );
+        if ($eventsResult['body'] !== false && (int) $eventsResult['http_code'] === 200) {
+            $decodedEvents = json_decode((string) $eventsResult['body'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedEvents['items'] ?? null)) {
+                $tonightEvents = $decodedEvents['items'];
+            }
+        }
+    }
 } catch (RuntimeException $exception) {
     $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';
     error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
 }
 
 $sections = $tonightData !== null ? astronomyTonightPreparedSections($tonightData, $now, $timezoneName) : [];
+$sections = astronomyTonightApplyMoonEditorialPriority(
+    $sections,
+    $tonightData !== null && astronomyTonightHasRelevantMoonEvent($tonightData, $tonightEvents, $timezoneName)
+);
 $highlights = astronomyTonightHighlights($sections);
 $featuredStars = $sections['stars'] ?? [];
 usort($featuredStars, static fn(array $a, array $b): int => ((float) ($a['magnitude'] ?? 99)) <=> ((float) ($b['magnitude'] ?? 99)));
@@ -79,6 +107,7 @@ $pageSeo = aquellasLunasSeoPage(
 <?php renderAnalyticsTracking(); ?>
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -178,6 +207,7 @@ $pageSeo = aquellasLunasSeoPage(
                 <?php endif; ?>
             <?php endif; ?>
 
+            <?php renderAstronomyExploreSky('tonight'); ?>
             <?php renderAstronomyTimings(); ?>
         </div>
     </main>

@@ -203,4 +203,85 @@ tonightAssert(
     'La redacción local volvió a producir pasado.'
 );
 
+$moonEditorialSections = [
+    'planets' => [['id' => 'venus']],
+    'moon' => [['id' => 'moon']],
+];
+$nightWithoutMoonEvent = astronomyTonightApplyMoonEditorialPriority($moonEditorialSections, false);
+tonightAssert(!isset($nightWithoutMoonEvent['moon']), 'Una noche sin evento lunar conservó la Luna.');
+tonightAssert(isset($nightWithoutMoonEvent['planets']), 'El filtro lunar eliminó los planetas principales.');
+
+$conjunction = [[
+    'type' => 'conjunction',
+    'datetime' => '2026-07-26T00:30:00-03:00',
+]];
+tonightAssert(
+    astronomyTonightHasRelevantMoonEvent($temporalData, $conjunction, $timezone),
+    'Una conjunción dentro de la noche no volvió protagonista a la Luna.'
+);
+$nightWithConjunction = astronomyTonightApplyMoonEditorialPriority($moonEditorialSections, true);
+tonightAssert(isset($nightWithConjunction['moon']), 'La conjunción no conservó la Luna visible.');
+
+$ordinaryPhase = [[
+    'type' => 'moon_phase',
+    'subtype' => 'first_quarter',
+    'datetime' => '2026-07-25T22:00:00-03:00',
+]];
+tonightAssert(
+    !astronomyTonightHasRelevantMoonEvent($temporalData, $ordinaryPhase, $timezone),
+    'Un cuarto ordinario volvió protagonista a la Luna.'
+);
+
+$fullMoon = [[
+    'type' => 'moon_phase',
+    'subtype' => 'full_moon',
+    'datetime' => '2026-07-25T12:00:00-03:00',
+]];
+tonightAssert(
+    astronomyTonightHasRelevantMoonEvent($temporalData, $fullMoon, $timezone),
+    'La Luna llena del día civil no fue considerada protagonista.'
+);
+
+$cardData = [
+    'night' => [
+        'start' => '2026-07-30T18:38:11-03:00',
+        'end' => '2026-07-31T07:21:21-03:00',
+    ],
+    'planets' => [
+        ['name' => 'Venus', 'visibility_status' => 'visible_later'],
+        ['name' => 'Marte', 'visibility_status' => 'visible_later'],
+    ],
+];
+$cardEvent = [[
+    'type' => 'conjunction',
+    'title' => 'Conjunción Luna–Júpiter',
+    'datetime' => '2026-07-30T21:30:00-03:00',
+    'details' => ['both_above_horizon' => true],
+]];
+tonightAssert(
+    astronomyTonightCardText($cardData, $cardEvent, $duringNight, $timezone)
+        === 'La Luna y Júpiter podrán verse juntos alrededor de las 21:30. También estarán visibles Venus y Marte.',
+    'La tarjeta no compuso un encuentro autónomo y separó los otros planetas visibles.'
+);
+
+$incompleteCardEvent = $cardEvent;
+unset($incompleteCardEvent[0]['title']);
+tonightAssert(
+    astronomyTonightCardText($cardData, $incompleteCardEvent, $duringNight, $timezone)
+        === 'Esta noche estarán visibles Venus y Marte.',
+    'Una conjunción incompleta produjo referencias sin objetos u hora.'
+);
+
+$venusEncounter = $cardEvent;
+$venusEncounter[0]['title'] = 'Conjunción Luna–Venus';
+tonightAssert(
+    astronomyTonightCardText($cardData, $venusEncounter, $duringNight, $timezone)
+        === 'La Luna y Venus podrán verse juntos alrededor de las 21:30. También estará visible Marte.',
+    'El objeto de la conjunción se repitió entre los planetas meramente visibles.'
+);
+tonightAssert(
+    astronomyTonightComparisonKey('Júpiter', false) === astronomyTonightComparisonKey('júpiter', false),
+    'El fallback sin mbstring no conservó la comparación de nombres en español.'
+);
+
 echo "Presentación de esta noche: escenarios completos e incompletos OK\n";

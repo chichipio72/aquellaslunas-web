@@ -24,6 +24,10 @@ if (!function_exists('renderAnalyticsTracking')) {
         echo "function gtag(){dataLayer.push(arguments);}" . PHP_EOL;
         echo "gtag('js', new Date());" . PHP_EOL;
         echo "gtag('config', '" . htmlspecialchars($measurementId, ENT_QUOTES, 'UTF-8') . "');" . PHP_EOL;
+        echo "window.aquellasLunasTrackAnalyticsEvent = function(name, params) {" . PHP_EOL;
+        echo "    if (typeof window.gtag !== 'function') { return false; }" . PHP_EOL;
+        echo "    try { window.gtag('event', name, params || {}); return true; } catch (error) { return false; }" . PHP_EOL;
+        echo "};" . PHP_EOL;
         echo '</script>' . PHP_EOL;
     }
 }

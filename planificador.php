@@ -10,6 +10,8 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/featured-dates.php';
+require_once __DIR__ . '/includes/site-sections.php';
+require_once __DIR__ . '/includes/explore-sky.php';
 sendDynamicNoCacheHeaders();
 
 $location = astronomyLocationContext();
@@ -42,6 +44,7 @@ $pageSeo = aquellasLunasSeoPage(
     <?php renderSeoHead($pageSeo); renderAnalyticsTracking(); renderFaviconLinks(); ?>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/astro-map.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -135,6 +138,7 @@ $pageSeo = aquellasLunasSeoPage(
                 <article id="planner-sun-card" class="card planner-body-card"><h2>Sol</h2><div data-body-results="sun">Esperando datos…</div></article>
                 <article id="planner-moon-card" class="card planner-body-card"><h2>Luna</h2><div data-body-results="moon">Esperando datos…</div></article>
             </section>
+            <?php renderAstronomyExploreSky('planner'); ?>
         </div>
     </main>
     <?php renderAstronomySiteFooter(); ?>

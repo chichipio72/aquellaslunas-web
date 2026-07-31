@@ -57,6 +57,129 @@ function astronomyTonightTime($value, string $timezone): ?string
     return astronomyTonightDateTime($value, $timezone)?->format('H:i');
 }
 
+function astronomyTonightConjunctionObjects(array $event): ?array
+{
+    $title = is_string($event['title'] ?? null) ? trim($event['title']) : '';
+    if (!preg_match('/^Conjunción\s+(.+?)\s*[–-]\s*(.+)$/u', $title, $matches)) {
+        return null;
+    }
+    $first = trim($matches[1]);
+    $second = trim($matches[2]);
+    if ($first === '' || $second === '') {
+        return null;
+    }
+    if ($first === 'Luna') {
+        return ['La Luna', $second];
+    }
+    if ($second === 'Luna') {
+        return ['La Luna', $first];
+    }
+    return null;
+}
+
+function astronomyTonightNaturalList(array $names): string
+{
+    $names = array_values(array_filter(array_map(
+        static fn($name): string => is_string($name) ? trim($name) : '',
+        $names
+    ), static fn(string $name): bool => $name !== ''));
+    if (count($names) < 2) {
+        return $names[0] ?? '';
+    }
+    $last = array_pop($names);
+    return implode(', ', $names) . ' y ' . $last;
+}
+
+function astronomyTonightComparisonKey(string $name, ?bool $mbstringAvailable = null): string
+{
+    $name = preg_replace('/^La\s+/u', '', trim($name)) ?? trim($name);
+    $useMbstring = $mbstringAvailable ?? function_exists('mb_strtolower');
+    return $useMbstring && function_exists('mb_strtolower')
+        ? mb_strtolower($name, 'UTF-8')
+        : strtolower($name);
+}
+
+function astronomyTonightCardText(
+    ?array $data,
+    array $events,
+    DateTimeImmutable $now,
+    string $timezone
+): ?string {
+    if ($data === null) {
+        return null;
+    }
+    $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
+    $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
+    $planets = astronomyTonightVisibleObjects(
+        is_array($data['planets'] ?? null) ? $data['planets'] : [],
+        astronomyTonightNightIsCurrent($data, $now, $timezone)
+    );
+
+    $encounterSentence = '';
+    $encounterObjects = [];
+    if ($nightStart !== null && $nightEnd !== null) {
+        foreach ($events as $event) {
+            if (!is_array($event) || ($event['type'] ?? '') !== 'conjunction') {
+                continue;
+            }
+            $date = astronomyTonightDateTime($event['datetime'] ?? null, $timezone);
+            $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+            $objects = astronomyTonightConjunctionObjects($event);
+            if (
+                $date === null
+                || $date < $nightStart
+                || $date > $nightEnd
+                || ($details['both_above_horizon'] ?? false) !== true
+                || $objects === null
+            ) {
+                continue;
+            }
+            $encounterObjects = $objects;
+            $encounterSentence = astronomyTonightNaturalList($objects)
+                . ' podrán verse juntos alrededor de las ' . $date->format('H:i') . '.';
+            break;
+        }
+    }
+
+    $encounterLookup = array_map(
+        static fn(string $name): string => astronomyTonightComparisonKey($name),
+        $encounterObjects
+    );
+    $planetNames = [];
+    foreach ($planets as $planet) {
+        $name = trim((string) ($planet['name'] ?? ''));
+        if ($name === '' || in_array(astronomyTonightComparisonKey($name), $encounterLookup, true)) {
+            continue;
+        }
+        $planetNames[] = $name;
+        if (count($planetNames) === 2) {
+            break;
+        }
+    }
+    $visibleSentence = '';
+    if ($planetNames !== []) {
+        $visibleSentence = $encounterSentence !== '' ? 'También ' : 'Esta noche ';
+        $visibleSentence .= count($planetNames) === 1 ? 'estará visible ' : 'estarán visibles ';
+        $visibleSentence .= astronomyTonightNaturalList($planetNames) . '.';
+    }
+    if ($encounterSentence !== '' || $visibleSentence !== '') {
+        return trim($encounterSentence . ' ' . $visibleSentence);
+    }
+
+    $stars = astronomyTonightVisibleObjects(
+        is_array($data['stars'] ?? null) ? $data['stars'] : [],
+        astronomyTonightNightIsCurrent($data, $now, $timezone)
+    );
+    if ($stars !== []) {
+        $names = array_slice(array_column($stars, 'name'), 0, 2);
+        return astronomyTonightNaturalList($names)
+            . (count($names) === 1
+                ? ' será una estrella notable para buscar esta noche.'
+                : ' serán dos estrellas notables para buscar esta noche.');
+    }
+    return 'Esta noche no habrá planetas visibles a simple vista desde tu ubicación.';
+}
+
 function astronomyTonightNightIsCurrent(array $data, DateTimeImmutable $now, string $timezone): bool
 {
     $start = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
@@ -309,6 +432,44 @@ function astronomyTonightPreparedSections(array $data, DateTimeImmutable $now, s
         'stars' => astronomyTonightRelevantObjects(is_array($data['stars'] ?? null) ? $data['stars'] : [], $data, $now, $timezone),
         'deep_sky' => astronomyTonightRelevantObjects(is_array($data['deep_sky_objects'] ?? null) ? $data['deep_sky_objects'] : [], $data, $now, $timezone),
     ], static fn(array $objects): bool => $objects !== []);
+}
+
+function astronomyTonightHasRelevantMoonEvent(array $data, array $events, string $timezone): bool
+{
+    $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
+    $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
+    if ($nightStart === null || $nightEnd === null) {
+        return false;
+    }
+    $nightDates = [$nightStart->format('Y-m-d') => true, $nightEnd->format('Y-m-d') => true];
+    $exceptionalTypes = ['conjunction', 'eclipse', 'earthshine', 'full_moon_observation', 'apsis', 'libration'];
+
+    foreach ($events as $event) {
+        if (!is_array($event)) {
+            continue;
+        }
+        $type = is_string($event['type'] ?? null) ? $event['type'] : '';
+        $subtype = is_string($event['subtype'] ?? null) ? $event['subtype'] : '';
+        $date = astronomyTonightDateTime($event['datetime'] ?? null, $timezone);
+        if ($date === null) {
+            continue;
+        }
+        if ($type === 'moon_phase' && $subtype === 'full_moon' && isset($nightDates[$date->format('Y-m-d')])) {
+            return true;
+        }
+        if (in_array($type, $exceptionalTypes, true) && $date >= $nightStart && $date <= $nightEnd) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function astronomyTonightApplyMoonEditorialPriority(array $sections, bool $moonIsRelevant): array
+{
+    if (!$moonIsRelevant) {
+        unset($sections['moon']);
+    }
+    return $sections;
 }
 
 function astronomyTonightNaturalSentence(array $object, array $data, DateTimeImmutable $now, string $timezone): string

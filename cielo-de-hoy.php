@@ -13,6 +13,8 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/astronomy-icon.php';
+require_once __DIR__ . '/includes/explore-sky.php';
+require_once __DIR__ . '/includes/moon-phase-presentation.php';
 sendDynamicNoCacheHeaders();
 
 // Prueba visual reversible: cambiar a false restaura los gráficos y la nubosidad anteriores.
@@ -170,7 +172,7 @@ $visiblePageTitle = $isToday
     : 'El cielo el ' . todayLongDate($parsedDate);
 $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName];
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
-$daily = $nextDaily = $directions = $eventsData = null;
+$daily = $nextDaily = $directions = $eventsData = $phasesData = null;
 $apiError = false;
 $eventTypes = TODAY_VISUAL_EXPERIMENT_ENABLED
     ? 'moon_phase,full_moon_observation,apsis,conjunction,earthshine,libration,eclipse'
@@ -182,6 +184,7 @@ try {
     $nextDaily = todayApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $parsedDate->modify('+1 day')->format('Y-m-d')] + $common), 'today next daily', 15, $usingCustomLocation);
     $directions = todayApiRequest($apiBaseUrl . '/v1/astronomy/directions?' . http_build_query(['date' => $requestedDate, 'time' => '12:00:00'] + $common), 'today directions', 15, $usingCustomLocation);
     $eventsData = todayApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $requestedDate, 'days' => 1, 'types' => $eventTypes] + $common), 'today events', 35, $usingCustomLocation);
+    $phasesData = todayApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $parsedDate->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common), 'today phases', 35, $usingCustomLocation);
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas today configuration error: ' . $exception->getMessage());
 }
@@ -199,7 +202,7 @@ $visualLightData['_sun'] = [
     'set' => $sun['set'] ?? null,
     'day_length_seconds' => $sun['day_length_seconds'] ?? null,
 ];
-$phase = capitalizeVisibleText($moon['phase']['name'] ?? 'Fase no disponible');
+$phase = astronomyMoonPhaseLabelForLocalDate($requestedDate, $timezoneName, $phasesData['items'] ?? []) ?? 'Fase no disponible';
 $illumination = is_numeric($moon['illumination_percent'] ?? null) ? (int) round((float) $moon['illumination_percent']) : null;
 $isSupermoon = is_numeric($moon['apparent_size_percent'] ?? null) && (float) $moon['apparent_size_percent'] >= astronomySupermoonMinApparentSizePercent();
 $moonImageInstant = $parsedDate->setTime(12, 0);
@@ -261,6 +264,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
 <?php renderAnalyticsTracking(); ?>
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today.css'), ENT_QUOTES, 'UTF-8') ?>">
     <?php if (TODAY_VISUAL_EXPERIMENT_ENABLED): ?><link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today-visual-experiment.css'), ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -289,7 +293,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
             <div class="today-summary__body">
                 <img class="today-moon-image" src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="320" height="320" alt="Apariencia de la Luna el <?= htmlspecialchars(todayLongDate($parsedDate)) ?>">
                 <div class="today-summary__copy">
-                    <h3><?= htmlspecialchars($phase) ?></h3>
+                    <h2><?= htmlspecialchars($phase) ?></h2>
                     <p class="today-lead"><?= htmlspecialchars($moonSummary) ?></p>
                     <div class="today-highlights">
                         <p><strong><?= $illumination !== null ? htmlspecialchars((string) $illumination) . ' %' : '—' ?></strong><span>iluminada</span></p>
@@ -347,6 +351,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
             <div class="today-cloud-hours" data-today-cloud-hours hidden></div>
             <p class="today-help" data-today-cloud-recommendation hidden></p>
         </article><?php endif; ?>
+        <?php renderAstronomyExploreSky('today'); ?>
         <?php renderAstronomyTimings(); ?>
     </div></main>
 

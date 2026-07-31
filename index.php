@@ -14,6 +14,13 @@ require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/tonight.php';
 require_once __DIR__ . '/includes/astronomy-icon.php';
+require_once __DIR__ . '/includes/date-format.php';
+require_once __DIR__ . '/includes/event-date-header.php';
+require_once __DIR__ . '/includes/explore-sky.php';
+require_once __DIR__ . '/includes/moon-phase-presentation.php';
+require_once __DIR__ . '/includes/calendar-event.php';
+require_once __DIR__ . '/includes/home-upcoming-events.php';
+require_once __DIR__ . '/includes/content-system.php';
 sendDynamicNoCacheHeaders();
 
 function homeV2ApiRequest(string $url, string $context, int $timeout, bool $customLocation): ?array
@@ -52,12 +59,6 @@ function homeV2Hour($value, string $timezone): string
     return homeV2Date($value, $timezone)?->format('H:i') ?? '—';
 }
 
-function homeV2ShortDate(DateTimeImmutable $date): string
-{
-    $months = [1 => 'ene', 2 => 'feb', 3 => 'mar', 4 => 'abr', 5 => 'may', 6 => 'jun', 7 => 'jul', 8 => 'ago', 9 => 'sep', 10 => 'oct', 11 => 'nov', 12 => 'dic'];
-    return (int) $date->format('j') . ' ' . $months[(int) $date->format('n')];
-}
-
 function homeV2LongDate(DateTimeImmutable $date, bool $withYear = false): string
 {
     $months = [1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril', 5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto', 9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre'];
@@ -85,52 +86,7 @@ function homeV2HorizonLabel(string $kind, DateTimeImmutable $date, DateTimeImmut
 
 function homeV2TonightText(?array $data, array $events, DateTimeImmutable $now, string $timezone): ?string
 {
-    if ($data === null) {
-        return null;
-    }
-    $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
-    $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
-    $planets = astronomyTonightVisibleObjects(
-        is_array($data['planets'] ?? null) ? $data['planets'] : [],
-        astronomyTonightNightIsCurrent($data, $now, $timezone)
-    );
-    foreach ($events as $event) {
-        $date = homeV2Date($event['datetime'] ?? null, $timezone);
-        if (($event['type'] ?? '') !== 'conjunction' || $date === null || $nightStart === null || $nightEnd === null || $date < $nightStart || $date > $nightEnd) {
-            continue;
-        }
-        $presentation = astronomyEventPresentation($event, $timezone);
-        $planetNames = array_slice(array_column($planets, 'name'), 0, 2);
-        return rtrim($presentation['summary'] !== '' ? $presentation['summary'] : $presentation['title'], '.')
-            . ($planetNames !== [] ? '; también podrán verse ' . implode(' y ', $planetNames) : '') . '.';
-    }
-    if ($planets !== []) {
-        $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
-        $sentences = array_filter(array_map(static function (array $planet) use ($timezone, $nightStart): string {
-            $name = trim((string) ($planet['name'] ?? ''));
-            $start = astronomyTonightDateTime($planet['visibility_start'] ?? null, $timezone);
-            if ($name === '') {
-                return '';
-            }
-            if (($planet['visibility_status'] ?? null) === 'visible_now') {
-                return $name . ' está visible ahora.';
-            }
-            if ($start === null) {
-                return '';
-            }
-            if ($nightStart !== null && abs($start->getTimestamp() - $nightStart->getTimestamp()) <= 20 * 60) {
-                return 'Al anochecer, ' . $name . ' ya estará visible.';
-            }
-            return $name . ' saldrá por el este a las ' . $start->format('H:i') . '.';
-        }, array_slice($planets, 0, 2)));
-        return implode(' ', $sentences);
-    }
-    $stars = astronomyTonightVisibleObjects(is_array($data['stars'] ?? null) ? $data['stars'] : [], astronomyTonightNightIsCurrent($data, $now, $timezone));
-    if ($stars !== []) {
-        $names = array_slice(array_column($stars, 'name'), 0, 2);
-        return implode(' y ', $names) . (count($names) === 1 ? ' será una estrella notable para buscar esta noche.' : ' serán dos estrellas notables para buscar esta noche.');
-    }
-    return 'Esta noche no habrá planetas visibles a simple vista desde tu ubicación.';
+    return astronomyTonightCardText($data, $events, $now, $timezone);
 }
 
 $location = astronomyLocationContext();
@@ -142,7 +98,8 @@ $now = get_current_datetime($timezoneName);
 $dateParam = $now->format('Y-m-d');
 $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName];
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
-$daily = $nextDaily = $phasesData = $eventsData = $tonightData = $moonInstantRaw = null;
+$daily = $nextDaily = $phasesData = $tonightData = $moonInstantRaw = null;
+$upcomingEvents = [];
 $hasApiError = false;
 
 try {
@@ -151,7 +108,24 @@ try {
     $nextDaily = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $now->modify('+1 day')->format('Y-m-d')] + $common), 'home v2 next daily', 12, $usingCustomLocation);
     $moonInstantRaw = homeV2ApiRequest($apiBaseUrl . '/v1/moon/instant?' . http_build_query(['datetime' => $now->format(DateTimeInterface::ATOM)] + $common), 'home v2 moon instant', 12, $usingCustomLocation);
     $phasesData = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $now->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common), 'home v2 phases', 35, $usingCustomLocation);
-    $eventsData = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $dateParam, 'days' => 30, 'types' => 'moon_phase,apsis,conjunction,earthshine,full_moon_observation', 'max_difference_minutes' => 70] + $common), 'home v2 upcoming', 20, $usingCustomLocation);
+    $upcomingSearch = homeUpcomingProgressiveSearch(
+        $now,
+        $timezoneName,
+        static function (string $startDate, int $days, string $segmentLabel) use ($apiBaseUrl, $common, $usingCustomLocation): ?array {
+            return homeV2ApiRequest(
+                $apiBaseUrl . '/v1/astronomy/events?' . http_build_query([
+                    'start_date' => $startDate,
+                    'days' => $days,
+                    'types' => HOME_UPCOMING_EVENT_TYPES,
+                    'max_difference_minutes' => 70,
+                ] + $common),
+                'home v2 upcoming ' . $segmentLabel,
+                20,
+                $usingCustomLocation
+            );
+        }
+    );
+    $upcomingEvents = $upcomingSearch['events'];
     $tonightData = astronomyTonightRequest($apiBaseUrl, $location, $dateParam, 'summary', 'home v2 tonight', 8);
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas home v2 API configuration error: ' . $exception->getMessage());
@@ -171,13 +145,6 @@ foreach (($phasesData['items'] ?? []) as $event) {
     }
 }
 uasort($nextPhases, static fn(array $a, array $b): int => (homeV2Date($a['datetime'] ?? null, $timezoneName)?->getTimestamp() ?? PHP_INT_MAX) <=> (homeV2Date($b['datetime'] ?? null, $timezoneName)?->getTimestamp() ?? PHP_INT_MAX));
-$upcomingEvents = array_values(array_filter($eventsData['items'] ?? [], static function ($event) use ($now, $timezoneName): bool {
-    $date = is_array($event) ? homeV2Date($event['datetime'] ?? null, $timezoneName) : null;
-    return $date !== null && $date >= $now;
-}));
-usort($upcomingEvents, static fn(array $a, array $b): int => (homeV2Date($a['datetime'] ?? null, $timezoneName)?->getTimestamp() ?? PHP_INT_MAX) <=> (homeV2Date($b['datetime'] ?? null, $timezoneName)?->getTimestamp() ?? PHP_INT_MAX));
-$upcomingEvents = array_slice($upcomingEvents, 0, 4);
-
 $moonInstant = homeValidateMoonInstant($moonInstantRaw);
 $moonSituation = null;
 $moonriseNoticeLevel = null;
@@ -202,7 +169,7 @@ if ($moonInstant !== null) {
     $moonriseNoticeLevel = $moonSituationPresentation['level'];
 }
 $moon = $daily['moon'] ?? [];
-$moonPhase = capitalizeVisibleText($moon['phase']['name'] ?? 'Sin datos');
+$moonPhase = astronomyMoonPhaseLabelForLocalDate($dateParam, $timezoneName, $phasesData['items'] ?? []) ?? 'Fase no disponible';
 $illumination = isset($moon['illumination_percent']) ? round((float) $moon['illumination_percent']) . '%' : null;
 $apparentSizeNumber = is_numeric($moon['apparent_size_percent'] ?? null) ? (float) $moon['apparent_size_percent'] : null;
 $isSupermoon = $apparentSizeNumber !== null && $apparentSizeNumber >= astronomySupermoonMinApparentSizePercent();
@@ -224,6 +191,9 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/calendar-scheduler.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/content-trivia.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/protected-photos.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyMobileSwipeNavigationScript('home'); ?>
@@ -241,7 +211,7 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
             <div class="home-v2-moon__body">
                 <div class="home-v2-moon__image"><img src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="360" height="360" alt="Apariencia actual de la Luna desde <?= htmlspecialchars($locationLabel) ?>"></div>
                 <div class="home-v2-moon__copy">
-                    <h3><?= htmlspecialchars($moonPhase) ?></h3>
+                    <h2><?= htmlspecialchars($moonPhase) ?></h2>
                     <?php if ($moonHorizonEvents !== []): ?><div class="home-v2-horizon" aria-label="Próximos horarios de la Luna">
                         <?php foreach ($moonHorizonEvents as $horizonEvent): ?><p><time datetime="<?= htmlspecialchars($horizonEvent['date']->format(DateTimeInterface::ATOM)) ?>"><?= htmlspecialchars(homeV2HorizonLabel($horizonEvent['kind'], $horizonEvent['date'], $now)) ?></time></p><?php endforeach; ?>
                     </div><?php endif; ?>
@@ -257,17 +227,7 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
 
         <article class="home-v2-card home-v2-tonight atmosphere-card--night" aria-labelledby="v2-tonight-title">
             <div class="home-v2-card__heading"><h2 id="v2-tonight-title">El cielo esta noche</h2></div>
-            <div class="home-v2-tonight__layout">
-                <p class="home-v2-tonight__summary"><?= htmlspecialchars($tonightText ?? 'La información de esta noche no está disponible por el momento.') ?></p>
-                <div class="home-v2-night-scene" aria-label="Esquema orientativo del cielo, no representa posiciones precisas">
-                    <span class="home-v2-night-scene__star home-v2-night-scene__star--one"></span>
-                    <span class="home-v2-night-scene__star home-v2-night-scene__star--two"></span>
-                    <span class="home-v2-night-scene__object home-v2-night-scene__object--one"></span>
-                    <span class="home-v2-night-scene__object home-v2-night-scene__object--two"></span>
-                    <span class="home-v2-night-scene__horizon"></span>
-                    <span class="home-v2-night-scene__east">E</span><span class="home-v2-night-scene__south">S</span><span class="home-v2-night-scene__west">O</span>
-                </div>
-            </div>
+            <p class="home-v2-tonight__summary"><?= htmlspecialchars($tonightText ?? 'La información de esta noche no está disponible por el momento.') ?></p>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('cielo-de-esta-noche.php'), ENT_QUOTES, 'UTF-8') ?>">Explorar esta noche <span aria-hidden="true">→</span></a>
         </article>
 
@@ -278,7 +238,7 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
                 <?php foreach ($nextPhases as $index => $phase): $date = homeV2Date($phase['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($phase, $timezoneName); ?>
                 <div class="home-v2-phase<?= $index === array_key_first($nextPhases) ? ' home-v2-phase--featured' : '' ?>">
                     <?php renderAstronomyIcon($phase, $latitude, 'home-v2-phase__icon'); ?>
-                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><p><?= $date !== null ? htmlspecialchars($index === array_key_first($nextPhases) ? homeV2ShortDate($date) . ' · ' . $date->format('H:i') : homeV2ShortDate($date)) : 'Fecha no disponible' ?></p></div>
+                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php renderAstronomyEventDateHeader($date, $now, $date !== null ? ($index === array_key_first($nextPhases) ? astronomyNearbyEventDate($date) . ' · ' . $date->format('H:i') : astronomyNearbyEventDate($date)) : 'Fecha no disponible', ['class' => 'home-v2-phase__date']); ?></div>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -289,33 +249,39 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
         <article class="home-v2-card home-v2-upcoming-card atmosphere-card--night" aria-labelledby="v2-upcoming-title">
             <div class="home-v2-card__heading"><h2 id="v2-upcoming-title">Lo próximo</h2></div>
             <?php if ($upcomingEvents !== []): ?><div class="home-v2-upcoming">
-                <?php foreach ($upcomingEvents as $index => $event): $date = homeV2Date($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); ?>
+                <?php foreach ($upcomingEvents as $index => $event): $date = homeV2Date($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $horizonDetail = astronomyFullMoonObservationMoment($event, $timezoneName); $observation = is_array($presentation['observation'] ?? null) ? $presentation['observation'] : null; $calendarEvent = astronomyCalendarEventData($event, $presentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eventos.php')); ?>
                 <section class="<?= $index === 0 ? 'home-v2-event home-v2-event--featured' : 'home-v2-event' ?>">
                     <?php renderAstronomyIcon($event, $latitude, 'home-v2-event__icon'); ?>
-                    <?php if ($date !== null): ?><time datetime="<?= htmlspecialchars($date->format(DateTimeInterface::ATOM)) ?>"><?= htmlspecialchars($index === 0 ? homeV2LongDate($date) : homeV2ShortDate($date)) ?></time><?php endif; ?>
-                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?></div>
+                    <?php if ($date !== null): ?><?php renderAstronomyEventDateHeader($date, $now, astronomyNearbyEventDate($date), ['class' => 'home-v2-event__date']); ?><?php endif; ?>
+                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if ($observation !== null): ?><p class="home-v2-event__times"><?= htmlspecialchars($observation['first_label']) ?> <?= htmlspecialchars($observation['first_time']->format('H:i')) ?> · <?= htmlspecialchars($observation['second_label']) ?> <?= htmlspecialchars($observation['second_time']->format('H:i')) ?> · Intervalo <?= htmlspecialchars($observation['start']->format('H:i')) ?>–<?= htmlspecialchars($observation['end']->format('H:i')) ?></p><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($observation['cloud_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span>Nubosidad prevista</span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php elseif ($horizonDetail !== null): ?><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span><?= htmlspecialchars($horizonDetail['label']) ?> · <time datetime="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($horizonDetail['date']->format('H:i')) ?></time></span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php endif; ?><?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--home'); ?></div>
                 </section>
                 <?php endforeach; ?>
             </div><?php else: ?><p class="home-v2-unavailable">No hay eventos cercanos para mostrar.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('eventos.php'), ENT_QUOTES, 'UTF-8') ?>">Ver todos los eventos <span aria-hidden="true">→</span></a>
         </article>
 
-        <section class="home-v2-card home-v2-explore" aria-labelledby="home-explore-title">
-            <div class="home-v2-card__heading"><h2 id="home-explore-title">Explorá el cielo</h2></div>
-            <p class="home-v2-explore__intro">Todo lo que necesitás para disfrutar, entender y fotografiar el cielo.</p>
-            <div class="home-v2-explore__grid">
-                <?php foreach ([
-                    ['today', 'El cielo hoy', 'Luna, Sol y luz del día.', 'cielo-de-hoy.php'],
-                    ['tonight', 'El cielo esta noche', 'Planetas y estrellas visibles.', 'cielo-de-esta-noche.php'],
-                    ['calendar', 'Calendario solar y lunar', 'Horarios y próximas fases.', 'sol-y-luna.php'],
-                    ['events', 'Eventos lunares', 'Conjunciones y momentos destacados.', 'eventos.php'],
-                    ['eclipses', 'Eclipses', 'Cuándo ocurren y cómo se verán.', 'eclipses.php'],
-                    ['planner', 'Planificador', 'Direcciones para planificar tus fotos.', 'planificador.php'],
-                ] as [$theme, $title, $description, $url]): ?>
-                <a class="home-v2-explore__card home-v2-explore__card--<?= $theme ?>" href="<?= htmlspecialchars(astronomyInternalUrl($url), ENT_QUOTES, 'UTF-8') ?>"><span class="home-v2-explore__visual" aria-hidden="true"><span></span><i></i></span><span><strong><?= htmlspecialchars($title) ?></strong><small><?= htmlspecialchars($description) ?></small></span><span class="home-v2-explore__arrow" aria-hidden="true">→</span></a>
-                <?php endforeach; ?>
+        <?php if (isContentEnabled()): ?><?php renderAstronomyHomeContentCards(astronomyLoadContentCatalog()); ?><?php endif; ?>
+        <?php renderAstronomyExploreSky(); ?>
+        <article class="home-v2-card home-v2-install-card" data-install-card hidden aria-labelledby="v2-install-title">
+            <div class="home-v2-card__heading home-v2-install-card__heading">
+                <h2 id="v2-install-title" data-install-title>Tené Aquellas Lunas a mano</h2>
+                <button class="home-v2-install-card__dismiss" type="button" data-install-dismiss data-install-source="home_card" aria-label="Cerrar sugerencia de instalación">×</button>
             </div>
-        </section>
+            <p class="home-v2-install-card__copy" data-install-copy>Guardá Aquellas Lunas en tu dispositivo para volver a abrirla rápido desde la pantalla de inicio o desde favoritos.</p>
+            <div class="home-v2-install-card__actions">
+                <button type="button" class="button button-primary" data-install-action data-install-trigger data-install-source="home_card">Instalar</button>
+                <button type="button" class="button compact-secondary-button" data-install-secondary data-install-source="home_card" hidden>Guardar en favoritos</button>
+                <button type="button" class="home-v2-install-card__help-toggle" data-install-help-toggle data-install-source="home_card" hidden>Ver pasos</button>
+            </div>
+            <p class="home-v2-install-card__status" data-install-status aria-live="polite"></p>
+            <div class="home-v2-install-card__help" data-install-help hidden>
+                <ol>
+                    <li>Tocar Compartir.</li>
+                    <li>Elegir Agregar a pantalla de inicio.</li>
+                    <li>Confirmar con Agregar.</li>
+                </ol>
+            </div>
+        </article>
         <?php renderAstronomyTimings(); ?>
     </div></main>
     <?php renderAstronomySiteFooter(); ?>

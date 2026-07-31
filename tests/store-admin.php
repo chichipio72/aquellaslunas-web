@@ -33,6 +33,7 @@ try {
     storeAdminAssert(!storeAdminIsAuthenticated(), 'Un login incorrecto autenticó la sesión.');
     storeAdminAssert(attemptStoreAdminLogin('test-admin', 'correct-password'), 'Se rechazó el login correcto.');
     storeAdminAssert(storeAdminIsAuthenticated(), 'La sesión no quedó autenticada.');
+    storeAdminAssert(STORE_ADMIN_HOME_PATH === 'index.php', 'El login correcto no tiene configurado el panel como destino.');
     storeAdminAssert(session_id() !== $beforeLoginId, 'No se regeneró session_id al autenticar.');
 
     $csrf = storeAdminCsrfToken();

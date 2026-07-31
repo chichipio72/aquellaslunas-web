@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/store-admin-auth.php';
+require_once __DIR__ . '/../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../includes/store-database.php';
 require_once __DIR__ . '/../includes/store-admin-photos.php';
 
@@ -70,8 +71,7 @@ try {
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive"><title>Fotos · Administración</title>
 <link rel="stylesheet" href="<?= htmlspecialchars('../' . versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>"></head>
-<body class="store-admin"><header class="store-admin-header"><div><p class="eyebrow">Área privada</p><h1>Fotos</h1></div>
-<form method="post" action="logout.php"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars(storeAdminCsrfToken(), ENT_QUOTES, 'UTF-8') ?>"><button type="submit" class="secondary-button">Cerrar sesión</button></form></header>
+<body class="store-admin"><?php renderStoreAdminNavigation('gallery', 'Galería y tienda'); ?>
 <main class="store-admin-main">
 <?php if ($message): ?><p class="store-admin-success" role="status"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($error): ?><p class="store-admin-alert" role="alert">No se pudo completar la operación.</p><?php endif; ?>

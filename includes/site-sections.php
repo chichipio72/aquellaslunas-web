@@ -14,8 +14,12 @@ function astronomySiteSections(): array
         'events' => ['id' => 'events', 'label' => 'Eventos lunares', 'url' => 'eventos.php', 'order' => 30, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 50],
         'eclipses' => ['id' => 'eclipses', 'label' => 'Eclipses', 'url' => 'eclipses.php', 'order' => 40, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 60],
         'planner' => ['id' => 'planner', 'label' => 'Planificador', 'url' => 'planificador.php', 'order' => 50, 'menu_enabled' => true, 'swipe_enabled' => true, 'swipe_order' => 70],
-        'gallery' => ['id' => 'gallery', 'label' => 'Galería', 'url' => 'galeria.php', 'order' => 60, 'menu_enabled' => false, 'swipe_enabled' => false],
+        'gallery' => ['id' => 'gallery', 'label' => 'Galería', 'url' => 'galeria.php', 'order' => 60, 'menu_enabled' => isLocalEnvironment(), 'swipe_enabled' => false],
+        'visual_tests' => ['id' => 'visual_tests', 'label' => 'Pruebas visuales', 'url' => 'pruebas-visuales.php', 'order' => 65, 'menu_enabled' => isLocalEnvironment(), 'swipe_enabled' => false],
+        'content' => ['id' => 'content', 'label' => 'Contenidos', 'url' => 'contenidos.php', 'order' => 67, 'menu_enabled' => isContentEnabled(), 'swipe_enabled' => false],
+        'content_editor' => ['id' => 'content_editor', 'label' => 'Editor de contenidos', 'url' => 'local-tools/content-editor/', 'order' => 68, 'menu_enabled' => isLocalEnvironment(), 'swipe_enabled' => false],
         'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 70, 'menu_enabled' => true, 'swipe_enabled' => false],
+        'capabilities' => ['id' => 'capabilities', 'label' => 'Qué ofrece Aquellas Lunas', 'url' => 'que-podes-hacer.php', 'order' => 75, 'menu_enabled' => true, 'swipe_enabled' => false],
         'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 80, 'menu_enabled' => true, 'swipe_enabled' => false],
     ];
     uasort($sections, static fn(array $first, array $second): int => $first['order'] <=> $second['order']);
@@ -42,12 +46,22 @@ function astronomySiteSectionUrl(string $sectionId): string
 function renderAstronomySiteNavigation(string $currentSectionId): void
 {
     ?><nav class="site-nav" aria-label="Navegación principal"><?php
+    $installRendered = false;
     foreach (astronomySiteSections() as $section) {
+        if ($section['id'] === 'about') {
+            if (!$installRendered) {
+                ?><button class="site-nav__action" type="button" data-install-trigger data-install-source="menu" aria-label="Instalar Aquellas Lunas">Instalar Aquellas Lunas</button><?php
+                $installRendered = true;
+            }
+        }
         if ($section['menu_enabled'] !== true) {
             continue;
         }
         $isCurrent = $section['id'] === $currentSectionId;
         ?><a href="<?= htmlspecialchars(astronomyInternalUrl($section['url']), ENT_QUOTES, 'UTF-8') ?>"<?= $isCurrent ? ' class="is-active" aria-current="page"' : '' ?>><?= htmlspecialchars($section['label']) ?></a><?php
+    }
+    if (!$installRendered) {
+        ?><button class="site-nav__action" type="button" data-install-trigger data-install-source="menu" aria-label="Instalar Aquellas Lunas">Instalar Aquellas Lunas</button><?php
     }
     ?></nav><?php
 }

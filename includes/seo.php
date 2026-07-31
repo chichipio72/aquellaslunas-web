@@ -30,6 +30,19 @@ if (!function_exists('aquellasLunasCanonicalUrl')) {
     }
 }
 
+if (!function_exists('aquellasLunasDefaultSocialImage')) {
+    function aquellasLunasDefaultSocialImage(): array
+    {
+        return [
+            'url' => aquellasLunasCanonicalUrl('/assets/images/social/aquellas-lunas-social.jpg'),
+            'width' => 1200,
+            'height' => 630,
+            'type' => 'image/jpeg',
+            'alt' => 'Fotografía de la Luna de Aquellas Lunas',
+        ];
+    }
+}
+
 if (!function_exists('aquellasLunasSeoPage')) {
     function aquellasLunasSeoPage(string $title, string $description, string $path, string $type = 'website'): array
     {
@@ -53,6 +66,7 @@ if (!function_exists('renderSeoHead')) {
         $type = $page['type'] ?? 'website';
         $path = $page['path'] ?? '/';
         $url = $canonicalUrl;
+        $socialImage = array_replace(aquellasLunasDefaultSocialImage(), $page['image'] ?? []);
 
         echo '    <title>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</title>' . PHP_EOL;
         echo '    <meta name="description" content="' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
@@ -64,12 +78,23 @@ if (!function_exists('renderSeoHead')) {
         echo '    <meta property="og:type" content="' . htmlspecialchars($type, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:url" content="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:site_name" content="' . htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta property="og:image" content="' . htmlspecialchars($socialImage['url'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta property="og:image:width" content="' . (int) $socialImage['width'] . '">' . PHP_EOL;
+        echo '    <meta property="og:image:height" content="' . (int) $socialImage['height'] . '">' . PHP_EOL;
+        echo '    <meta property="og:image:type" content="' . htmlspecialchars($socialImage['type'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta property="og:image:alt" content="' . htmlspecialchars($socialImage['alt'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta name="twitter:card" content="summary_large_image">' . PHP_EOL;
         echo '    <meta name="twitter:title" content="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta name="twitter:description" content="' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta name="twitter:image" content="' . htmlspecialchars($socialImage['url'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta name="twitter:image:alt" content="' . htmlspecialchars($socialImage['alt'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
 
-        $schemaOrgType = $type === 'website' ? 'WebSite' : 'WebPage';
-        $schemaOrgName = $siteName;
+        $schemaOrgType = match ($type) {
+            'website' => 'WebSite',
+            'article' => 'Article',
+            default => 'WebPage',
+        };
+        $schemaOrgName = $type === 'website' ? $siteName : $title;
         $schemaOrgDescription = $description;
         $schemaOrgUrl = $url;
         $schemaOrgLanguage = 'es';
@@ -80,9 +105,15 @@ if (!function_exists('renderSeoHead')) {
             'url' => $schemaOrgUrl,
             'inLanguage' => $schemaOrgLanguage,
             'description' => $schemaOrgDescription,
+            'image' => $socialImage['url'],
         ];
 
         if ($type !== 'website') {
+            $schemaOrgJson['isPartOf'] = [
+                '@type' => 'WebSite',
+                'name' => $siteName,
+                'url' => aquellasLunasCanonicalUrl('/'),
+            ];
             $schemaOrgJson['about'] = [
                 '@type' => 'Thing',
                 'name' => $title,

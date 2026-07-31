@@ -9,12 +9,16 @@ require_once __DIR__ . '/location-preferences.php';
  */
 function astronomyLocationContext(): array
 {
+    $hadStoredValues = astronomyLocationRequestWasInvalid();
     $fallback = [
         'name' => 'Buenos Aires',
         'latitude' => ASTRONOMY_DEFAULT_LATITUDE,
         'longitude' => ASTRONOMY_DEFAULT_LONGITUDE,
         'timezone' => ASTRONOMY_DEFAULT_TIMEZONE,
         'mode' => 'default',
+        'confirmed' => false,
+        'initial' => true,
+        'stored_invalid' => false,
     ];
     $latitude = astronomyLocationCoordinate($_COOKIE['astro_latitude'] ?? null, -90, 90);
     $longitude = astronomyLocationCoordinate($_COOKIE['astro_longitude'] ?? null, -180, 180);
@@ -22,6 +26,10 @@ function astronomyLocationContext(): array
     $mode = astronomyLocationMode($_COOKIE['astro_location_mode'] ?? null);
 
     if ($latitude === null || $longitude === null || $timezone === null || $mode === null) {
+        if ($hadStoredValues) {
+            astronomyClearStoredLocation(true);
+            $fallback['stored_invalid'] = true;
+        }
         return $fallback;
     }
     $name = astronomyStoredLocationLabel($latitude, $longitude, $mode);
@@ -39,6 +47,9 @@ function astronomyLocationContext(): array
         'longitude' => $longitude,
         'timezone' => $timezone,
         'mode' => $mode,
+        'confirmed' => astronomyLocationIsConfirmed(),
+        'initial' => !astronomyLocationIsConfirmed(),
+        'stored_invalid' => false,
     ];
 }
 

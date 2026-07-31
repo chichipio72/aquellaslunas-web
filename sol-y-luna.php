@@ -10,6 +10,7 @@ require_once __DIR__ . '/includes/asset-url.php';
 require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
+require_once __DIR__ . '/includes/explore-sky.php';
 sendDynamicNoCacheHeaders();
 
 $defaultDays = 30;
@@ -185,7 +186,7 @@ if ($apiErrorMessage === null && empty($rows)) {
     astronomyApiRecordValidation('range', true, false);
     error_log('Aquellas Lunas API invalid response: range contains no items.');
 }
-$pageSeo = aquellasLunasSeoPage('Sol y Luna | Aquellas Lunas', 'Vista de Sol y Luna con datos astronómicos para varios días y una barra de visibilidad del cielo.', '/sol-y-luna.php', 'article');
+$pageSeo = aquellasLunasSeoPage('Calendario solar y lunar | Aquellas Lunas', 'Calendario solar y lunar con horarios, fases e intervalos de visibilidad para varios días.', '/sol-y-luna.php', 'article');
 if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));
@@ -200,6 +201,7 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
 <?php renderAnalyticsTracking(); ?>
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/sky-timeline.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/sky-popover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -264,7 +266,7 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                                 <th scope="col" title="Puesta de la Luna" aria-label="Puesta de la Luna"><span class="astro-symbol astro-symbol--moon" aria-hidden="true">🌙</span> <span class="astro-arrow astro-arrow--set" aria-hidden="true">↓</span></th>
                                 <th scope="col" title="Iluminación lunar" aria-label="Iluminación lunar">Luz</th>
                                 <th scope="col" title="Edad lunar en días" aria-label="Edad lunar en días">Edad</th>
-                                <th scope="col" title="Visibilidad del Sol y la Luna" aria-label="Visibilidad del Sol y la Luna">Cielo</th>
+                                <th class="visibility-column-heading" scope="col" title="Horarios de visibilidad" aria-label="Horarios de visibilidad"><span>Horarios de visibilidad</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -365,6 +367,7 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                 </div>
             </section>
             <?php endif; ?>
+            <?php renderAstronomyExploreSky('calendar'); ?>
             <?php renderAstronomyTimings(); ?>
         </div>
     </main>

@@ -3,6 +3,8 @@
 const ASTRONOMY_DEFAULT_LATITUDE = -34.53;
 const ASTRONOMY_DEFAULT_LONGITUDE = -58.48;
 const ASTRONOMY_DEFAULT_TIMEZONE = 'America/Argentina/Buenos_Aires';
+const ASTRONOMY_LOCATION_COOKIE_DAYS = 400;
+const ASTRONOMY_LOCATION_COOKIE_LIFETIME = 60 * 60 * 24 * ASTRONOMY_LOCATION_COOKIE_DAYS;
 
 function astronomyLocationCoordinate($value, float $minimum, float $maximum): ?float
 {
@@ -65,6 +67,64 @@ function astronomyStoredLocationLabel(float $latitude, float $longitude, string 
     }
     return astronomyLocationName($_COOKIE['astro_location_name'] ?? null)
         ?? astronomyLocationCoordinateLabel($latitude, $longitude);
+}
+
+function astronomyLocationCookieOptions(?int $expires = null): array
+{
+    $secure = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+    return [
+        'expires' => $expires ?? time() + ASTRONOMY_LOCATION_COOKIE_LIFETIME,
+        'path' => '/',
+        'secure' => $secure,
+        'httponly' => false,
+        'samesite' => 'Lax',
+    ];
+}
+
+function astronomyLocationHasCompleteCookies(): bool
+{
+    return astronomyLocationCoordinate($_COOKIE['astro_latitude'] ?? null, -90, 90) !== null
+        && astronomyLocationCoordinate($_COOKIE['astro_longitude'] ?? null, -180, 180) !== null
+        && astronomyLocationTimezone($_COOKIE['astro_timezone'] ?? null) !== null
+        && astronomyLocationMode($_COOKIE['astro_location_mode'] ?? null) !== null
+        && astronomyLocationName($_COOKIE['astro_location_name'] ?? null) !== null;
+}
+
+function astronomyLocationIsConfirmed(): bool
+{
+    if (!astronomyLocationHasCompleteCookies()) {
+        return false;
+    }
+    $mode = astronomyLocationMode($_COOKIE['astro_location_mode'] ?? null);
+    return $mode !== 'default' || ($_COOKIE['astro_location_confirmed'] ?? null) === '1';
+}
+
+function astronomyLocationIntroWasSeen(): bool
+{
+    return ($_COOKIE['astro_location_intro_seen'] ?? null) === '1';
+}
+
+function astronomyStoreLocationIntroSeen(): void
+{
+    setcookie('astro_location_intro_seen', '1', astronomyLocationCookieOptions());
+}
+
+function astronomyClearStoredLocation(bool $clearIntro = false): void
+{
+    $options = astronomyLocationCookieOptions(time() - 3600);
+    foreach ([
+        'astro_latitude',
+        'astro_longitude',
+        'astro_timezone',
+        'astro_location_mode',
+        'astro_location_name',
+        'astro_location_confirmed',
+    ] as $cookie) {
+        setcookie($cookie, '', $options);
+    }
+    if ($clearIntro) {
+        setcookie('astro_location_intro_seen', '', $options);
+    }
 }
 
 function astronomyReverseGeocode(float $latitude, float $longitude): string
@@ -163,14 +223,15 @@ function astronomyReverseGeocode(float $latitude, float $longitude): string
 function astronomyStoreLocation(float $latitude, float $longitude, string $timezone, string $mode, ?string $name = null): void
 {
     $mode = astronomyLocationMode($mode) ?? 'default';
-    $expires = time() + 60 * 60 * 24 * 30;
-    $options = ['expires' => $expires, 'path' => '/', 'samesite' => 'Lax'];
+    $options = astronomyLocationCookieOptions();
     setcookie('astro_latitude', (string) $latitude, $options);
     setcookie('astro_longitude', (string) $longitude, $options);
     setcookie('astro_timezone', $timezone, $options);
     setcookie('astro_location_mode', $mode, $options);
     setcookie('astro_location_name', astronomyLocationName($name)
         ?? ($mode === 'default' ? 'Buenos Aires' : astronomyLocationCoordinateLabel($latitude, $longitude)), $options);
+    setcookie('astro_location_confirmed', '1', $options);
+    setcookie('astro_location_intro_seen', '1', $options);
 }
 
 function astronomyStoreDefaultLocation(): void
@@ -224,24 +285,8 @@ function astronomyApiRejectedLocationParameters(array $result): bool
     return preg_match('/\b(latitude|longitude|timezone)\b/', $body) === 1;
 }
 
-function astronomyRecoverDefaultLocationFromApi(array $result): never
+function astronomyRecoverDefaultLocationFromApi(array $result): void
 {
     error_log('Aquellas Lunas location parameters rejected by API with HTTP status '
-        . (int) ($result['http_code'] ?? 0) . '; falling back to Buenos Aires.');
-    astronomyStoreDefaultLocation();
-
-    $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
-    $parts = parse_url($requestUri);
-    $query = [];
-    parse_str((string) ($parts['query'] ?? ''), $query);
-    foreach (['latitude', 'longitude', 'timezone', 'location_action'] as $parameter) {
-        unset($query[$parameter]);
-    }
-    $query['location_status'] = 'api_rejected';
-    $target = (string) ($parts['path'] ?? '/');
-    if ($query !== []) {
-        $target .= '?' . http_build_query($query);
-    }
-    header('Location: ' . $target, true, 303);
-    exit;
+        . (int) ($result['http_code'] ?? 0) . '; preserving the confirmed location.');
 }

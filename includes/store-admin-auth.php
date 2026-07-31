@@ -4,6 +4,7 @@ require_once __DIR__ . '/api-config.php';
 
 const STORE_ADMIN_SESSION_KEY = 'store_admin_authenticated';
 const STORE_ADMIN_CSRF_KEY = 'store_admin_csrf_token';
+const STORE_ADMIN_HOME_PATH = 'index.php';
 
 function sendStoreAdminHeaders(): void
 {

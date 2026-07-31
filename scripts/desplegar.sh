@@ -6,21 +6,94 @@ readonly EXPECTED_ROOT='/srv/proyectos/astronomia/web'
 readonly FTP_HOST='set.servidoraweb.net'
 readonly FTP_PORT='21'
 readonly FTP_USER='andres@aquellaslunas.com.ar'
+readonly ROOT_ROBOTS_REMOTE_PATH='robots.txt'
 
 usage() {
-    printf 'Uso: %s [--dry-run]\n' "$0" >&2
+    printf 'Uso: %s [--dry-run|--list-local]\n' "$0" >&2
 }
 
 dry_run_option=''
+list_local=false
 case "${1:-}" in
     '') ;;
     --dry-run) dry_run_option='--dry-run' ;;
+    --list-local) list_local=true ;;
     *) usage; exit 2 ;;
 esac
 
 if (( $# > 1 )); then
     usage
     exit 2
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+local_root="$(cd -- "${script_dir}/.." && pwd -P)"
+
+if [[ "$local_root" != "$EXPECTED_ROOT" || ! -f "$local_root/index.php" || ! -f "$local_root/sol-y-luna.php" ]]; then
+    printf 'Error: la carpeta local no es %s o no contiene la web esperada.\n' "$EXPECTED_ROOT" >&2
+    exit 1
+fi
+
+readonly -a DEPLOY_EXCLUDE_PATTERNS=(
+    '^\.git(/|$)'
+    '^\.github(/|$)'
+    '^\.vscode(/|$)'
+    '^\.idea(/|$)'
+    '(^|/)\.venv(/|$)'
+    '^docs(/|$)'
+    '^apache(/|$)'
+    '^scripts(/|$)'
+    '^tests(/|$)'
+    '(^|/)local-tools(/|$)'
+    '^storage(/|$)'
+    '(^|/)Dockerfile[^/]*$'
+    '^docker-compose\.yml$'
+    '^\.(dockerignore|gitignore)$'
+    '(^|/)\.env(\..*)?$'
+    '^README\.md$'
+    '(^|/)requirements\.txt$'
+    '^robots\.txt$'
+    '^(cuarto|llena|luna-nueva)\.png$'
+    '^php\.ini$'
+    '^pytest\.ini$'
+    '\.[Cc][Ss][Vv]$'
+    '\.[Zz][Ii][Pp]$'
+    '(^|/)(logs?)(/|$)'
+    '\.log$'
+    '(^|/)(tmp|temp)(/|$)'
+    '\.(tmp|temp)$'
+    '\.pid$'
+    '(^|/)(\.cache|cache|__pycache__|coverage)(/|$)'
+    '\.(py|py[co]|sw[op])$'
+    '(^|/)(\.DS_Store|Thumbs\.db|Desktop\.ini)$'
+    '(^|/)~[^/]*$'
+    '~$'
+    '^\.phpunit\.result\.cache$'
+)
+
+deployment_path_is_excluded() {
+    local relative_path="$1"
+    local pattern
+    for pattern in "${DEPLOY_EXCLUDE_PATTERNS[@]}"; do
+        if [[ "$relative_path" =~ $pattern ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [[ "$list_local" == true ]]; then
+    candidate_count=0
+    while IFS= read -r -d '' local_path; do
+        relative_path="${local_path#"$local_root"/}"
+        if deployment_path_is_excluded "$relative_path"; then
+            continue
+        fi
+        printf '%s\n' "$relative_path"
+        ((candidate_count += 1))
+    done < <(find "$local_root" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
+    printf 'LISTADO LOCAL: %d archivos o enlaces candidatos; no se realizó ninguna conexión ni transferencia.\n' "$candidate_count" >&2
+    exit 0
 fi
 
 if ! command -v lftp >/dev/null 2>&1; then
@@ -33,16 +106,35 @@ if [[ -z "${ASTRONOMY_FTP_PASSWORD:-}" ]]; then
     exit 1
 fi
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-local_root="$(cd -- "${script_dir}/.." && pwd -P)"
-
-if [[ "$local_root" != "$EXPECTED_ROOT" || ! -f "$local_root/index.php" || ! -f "$local_root/sol-y-luna.php" ]]; then
-    printf 'Error: la carpeta local no es %s o no contiene la web esperada.\n' "$EXPECTED_ROOT" >&2
-    exit 1
-fi
-
 export LFTP_PASSWORD="$ASTRONOMY_FTP_PASSWORD"
 trap 'unset LFTP_PASSWORD' EXIT
+
+if [[ -n "${ASTRONOMY_ROOT_FTP_USER:-}" && -n "${ASTRONOMY_ROOT_FTP_PASSWORD:-}" ]]; then
+    if [[ -n "$dry_run_option" ]]; then
+        printf 'DRY RUN: se publicaría %s como /%s mediante la cuenta raíz.\n' "$local_root/robots.txt" "$ROOT_ROBOTS_REMOTE_PATH"
+    else
+        export LFTP_PASSWORD="$ASTRONOMY_ROOT_FTP_PASSWORD"
+        lftp <<LFTP_ROOT_COMMANDS
+set cmd:fail-exit yes
+set ftp:ssl-force true
+set ftp:ssl-auth TLS
+set ftp:ssl-protect-data true
+set ssl:verify-certificate true
+set ssl:check-hostname true
+open --env-password -u "${ASTRONOMY_ROOT_FTP_USER}" -p ${FTP_PORT} ftp://${FTP_HOST}
+put --verbose "${local_root}/robots.txt" -o "${ROOT_ROBOTS_REMOTE_PATH}"
+bye
+LFTP_ROOT_COMMANDS
+        export LFTP_PASSWORD="$ASTRONOMY_FTP_PASSWORD"
+    fi
+else
+    printf 'Aviso: no se publicó /robots.txt en la raíz; faltan ASTRONOMY_ROOT_FTP_USER y ASTRONOMY_ROOT_FTP_PASSWORD.\n' >&2
+fi
+
+mirror_excludes=''
+for pattern in "${DEPLOY_EXCLUDE_PATTERNS[@]}"; do
+    mirror_excludes+=" --exclude '${pattern}'"
+done
 
 lftp <<LFTP_COMMANDS
 set cmd:fail-exit yes
@@ -52,37 +144,6 @@ set ftp:ssl-protect-data true
 set ssl:verify-certificate true
 set ssl:check-hostname true
 open --env-password -u "${FTP_USER}" -p ${FTP_PORT} ftp://${FTP_HOST}
-mirror --reverse ${dry_run_option} --verbose \
-    --exclude '^\\.git(/|$)' \
-    --exclude '^\\.github(/|$)' \
-    --exclude '^\\.vscode(/|$)' \
-    --exclude '^\\.idea(/|$)' \
-    --exclude '^docs(/|$)' \
-    --exclude '^apache(/|$)' \
-    --exclude '^scripts(/|$)' \
-    --exclude '^tests(/|$)' \
-    --exclude '^storage(/|$)' \
-    --exclude '(^|/)Dockerfile[^/]*$' \
-    --exclude '^docker-compose\\.yml$' \
-    --exclude '^\\.(dockerignore|gitignore)$' \
-    --exclude '(^|/)\\.env(\\..*)?$' \
-    --exclude '^README\\.md$' \
-    --exclude '^robots\\.txt$' \
-    --exclude '^(cuarto|llena|luna-nueva)\\.png$' \
-    --exclude '^php\\.ini$' \
-    --exclude '^pytest\\.ini$' \
-    --exclude '\\.[Zz][Ii][Pp]$' \
-    --exclude '(^|/)(logs?)(/|$)' \
-    --exclude '\\.log$' \
-    --exclude '(^|/)(tmp|temp)(/|$)' \
-    --exclude '\\.(tmp|temp)$' \
-    --exclude '\\.pid$' \
-    --exclude '(^|/)(\\.cache|cache|__pycache__|coverage)(/|$)' \
-    --exclude '\\.(py[co]|sw[op])$' \
-    --exclude '(^|/)(\\.DS_Store|Thumbs\\.db|Desktop\\.ini)$' \
-    --exclude '(^|/)~[^/]*$' \
-    --exclude '~$' \
-    --exclude '^\\.phpunit\\.result\\.cache$' \
-    "${local_root}/" ./
+mirror --reverse ${dry_run_option} --verbose ${mirror_excludes} "${local_root}/" ./
 bye
 LFTP_COMMANDS

@@ -23,6 +23,13 @@ produce un error público 503 sin filtrar la URL interna. El proxy
 
 La cuenta FTP entra directamente en la carpeta remota efectiva de publicación, que corresponde a la carpeta pública `astro`. El script no ejecuta `cd public_html/astro` porque ese directorio ya es la raíz visible de la cuenta. Producción no usa Docker.
 
+`APP_ENV` puede omitirse en el hosting: la aplicación asume `production` ante
+ausencia, vacío o valor desconocido. No usar `ASTRONOMY_SHOW_TIMINGS`,
+`LOCAL_TIME_SIMULATION_ENABLED` ni otra bandera funcional para detectar el entorno.
+El simulador exige simultáneamente `APP_ENV=local` y
+`LOCAL_TIME_SIMULATION_ENABLED=true`. `CONTENT_ENABLED_IN_PRODUCTION` debe permanecer
+ausente o en `false` hasta decidir publicar la futura sección de contenido.
+
 ## Configuración externa previa
 
 Crear fuera del directorio público:
@@ -89,7 +96,7 @@ Antes de habilitar cualquier función futura de tienda, crear las tres carpetas 
 
 Asignar en cPanel el propietario/grupo correspondiente al proceso PHP y permisos mínimos equivalentes: lectura en originales, y lectura/escritura en previews y catálogo. No usar permisos públicos `777`. Verificar mediante PHP bajo el mismo usuario que atiende la web, sin imprimir las rutas en una respuesta HTTP.
 
-`astronomy_show_timings` debe permanecer en `false` normalmente. Al cambiarlo explícitamente a `true`, las páginas HTML agregan al final un bloque discreto con estado HTTP, tiempo interno de la API y tiempo total observado por la web. La misma condición habilita `debug_now` y su barra de simulación; con el valor normal de producción en `false`, ese parámetro se ignora. La imagen lunar se mide en su petición independiente y deja el resultado en `error_log`.
+`astronomy_show_timings` debe permanecer en `false` normalmente. Al cambiarlo explícitamente a `true`, las páginas HTML agregan al final un bloque discreto con estado HTTP, tiempo interno de la API y tiempo total observado por la web. Esta bandera no habilita `debug_now`, el simulador ni páginas locales. La imagen lunar se mide en su petición independiente y deja el resultado en `error_log`.
 
 En las secciones con swipe, el panel táctil requiere además `mobile_swipe_navigation_debug_enabled => true`. Sólo entonces evita la navegación automática hasta pulsar **Ir al destino detectado**. Timings puede permanecer activo sin ese panel; la opción de diagnóstico táctil no debe permanecer activa para visitantes.
 
@@ -128,15 +135,50 @@ Los GIF deben ser legibles por Apache. En local se normalizan a `0644`; con `060
 find assets/images/eclipses -maxdepth 1 -type f -name '*.gif' -exec chmod 0644 {} +
 ```
 
-El proyecto publica `sitemap.xml` dentro de `astro`, pero excluye `robots.txt`. La línea propuesta para el robots de la raíz del dominio se conserva sólo como referencia en `docs/robots-raiz-propuesto.txt` y debe integrarse manualmente fuera de este despliegue.
+## `robots.txt` de la raíz del dominio
+
+`robots.txt` se mantiene una sola vez en la raíz del repositorio. El despliegue
+principal continúa excluyéndolo del mirror de `/astro/` y, cuando están
+definidas `ASTRONOMY_ROOT_FTP_USER` y `ASTRONOMY_ROOT_FTP_PASSWORD`, el mismo
+script lo transfiere mediante una segunda conexión FTPS a la raíz pública del
+dominio:
+
+```bash
+export ASTRONOMY_ROOT_FTP_USER='usuario-con-acceso-a-public_html'
+export ASTRONOMY_ROOT_FTP_PASSWORD='contraseña'
+```
+
+La cuenta de publicación habitual está restringida a `public_html/astro` y no
+puede escribir `https://aquellaslunas.com.ar/robots.txt`. Por eso la segunda
+cuenta debe entrar directamente en `public_html`, o en la raíz pública
+equivalente. Si esas variables no están disponibles, el despliegue de la web
+continúa y muestra un aviso explícito, sin reemplazar ni crear una copia manual.
+
+Cloudflare puede anteponer sus directivas administradas al archivo del origen.
+No es necesario desactivar **Managed robots.txt**: cuando el origen responde 200,
+Cloudflare combina ambos contenidos. Después de cada despliegue se debe comprobar
+que la respuesta pública contenga tanto el bloque administrado, si está activo,
+como las reglas de `/astro/` y la referencia al sitemap.
 
 ## Dry run
+
+El listado local aplica exactamente las mismas expresiones de exclusión que el
+mirror, no requiere credenciales y no abre ninguna conexión:
+
+```bash
+cd /srv/proyectos/astronomia/web
+./scripts/desplegar.sh --list-local
+```
+
+El dry run remoto compara luego los archivos candidatos con el hosting:
 
 ```bash
 cd /srv/proyectos/astronomia/web
 export ASTRONOMY_FTP_PASSWORD='contraseña'
+export ASTRONOMY_ROOT_FTP_USER='usuario-con-acceso-a-public_html'
+export ASTRONOMY_ROOT_FTP_PASSWORD='contraseña'
 ./scripts/desplegar.sh --dry-run
-unset ASTRONOMY_FTP_PASSWORD
+unset ASTRONOMY_FTP_PASSWORD ASTRONOMY_ROOT_FTP_USER ASTRONOMY_ROOT_FTP_PASSWORD
 ```
 
 El modo prueba se conecta y compara los árboles, pero no transfiere archivos.
@@ -146,8 +188,10 @@ El modo prueba se conecta y compara los árboles, pero no transfiere archivos.
 ```bash
 cd /srv/proyectos/astronomia/web
 export ASTRONOMY_FTP_PASSWORD='contraseña'
+export ASTRONOMY_ROOT_FTP_USER='usuario-con-acceso-a-public_html'
+export ASTRONOMY_ROOT_FTP_PASSWORD='contraseña'
 ./scripts/desplegar.sh
-unset ASTRONOMY_FTP_PASSWORD
+unset ASTRONOMY_FTP_PASSWORD ASTRONOMY_ROOT_FTP_USER ASTRONOMY_ROOT_FTP_PASSWORD
 ```
 
 ## Exclusiones reales
@@ -155,10 +199,12 @@ unset ASTRONOMY_FTP_PASSWORD
 No se transfieren:
 
 - pruebas locales bajo `tests/`;
-- `.git/`, `.github/`, `.vscode/` y `.idea/`;
-- `docs/`, `apache/` y `scripts/`;
+- `.git/`, `.github/`, `.vscode/`, `.idea/` y `.venv/`;
+- `docs/`, `apache/`, `scripts/` y `local-tools/`;
 - `Dockerfile` y variantes;
 - `docker-compose.yml`, `.dockerignore` y `.gitignore`;
+- `.env` y sus variantes;
+- `requirements.txt`, archivos Python, `*.pyc`, `__pycache__/` y `*.csv`;
 - `.env` y `.env.*`;
 - originales y catálogo bajo `storage/`, y previews locales bajo `assets/images/tienda/previews/`;
 - `README.md`, `php.ini` y `pytest.ini`;
@@ -201,11 +247,15 @@ https://aquellaslunas.com.ar/astro/eclipses.php
 https://aquellaslunas.com.ar/astro/ubicacion.php
 https://aquellaslunas.com.ar/astro/galeria.php
 https://aquellaslunas.com.ar/astro/acerca-del-sitio.php
+https://aquellaslunas.com.ar/robots.txt
+https://aquellaslunas.com.ar/astro/assets/images/social/aquellas-lunas-social.jpg
 ```
 
 Revisar:
 
 - HTTP 200 y datos reales;
+- `robots.txt` raíz con las exclusiones de `/astro/` y el sitemap correcto;
+- imagen social JPEG de 1200 × 630 y metadatos Open Graph/Twitter absolutos;
 - directivas `no-store/no-cache` en las vistas dinámicas;
 - carga de CSS y JavaScript bajo `/astro/assets/`;
 - favicon SVG/ICO/PNG y Apple Touch Icon con query `v=<filemtime>`;

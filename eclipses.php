@@ -10,10 +10,15 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/astronomy-icon.php';
+require_once __DIR__ . '/includes/date-format.php';
+require_once __DIR__ . '/includes/event-date-header.php';
+require_once __DIR__ . '/includes/explore-sky.php';
+require_once __DIR__ . '/includes/eclipse-query-policy.php';
+require_once __DIR__ . '/includes/calendar-event.php';
+require_once __DIR__ . '/includes/eclipse-detail-component.php';
 
 sendDynamicNoCacheHeaders();
 
-const ECLIPSES_MAX_YEARS = 10;
 const ECLIPSES_IMAGE_SOL_PARTIAL_PATH = 'assets/images/contenido/SolParcial.jpg';
 const ECLIPSES_IMAGE_SOL_TOTAL_PATH = 'assets/images/contenido/SolTotal.jpg';
 const ECLIPSES_IMAGE_LUNA_PARTIAL_PATH = 'assets/images/contenido/LunaParcial.jpg';
@@ -290,7 +295,7 @@ function eclipsesVisibilityMap(array $global, array $event, ?DateTimeImmutable $
 
     $mapKind = is_string($map['map_kind'] ?? null) ? trim((string) $map['map_kind']) : '';
     $typeLabel = eclipsesTypeLabel($event);
-    $dateLabel = $eventDate?->format('d/m/Y') ?? 'fecha no disponible';
+    $dateLabel = $eventDate !== null ? astronomyEclipseDate($eventDate) : 'fecha no disponible';
     $alt = 'Mapa de visibilidad mundial del ' . strtolower($typeLabel) . ' del ' . $dateLabel;
     if ($mapKind !== '') {
         $alt .= ' (' . $mapKind . ')';
@@ -332,23 +337,23 @@ function eclipsesModalData(array $event, string $timezoneName): array
 
     $maximum = eclipsesEventDateTime($event['datetime'] ?? null, $timezoneName);
     if ($maximum !== null) {
-        $generalRows[] = ['label' => 'Máximo (hora local)', 'value' => $maximum->format('d/m/Y H:i')];
+        $generalRows[] = ['label' => 'Máximo (hora local)', 'value' => astronomyEclipseDateTime($maximum)];
     }
 
     $firstVisible = eclipsesEventDateTime($local['first_visible_instant'] ?? null, $timezoneName);
     if ($firstVisible !== null) {
-        $localRows[] = ['label' => 'Inicio visible', 'value' => $firstVisible->format('d/m/Y H:i')];
+        $localRows[] = ['label' => 'Inicio visible', 'value' => astronomyEclipseDateTime($firstVisible)];
     }
 
     $lastVisible = eclipsesEventDateTime($local['last_visible_instant'] ?? null, $timezoneName);
     if ($lastVisible !== null) {
-        $localRows[] = ['label' => 'Final visible', 'value' => $lastVisible->format('d/m/Y H:i')];
+        $localRows[] = ['label' => 'Final visible', 'value' => astronomyEclipseDateTime($lastVisible)];
     }
 
     foreach (['sunrise_during_eclipse' => 'Amanecer durante eclipse', 'sunset_during_eclipse' => 'Atardecer durante eclipse', 'moonrise_during_eclipse' => 'Salida de la Luna durante eclipse', 'moonset_during_eclipse' => 'Puesta de la Luna durante eclipse'] as $key => $label) {
         $value = eclipsesEventDateTime($local[$key] ?? null, $timezoneName);
         if ($value !== null) {
-            $localRows[] = ['label' => $label, 'value' => $value->format('d/m/Y H:i')];
+            $localRows[] = ['label' => $label, 'value' => astronomyEclipseDateTime($value)];
         }
     }
 
@@ -410,7 +415,7 @@ function eclipsesModalData(array $event, string $timezoneName): array
 
         $contacts[] = [
             'label' => eclipsesContactCodeLabel($code),
-            'time' => $date->format('d/m/Y H:i'),
+            'time' => astronomyEclipseDateTime($date),
             'body' => eclipsesPrimaryBodyLabel($event),
             'extra' => $extra,
         ];
@@ -471,9 +476,8 @@ if ($filtersWereSubmitted) {
     } elseif ($endDate < $startDate) {
         $apiErrorMessage = 'La fecha hasta debe ser igual o posterior a la fecha desde.';
     } else {
-        $maxEndDate = $startDate->modify('+' . ECLIPSES_MAX_YEARS . ' years');
-        if ($endDate > $maxEndDate) {
-            $rangeNotice = 'Para esta sección podés consultar hasta 10 años en una sola búsqueda de eclipses. Ajustá el rango para continuar.';
+        if (!eclipsesRangeIsAllowed($startDate, $endDate)) {
+            $rangeNotice = 'El intervalo máximo de consulta es de 5 años.';
         } else {
             $days = (int) $startDate->diff($endDate)->days + 1;
             try {
@@ -565,8 +569,10 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
 <?php renderAnalyticsTracking(); ?>
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/eclipses.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/calendar-scheduler.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyMobileSwipeNavigationScript('eclipses'); ?>
@@ -583,11 +589,11 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                 <h1 id="eclipses-title"><?= htmlspecialchars(astronomySiteSectionLabel('eclipses')) ?></h1>
                 <p class="hero-subtitle">Consultá fechas, tipos y visibilidad desde tu ubicación.</p>
 
-                <form id="eclipses-query-form" class="eclipses-controls" method="get">
+                <form id="eclipses-query-form" class="eclipses-controls" method="get" data-max-range-years="<?= ECLIPSES_MAX_YEARS ?>">
                     <?php renderAstronomyDebugClockInput(); ?>
                     <input type="hidden" name="filters_submitted" value="1">
                     <label class="control-field eclipses-date"><span>Desde</span><input type="date" name="start_date" value="<?= htmlspecialchars($startDateInput) ?>" required></label>
-                    <label class="control-field eclipses-date"><span>Hasta</span><input type="date" name="end_date" value="<?= htmlspecialchars($endDateInput) ?>" required></label>
+                    <label class="control-field eclipses-date"><span>Hasta</span><input type="date" name="end_date" value="<?= htmlspecialchars($endDateInput) ?>" min="<?= htmlspecialchars($startDateInput) ?>" max="<?= htmlspecialchars($startDate->modify('+' . ECLIPSES_MAX_YEARS . ' years')->format('Y-m-d')) ?>" required></label>
 
                     <label class="control-field eclipses-select"><span>Tipo</span>
                         <select name="type_filter">
@@ -634,115 +640,46 @@ if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
                         <?php foreach ($events as $index => $event): ?>
                             <?php
                             $eventDate = eclipsesEventDateTime($event['datetime'] ?? null, $timezoneName);
-                            $dateLabel = $eventDate?->format('d/m/Y') ?? 'Fecha no disponible';
+                            $dateLabel = $eventDate !== null ? astronomyEclipseDate($eventDate) : 'Fecha no disponible';
                             $timeLabel = $eventDate?->format('H:i') ?? 'Hora no disponible';
                             $typeLabel = eclipsesTypeLabel($event);
                             $classification = eclipsesVisibilityClassification($event);
                             $visibilityLabel = eclipsesVisibilityLabel($classification);
                             $isVisible = eclipsesIsVisible($classification);
-                            $templateId = 'eclipse-template-' . $index . '-' . substr(md5((string) ($event['datetime'] ?? '') . ($event['subtype'] ?? '')), 0, 8);
-                            $modalData = eclipsesModalData($event, $timezoneName);
-                            $image = eclipsesPickImage($event);
+                            $templateId = 'eclipse-detail-' . astronomyEclipseDetailId($event);
+                            $calendarPresentation = [
+                                'title' => $typeLabel,
+                                'summary' => $visibilityLabel,
+                                'explanation' => '',
+                            ];
+                            $calendarEvent = astronomyCalendarEventData($event, $calendarPresentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php'));
                             ?>
                             <li class="eclipse-item<?= $isVisible ? '' : ' eclipse-item--not-visible' ?>">
-                                <button type="button" class="eclipse-item-trigger" data-eclipse-modal-open data-template-id="<?= htmlspecialchars($templateId) ?>" aria-label="Abrir detalle de <?= htmlspecialchars($typeLabel) ?> del <?= htmlspecialchars($dateLabel) ?>">
+                                <button type="button" class="eclipse-item-trigger" data-eclipse-modal-open data-eclipse-id="<?= htmlspecialchars(astronomyEclipseDetailId($event)) ?>" data-template-id="<?= htmlspecialchars($templateId) ?>" aria-label="Abrir detalle de <?= htmlspecialchars($typeLabel) ?> del <?= htmlspecialchars($dateLabel) ?>">
                                     <div class="eclipse-item-head">
                                         <?php renderAstronomyIcon(['type' => 'eclipse', 'subtype' => (string) ($event['subtype'] ?? '')], $latitude, 'eclipse-item-icon'); ?>
                                         <h3><?= htmlspecialchars($typeLabel) ?></h3>
                                         <span class="eclipse-time" aria-label="Hora local del máximo"><?= htmlspecialchars($timeLabel) ?></span>
                                     </div>
-                                    <p class="eclipse-date"><?= htmlspecialchars($dateLabel) ?></p>
+                                    <?php renderAstronomyEventDateHeader($eventDate, $today, $dateLabel, ['class' => 'eclipse-date']); ?>
                                     <p class="eclipse-visibility"><?= htmlspecialchars($visibilityLabel) ?></p>
                                     <?php if (!$isVisible): ?><p class="eclipse-badge" aria-label="Evento no visible desde la ubicación seleccionada">No visible</p><?php endif; ?>
                                 </button>
+                                <?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--eclipse'); ?>
+                                <?php renderAstronomyEclipseDetailTemplate($event, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php')); ?>
 
-                                <template id="<?= htmlspecialchars($templateId) ?>">
-                                    <article class="eclipse-detail">
-                                        <header class="eclipse-detail-header">
-                                            <h2><?= htmlspecialchars($typeLabel) ?></h2>
-                                            <p><?= htmlspecialchars($dateLabel) ?> · <?= htmlspecialchars($timeLabel) ?> (hora local)</p>
-                                        </header>
-
-                                        <?php if ($image !== null): ?>
-                                            <figure class="eclipse-detail-image">
-                                                <img src="<?= htmlspecialchars($image['url']) ?>" alt="<?= htmlspecialchars($typeLabel) ?>" loading="lazy">
-                                                <figcaption><?= htmlspecialchars($image['label']) ?></figcaption>
-                                            </figure>
-                                        <?php endif; ?>
-
-                                        <?php if ($modalData['general_rows'] !== []): ?>
-                                            <section class="eclipse-detail-general" aria-labelledby="<?= htmlspecialchars($templateId) ?>-general-title">
-                                                <h3 id="<?= htmlspecialchars($templateId) ?>-general-title">Datos generales</h3>
-                                                <dl class="eclipse-detail-facts">
-                                                    <?php foreach ($modalData['general_rows'] as $row): ?>
-                                                        <div><dt><?= htmlspecialchars($row['label']) ?></dt><dd><?= htmlspecialchars($row['value']) ?></dd></div>
-                                                    <?php endforeach; ?>
-                                                </dl>
-                                            </section>
-                                        <?php endif; ?>
-
-                                        <section class="eclipse-detail-local" aria-labelledby="<?= htmlspecialchars($templateId) ?>-local-title">
-                                            <h3 id="<?= htmlspecialchars($templateId) ?>-local-title">Desde tu ubicación</h3>
-                                            <p class="eclipse-visibility"><?= htmlspecialchars($visibilityLabel) ?></p>
-                                            <?php if ($modalData['local_rows'] !== []): ?>
-                                                <dl class="eclipse-detail-facts">
-                                                    <?php foreach ($modalData['local_rows'] as $row): ?>
-                                                        <div><dt><?= htmlspecialchars($row['label']) ?></dt><dd><?= htmlspecialchars($row['value']) ?></dd></div>
-                                                    <?php endforeach; ?>
-                                                </dl>
-                                            <?php endif; ?>
-
-                                            <?php if ($modalData['contacts'] !== []): ?>
-                                                <section class="eclipse-detail-contacts" aria-labelledby="<?= htmlspecialchars($templateId) ?>-contacts-title">
-                                                <h3 id="<?= htmlspecialchars($templateId) ?>-contacts-title">Contactos</h3>
-                                                <ul>
-                                                    <?php foreach ($modalData['contacts'] as $contact): ?>
-                                                        <li>
-                                                            <strong><?= htmlspecialchars($contact['label']) ?>:</strong>
-                                                            <span><?= htmlspecialchars($contact['time']) ?></span>
-                                                            <?php if ($contact['extra'] !== []): ?>
-                                                                <span class="eclipse-contact-extra">(<?= htmlspecialchars($contact['body']) ?> <?= htmlspecialchars(implode(' · ', $contact['extra'])) ?>)</span>
-                                                            <?php endif; ?>
-                                                        </li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                                </section>
-                                            <?php endif; ?>
-                                        </section>
-
-                                        <?php if ($modalData['visibility_map'] !== null): ?>
-                                            <section class="eclipse-detail-world-map" aria-labelledby="<?= htmlspecialchars($templateId) ?>-world-title">
-                                                <h3 id="<?= htmlspecialchars($templateId) ?>-world-title">Visibilidad mundial</h3>
-                                                <p>Este mapa muestra las regiones del mundo desde las que puede observarse el eclipse.</p>
-                                                <a class="eclipse-world-map__image-link" href="<?= htmlspecialchars($modalData['visibility_map']['url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" aria-label="Ver el mapa de visibilidad mundial completo">
-                                                    <img src="<?= htmlspecialchars($modalData['visibility_map']['url'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($modalData['visibility_map']['alt'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
-                                                </a>
-                                                <?php if ($modalData['visibility_map']['attribution'] !== ''): ?>
-                                                    <p class="eclipse-world-map__attribution"><?= htmlspecialchars($modalData['visibility_map']['attribution']) ?></p>
-                                                <?php endif; ?>
-                                                <?php if ($modalData['visibility_map']['source_link'] !== null): ?>
-                                                    <p class="eclipse-world-map__source"><a href="<?= htmlspecialchars($modalData['visibility_map']['source_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer">Consultar fuente del mapa</a></p>
-                                                <?php endif; ?>
-                                            </section>
-                                        <?php endif; ?>
-                                    </article>
-                                </template>
                             </li>
                         <?php endforeach; ?>
                     </ol>
                 <?php endif; ?>
                 </div>
             </section>
+            <?php renderAstronomyExploreSky('eclipses'); ?>
             <?php renderAstronomyTimings(); ?>
         </div>
     </main>
 
-    <dialog id="eclipses-modal" class="eclipses-modal" aria-labelledby="eclipses-modal-title">
-        <div class="eclipses-modal__surface">
-            <button type="button" class="eclipses-modal__close" data-eclipse-modal-close aria-label="Cerrar detalle">×</button>
-            <div id="eclipses-modal-content"></div>
-        </div>
-    </dialog>
+    <?php renderAstronomyEclipseModal(); ?>
 
     <?php renderAstronomySiteFooter(); ?>
 </body>

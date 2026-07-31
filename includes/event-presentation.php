@@ -80,6 +80,110 @@ function astronomyFullMoonObservationSummary(string $subtype, array $details): s
     };
 }
 
+function astronomyFullMoonObservationMoment(array $event, string $timezoneName): ?array
+{
+    if (($event['type'] ?? null) !== 'full_moon_observation') {
+        return null;
+    }
+    $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+    $kind = is_string($details['moon_event'] ?? null) ? trim($details['moon_event']) : '';
+    if (!in_array($kind, ['moonrise', 'moonset'], true)) {
+        return null;
+    }
+    $date = astronomyEventDateTime($details['moon_event_time'] ?? null, $timezoneName);
+    if ($date === null) {
+        return null;
+    }
+    return [
+        'label' => $kind === 'moonrise' ? 'Salida de la Luna' : 'Puesta de la Luna',
+        'date' => $date,
+    ];
+}
+
+function astronomyEarthshineEventIsDisplayable(array $event): bool
+{
+    if (($event['type'] ?? null) !== 'earthshine') {
+        return true;
+    }
+    $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+    $offsetDays = is_numeric($details['offset_days'] ?? null) ? (int) $details['offset_days'] : null;
+    $illumination = is_numeric($details['illumination_percent'] ?? null)
+        && is_finite((float) $details['illumination_percent'])
+        ? (float) $details['illumination_percent']
+        : null;
+    return !($offsetDays === 0 && $illumination !== null && $illumination < 0.4);
+}
+
+function astronomyEventRelationText(int $minutes, string $before, string $after): string
+{
+    $absolute = abs($minutes);
+    $quantity = $absolute . ' min';
+    if ($minutes < 0) {
+        return $quantity . ' ' . $before;
+    }
+    if ($minutes > 0) {
+        return $quantity . ' ' . $after;
+    }
+    return 'al mismo tiempo';
+}
+
+function astronomyEarthshineObservationDetails(array $event, string $timezoneName): ?array
+{
+    if (($event['type'] ?? null) !== 'earthshine') {
+        return null;
+    }
+    $subtype = is_string($event['subtype'] ?? null) ? $event['subtype'] : '';
+    if (!in_array($subtype, ['morning', 'evening'], true)) {
+        return null;
+    }
+    $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+    $moonTime = astronomyEventDateTime($details['moon_event_time'] ?? null, $timezoneName);
+    $solarTime = astronomyEventDateTime($details['solar_event_time'] ?? null, $timezoneName);
+    $start = astronomyEventDateTime($details['start_time'] ?? ($event['datetime'] ?? null), $timezoneName);
+    $end = astronomyEventDateTime($details['end_time'] ?? ($event['end_datetime'] ?? null), $timezoneName);
+    $bestTime = astronomyEventDateTime($details['best_visible_time'] ?? null, $timezoneName) ?? $start;
+    $illumination = is_numeric($details['illumination_percent'] ?? null)
+        ? (float) $details['illumination_percent']
+        : null;
+    $separation = is_numeric($details['separation_degrees'] ?? null)
+        ? (float) $details['separation_degrees']
+        : null;
+    $difference = is_numeric($details['difference_minutes'] ?? null)
+        ? (int) round((float) $details['difference_minutes'])
+        : null;
+    if ($moonTime === null || $solarTime === null || $start === null || $end === null
+        || $illumination === null || $separation === null || $difference === null) {
+        return null;
+    }
+
+    $illuminationLabel = astronomyEventNumber($illumination, 1);
+    $separationLabel = astronomyEventNumber($separation, 1);
+    if ($illuminationLabel === null || $separationLabel === null) {
+        return null;
+    }
+    $morning = $subtype === 'morning';
+    $relation = astronomyEventRelationText($difference, 'antes', 'después');
+    $moonLabel = $morning ? 'Salida de la Luna' : 'Puesta de la Luna';
+    $solarLabel = $morning ? 'Salida del Sol' : 'Puesta del Sol';
+    return [
+        'period_label' => $morning ? 'Antes del amanecer' : 'Después del atardecer',
+        'summary' => 'Iluminación ' . $illuminationLabel . ' % · Separación del Sol '
+            . $separationLabel . '° · La Luna ' . ($morning ? 'saldrá ' : 'se pondrá ') . $relation,
+        'moon_label' => $moonLabel,
+        'moon_time' => $moonTime,
+        'solar_label' => $solarLabel,
+        'solar_time' => $solarTime,
+        'first_label' => $morning ? $moonLabel : $solarLabel,
+        'first_time' => $morning ? $moonTime : $solarTime,
+        'second_label' => $morning ? $solarLabel : $moonLabel,
+        'second_time' => $morning ? $solarTime : $moonTime,
+        'start' => $start,
+        'end' => $end,
+        'cloud_time' => $bestTime,
+        'earthshine_visible' => ($details['earthshine_visible'] ?? false) === true,
+    ];
+}
+
 function astronomyEventTechnicalDetails(array $fields): array
 {
     $result = [];
@@ -341,6 +445,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         'public_details' => [],
         'contact_points' => [],
         'alert' => '',
+        'observation' => null,
     ];
 
     if ($type === 'conjunction') {
@@ -385,16 +490,30 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
     }
 
     if ($type === 'earthshine') {
-        $presentation['title'] = 'La parte oscura de la Luna también será visible';
-        $presentation['summary'] = match ($subtype) {
+        $observation = astronomyEarthshineObservationDetails($event, $timezoneName);
+        $earthshineVisible = ($details['earthshine_visible'] ?? null) !== false;
+        $presentation['title'] = $earthshineVisible
+            ? 'La parte oscura de la Luna también será visible'
+            : ($subtype === 'morning' ? 'Luna fina antes del amanecer' : 'Luna fina después del atardecer');
+        $presentation['summary'] = $observation['summary'] ?? match ($subtype) {
             'morning' => 'Poco antes del amanecer, hacia el este.',
             'evening' => 'Poco después del atardecer, hacia el oeste.',
             default => '',
         };
         $presentation['time_label'] = $timeLabel . ($endDate !== null ? '–' . $endDate->format('H:i') : '');
+        $presentation['observation'] = $observation;
+        if ($observation !== null && $observation['earthshine_visible']) {
+            $presentation['explanation'] = 'También puede verse la parte oscura del disco lunar.';
+        }
         $presentation['technical_details'] = astronomyEventTechnicalDetails([
             'Carácter' => 'Ventana observacional estimada.',
             'Iluminación lunar' => astronomyEventPercent($details['illumination_percent'] ?? null),
+            'Separación del Sol' => ($value = astronomyEventNumber($details['separation_degrees'] ?? null, 1)) !== null ? $value . '°' : null,
+            'Salida o puesta de la Luna' => $observation !== null ? $observation['moon_time']->format('H:i') : null,
+            'Salida o puesta del Sol' => $observation !== null ? $observation['solar_time']->format('H:i') : null,
+            'Diferencia temporal' => is_numeric($details['difference_minutes'] ?? null)
+                ? astronomyEventMinuteQuantity(abs((int) round((float) $details['difference_minutes'])))
+                : null,
             'Altura lunar' => ($value = astronomyEventNumber($details['moon_altitude_degrees'] ?? null, 1)) !== null ? $value . '°' : null,
         ]);
         return $presentation;
@@ -551,7 +670,13 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
     }
 
     if ($type === 'full_moon_observation' && in_array($subtype, ['morning', 'evening'], true)) {
+        $presentation['title'] = $subtype === 'morning'
+            ? 'Luna llena cerca de la salida del Sol'
+            : 'Luna llena cerca de la puesta del Sol';
         $presentation['summary'] = astronomyFullMoonObservationSummary($subtype, $details);
+        $presentation['explanation'] = $subtype === 'morning'
+            ? 'Una oportunidad para observar la Luna llena baja mientras comienza el día.'
+            : 'Una oportunidad para observar la Luna llena baja mientras termina el día.';
         $difference = is_numeric($details['difference_minutes'] ?? null)
             ? astronomyEventMinuteQuantity(abs((int) round((float) $details['difference_minutes'])))
             : null;

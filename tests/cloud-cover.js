@@ -71,6 +71,15 @@ const cloudCoverTest = async () => {
   if (AstronomyCloudCover.nearestCloudCover(forecast, nowMs + 1000) !== 35) {
     throw new Error('No se eligió la hora de pronóstico más cercana.');
   }
+  const expectedCategories = [
+    [0, 'clear'], [20, 'clear'], [21, 'some'], [50, 'some'],
+    [51, 'mostly'], [80, 'mostly'], [81, 'overcast'], [100, 'overcast'],
+  ];
+  expectedCategories.forEach(([value, expected]) => {
+    if (AstronomyCloudCover.cloudCategory(value)?.key !== expected) {
+      throw new Error(`Categoría de nubosidad incorrecta para ${value} %.`);
+    }
+  });
   const layers = AstronomyCloudCover.nearestCloudLayers(forecast, nowMs + 1000);
   if (!layers || layers.low !== 2 || layers.mid !== 0 || layers.high !== 3) {
     throw new Error('No se conservaron las cuatro variables de nubosidad.');

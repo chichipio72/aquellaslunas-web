@@ -7,8 +7,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('eclipses-modal');
   const modalContent = document.getElementById('eclipses-modal-content');
   const closeButton = modal?.querySelector('[data-eclipse-modal-close]');
+  const startDateInput = form?.elements.namedItem('start_date');
+  const endDateInput = form?.elements.namedItem('end_date');
+  const maxRangeYears = Number(form?.dataset.maxRangeYears || 5);
   let submitting = false;
   let opener = null;
+
+  const shiftedYearDate = (value, years) => {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return '';
+    const date = new Date(Date.UTC(Number(match[1]) + years, Number(match[2]) - 1, Number(match[3])));
+    if (date.getUTCMonth() !== Number(match[2]) - 1) date.setUTCDate(0);
+    return date.toISOString().slice(0, 10);
+  };
+
+  const updateDateLimits = () => {
+    if (!(startDateInput instanceof HTMLInputElement) || !(endDateInput instanceof HTMLInputElement)) return;
+    endDateInput.min = startDateInput.value || '';
+    endDateInput.max = shiftedYearDate(startDateInput.value, maxRangeYears);
+    endDateInput.setCustomValidity(
+      endDateInput.value && endDateInput.max && endDateInput.value > endDateInput.max
+        ? 'El intervalo máximo de consulta es de 5 años.'
+        : '',
+    );
+  };
 
   const setLoadingState = (isLoading) => {
     if (results instanceof HTMLElement) {
@@ -32,7 +54,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   if (form instanceof HTMLFormElement && loading instanceof HTMLElement) {
+    startDateInput?.addEventListener('change', updateDateLimits);
+    endDateInput?.addEventListener('change', updateDateLimits);
+    updateDateLimits();
     form.addEventListener('submit', (event) => {
+      updateDateLimits();
       if (!form.checkValidity()) {
         return;
       }
@@ -88,7 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const templateId = trigger.dataset.templateId;
+    const eclipseId = trigger.dataset.eclipseId;
+    const templateId = trigger.dataset.templateId || (eclipseId ? `eclipse-detail-${eclipseId}` : '');
     if (!templateId) {
       return;
     }

@@ -7,16 +7,15 @@ const ASTRONOMY_SIMULATED_TIME_COOKIE = 'astronomy_simulated_local_time';
 
 function astronomyLocalTimeSimulationEnabled(): bool
 {
-    static $enabled = null;
-    if ($enabled !== null) {
-        return $enabled;
+    if (!isLocalEnvironment()) {
+        return false;
     }
     $environmentValue = getenv('LOCAL_TIME_SIMULATION_ENABLED');
     if (is_string($environmentValue) && trim($environmentValue) !== '') {
-        return $enabled = filter_var($environmentValue, FILTER_VALIDATE_BOOLEAN) === true;
+        return filter_var($environmentValue, FILTER_VALIDATE_BOOLEAN) === true;
     }
     $productionConfig = loadAstronomyProductionConfig();
-    return $enabled = filter_var(
+    return filter_var(
         $productionConfig['local_time_simulation_enabled'] ?? false,
         FILTER_VALIDATE_BOOLEAN
     ) === true;

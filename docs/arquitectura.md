@@ -46,13 +46,191 @@ Las vistas públicas invocan el encabezado común con la marca **Aquellas Lunas*
 - `site-header.php`, `site-footer.php` y `location-map.php`: interfaz compartida.
 - `event-presentation.php`: títulos, resúmenes y detalles técnicos de eventos.
 - `home-sky.php`: validación de Luna instantánea y avisos de salida.
+
+`api-config.php` también es la única fuente de detección del entorno.
+`appEnvironment()` sólo reconoce `APP_ENV=local`; cualquier ausencia o valor distinto
+es producción. Las capacidades locales consultan `isLocalEnvironment()`. Una bandera
+de una función particular —simulador, timings, navegación u otra— nunca debe usarse
+como indicador general del entorno.
+
+## Infraestructura de contenidos
+
+`includes/content-system.php` recorre automáticamente el nivel superior de
+`includes/contenido/` y sólo carga archivos `.php`. El nombre del archivo es la única
+fuente del slug. Cada `require` está aislado con `Throwable`; el catálogo conserva
+errores por artículo, trivia o entrada “Sabías que…” sin propagar una falla al resto
+de la página.
+
+La validación cubre contrato y metadatos, Markdown, identificadores y opciones de
+trivia, referencias a artículos y anclas, imágenes locales y marcadores
+`[[imagen]]`, `[[esquema]]` y `[[trivia]]`. El renderizador Markdown propio implementa
+un subconjunto deliberadamente pequeño y escapa primero todo texto. Los componentes
+futuros se emiten como marcadores visibles, sin ejecutar contenido arbitrario.
+
+Las imágenes reutilizables se resuelven exclusivamente desde
+`assets/images/tienda/previews/contenido/`. Un único resolver filtra archivos JPG/JPEG, PNG y
+WEBP mediante extensión y contenido real. Conserva la imagen solicitada cuando
+existe; si falta, selecciona una alternativa válida al azar. Una carpeta ausente o
+vacía produce contenido sin imagen. Los reemplazos nunca invalidan entidades y sólo
+se informan como advertencias cuando el debug local está activo.
+
+Las páginas públicas nunca enlazan los originales: artículos, bloques, trivias y
+“Sabías que…” usan únicamente esas previews limitadas. Las fotografías reciben la
+clase `js-protected-photo`, no son enlaces y deshabilitan arrastre y menú contextual
+mediante una mejora JavaScript progresiva. Apache rechaza hotlinking casual desde
+referers externos sólo para esta carpeta, manteniendo dominio público, entorno local
+y solicitudes sin Referer. Estas medidas son exclusivamente disuasorias: una
+preview mostrada puede recuperarse con herramientas de desarrollo, caché o captura
+de pantalla. El clic derecho no es seguridad; la protección efectiva depende de no
+publicar el original, limitar resolución y conservar la marca de agua de la preview.
+
+`contenidos.php` muestra el índice y `contenido.php?slug=...` resuelve artículos. La
+portada pide al mismo catálogo una trivia y una entrada “Sabías que…” aleatorias; las
+opciones de trivia se mezclan sobre una copia. En modo usuario sólo participan
+entidades válidas y visibles. En debug local, los errores se sustituyen por bloques
+de diagnóstico.
+
+`includes/content-debug.php` administra ese modo mediante la sesión local y un POST
+con CSRF. No usa variables de entorno y nunca puede habilitarse fuera de
+`isLocalEnvironment()`. Tanto enlaces como páginas directas y loader comprueban
+`isContentEnabled()`.
+
+### Criterio permanente para controles interactivos
+
+Todo enlace, botón o control nuevo debe usar un patrón visual explícito y coherente
+con el sitio; nunca se publica con la apariencia nativa del navegador. Para acciones
+de tarjeta se reutiliza `.home-v2-card__link`, para acciones generales las variantes
+de `.button`, y para elecciones compactas `.interactive-choice`. Todos los patrones
+deben incluir estados de foco visibles, interacción por teclado y comunicar estados
+sin depender únicamente del color.
+
+La trivia de portada mezcla las opciones en el servidor, pero cada opción conserva
+su propia condición de correcta derivada de la presencia de `explicacion`. El
+cliente bloquea selecciones posteriores, marca textualmente la respuesta correcta y
+publica resultado y explicación mediante una región `aria-live`.
+
+### Editor local de contenidos
+
+`local-tools/content-editor/` ofrece listado, alta y edición del modelo estructurado
+sin editar fragmentos del PHP original. Su entrada verifica directamente
+`isLocalEnvironment()` y responde 404 fuera de local, además de permanecer excluida
+del despliegue. El núcleo se mantiene separado de la vista para probar normalización,
+serialización y persistencia.
+
+Antes de guardar, el editor serializa el candidato en un directorio temporal junto
+con el resto de los artículos y lo recarga mediante `astronomyLoadContentCatalog()`.
+Así reutiliza las validaciones públicas de estructura, Markdown, componentes,
+trivias, referencias e IDs. Sólo agrega controles propios de entrada, como la regla
+segura del slug y la protección CSRF.
+
+Los archivos se regeneran completos con un heredoc `MD` para `articulo`. En una
+edición se copia primero el original a
+`local-tools/content-editor/backups/<slug>/<slug>-YYYYmmdd-HHMMSS-<sufijo>.php`;
+después se escribe un temporal dentro de `includes/contenido/` y `rename()` realiza
+el reemplazo atómico. Inmediatamente después se limpia la caché de estado de PHP y
+se invalida OPcache para que la redirección cargue el array recién escrito, incluida
+la imagen principal y sus diagnósticos. El editor responde con `no-store` y usa
+`303 See Other` tras un POST exitoso para no restaurar formularios o advertencias
+anteriores desde la caché del navegador. No existen acciones de renombrado ni
+eliminación en esta versión.
+
+El selector visual de imágenes reutiliza exclusivamente
+`astronomyContentAvailableImages()` sobre el nivel superior de
+`assets/images/tienda/previews/contenido/`. Descarta extensiones no admitidas y
+archivos que no sean imágenes reales. Esos archivos ya son las previews
+reutilizables, por lo que no se busca otra variante. El formulario y el PHP
+generado conservan únicamente el nombre del archivo.
+
+El campo estructurado `imagen` del artículo representa su imagen principal y es
+opcional, igual que en trivias y “Sabías que…”. Se resuelve una vez en el loader y
+se muestra en índice y página individual. Los marcadores `[[imagen ...]]` continúan
+siendo componentes independientes insertados dentro del Markdown. Antes de guardar,
+el editor verifica todos los nombres recibidos por POST contra la lista interna de
+la galería, por lo que rutas, nombres ajenos y valores manipulados son rechazados.
+
+`imagen_posicion_x` e `imagen_posicion_y` guardan el punto focal de la imagen
+principal como porcentajes de 0 a 100. La ausencia o un valor inválido se normaliza
+a 50. El índice muestra una miniatura apaisada 16:9 en una columna editorial del
+35 % a la izquierda del texto; bajo 700 px, imagen y texto se apilan. La página individual
+separa el H1 del cuerpo Markdown y ordena título, resumen, cabecera y desarrollo.
+Allí la imagen principal usa un hero propio de ancho completo, proporción 16:9,
+conserva el mismo punto focal almacenado y centra la fotografía. El editor conserva el original como
+referencia y muestra aparte una preview 16:9 fiel al resultado público; habilita el
+selector de foco cuando hay recorte. Una relación fuera del rango tolerante
+1.70–1.85 produce una advertencia no bloqueante.
+
+Ninguna presentación amplía un archivo por encima de sus dimensiones naturales.
+El resolver expone ancho y alto reales como límites CSS; hero, índice, componentes
+internos y previews pueden reducir la fotografía con `contain`, pero nunca aplican
+zoom. Si el marco disponible es mayor, la imagen queda centrada y el espacio
+restante permanece libre.
+
+Esta política no se propaga a otras clases de recurso. Una fotografía independiente
+usa `[[imagen src="archivo.jpg" alt="Descripción"]]` y siempre queda centrada. Para
+asociar explícitamente texto e imagen se usa un bloque cerrado:
+`[[bloque-imagen src="archivo.jpg" alt="Descripción" posicion="derecha"]] ... [[/bloque-imagen]]`.
+Admite `derecha` o `izquierda` y se renderiza como Grid autocontenido, sin flotados;
+en móvil el texto queda primero y la imagen centrada después. Las fotografías
+verticales usan `min(70%, 240px)` y, hasta 380 px, `min(60%, 210px)`; las
+horizontales pueden ocupar `min(90%, 480px)`. Las alineaciones
+laterales antiguas de `[[imagen]]` siguen siendo legibles como figuras centradas y
+producen una recomendación de migración en debug local. Todas usan `contain`, ancho
+máximo y altura automática. El futuro componente
+`[[esquema ...]]`, incluidos SVG e ilustraciones, también deberá usar `contain` y
+nunca recortar su contenido.
+
+La interfaz de edición conserva un único formulario y distribuye sus campos en tres
+paneles ARIA: Contenido, “Sabías que…” y Trivias. Los dos últimos usan un patrón
+maestro-detalle: una lista compacta controla mediante `hidden` cuál bloque del mismo
+formulario queda visible. Cambiar de solapa o selección no reconstruye nodos ni
+modifica sus valores. Las solapas y listas admiten flechas, Inicio y Fin; los
+controles mantienen foco visible. La solapa activa viaja en un campo oculto del
+formulario y se incorpora a la redirección posterior al guardado, por lo que
+Contenido, “Sabías que…” o Trivias permanecen seleccionadas tanto después de un
+guardado exitoso como ante una validación fallida.
+
+El navegador actualiza en la lista el título/pregunta y la visibilidad mientras se
+escribe. Los errores del servidor se señalan tanto en el elemento de la lista como
+junto al campo correspondiente. Altas y bajas sólo alteran el modelo DOM hasta
+guardar; la baja utiliza un diálogo integrado y el formulario avisa con
+`beforeunload` si se intenta salir con cambios pendientes.
+
+El índice local calcula el estado editorial agregando incidencias del artículo, sus
+trivias y sus tarjetas: sin incidencias es **Válido**, con warnings no bloqueantes es
+**Con advertencias**, y con cualquier error es **Con errores**. Al editar, cada
+warning conserva la ruta de campo y el mensaje del resolver, incluidos el nombre
+solicitado y la alternativa elegida.
+
+Las advertencias de imagen se etiquetan por origen: imagen principal, trivia,
+“Sabías que…” o imagen embebida. Los componentes Markdown conservan número ordinal
+y línea aproximada calculada desde el offset del marcador. El editor ofrece
+**Ir al componente**, activa la solapa Contenido y selecciona esa línea en el
+textarea; nunca reemplaza automáticamente la referencia editorial.
+
+En la solapa Contenido, slug, versión y visibilidad forman una fila compacta. La
+imagen principal vive en un único panel con el original —máximo 220×390 px— y la
+vista 16:9 del hero lado a lado; en móvil se apilan. Título, resumen y demás
+metadatos continúan después a ancho completo, fuera de esa grilla visual.
 - `asset-url.php`: query `v=<filemtime>` para assets locales.
 - `analytics.php`, `seo.php` y `favicon-links.php`: cabecera pública.
 - `moon-images.php`: miniaturas lunares estáticas.
 
 ## Eclipses y mapas mundiales
 
-`eclipses.php` valida el formulario, limita la búsqueda exclusiva de eclipses a diez años y consume server-side `/v1/astronomy/events?types=eclipse`. El listado no renderiza mapas. Cada evento contiene un `<template>` que `assets/js/eclipses.js` clona dentro de un `<dialog>`.
+`eclipses.php` valida el formulario, limita la búsqueda exclusiva de eclipses a cinco
+años y consume server-side `/v1/astronomy/events?types=eclipse`. El límite se refleja
+en los controles del navegador y se vuelve a comprobar antes de cualquier consulta a
+la API; un exceso muestra “El intervalo máximo de consulta es de 5 años.” El listado
+no renderiza mapas. Cada evento contiene un `<template>` que `assets/js/eclipses.js`
+clona dentro de un `<dialog>`.
+
+El detalle se implementa en `includes/eclipse-detail-component.php`. Ese componente
+construye el modelo, el identificador estable, el botón disparador, la plantilla y el
+único `<dialog>`. Lo consumen tanto `eclipses.php` como las tarjetas `type=eclipse`
+de `eventos.php`; estas últimas usan el evento ya recibido por la consulta general y
+no realizan otra petición. `assets/js/eclipses.js` resuelve la plantilla por el
+identificador del eclipse. Mapas no disponibles producen `null` y no renderizan
+sección ni espacio residual. La agenda se construye con el helper común de calendario.
 
 ## Visibilidad de esta noche
 
@@ -67,6 +245,12 @@ tres estados visibles y el orden entregado por la API, sin reordenar estrellas.
 Direcciones sólo se usan en `visible_now`. `moon_proximity` se redacta como cercanía
 visual y nunca se aplica a la propia Luna; `observation_aid` se presenta como ayuda de
 observación.
+
+La Luna se conserva en la página detallada sólo cuando coincide con un evento lunar
+relevante: Luna llena en alguno de los días civiles atravesados por la noche, o una
+conjunción, eclipse, luz cenicienta, oportunidad de Luna llena, ápside o libración
+dentro de la ventana nocturna. La consulta de eventos sólo decide protagonismo; las
+posiciones y ventanas observables continúan perteneciendo al contrato `tonight`.
 
 El catálogo independiente de veinte estrellas y todas las constelaciones son contrato
 de la API, no datos duplicados en PHP. La vista usa sólo `constellation.name`, omite el
@@ -112,11 +296,23 @@ Los tres retornos bajo `tienda/` son informativos y no confirman pagos ni habili
 
 La confirmación bloquea pedido y pago dentro de una transacción. Exige referencia existente y coincidencia exacta de moneda e importe; sólo `approved` marca el pedido pagado. El permiso se crea con 32 bytes aleatorios, vencimiento y máximo configurables. El bloqueo del pedido y la comprobación previa por `pedido_id` evitan duplicar permisos ante reintentos aunque el esquema no tenga una clave única sobre esa columna. `pedido_fotos` nunca se actualiza. No existe todavía un endpoint que consuma el token.
 
-## Administración privada de fotos
+## Administración privada
 
-`admin/login.php`, `admin/fotos.php` y `admin/logout.php` forman un área no enlazada desde el sitio público. `includes/store-admin-auth.php` centraliza cookie HttpOnly/SameSite=Lax, sesión, autenticación con `password_verify()`, regeneración del ID, CSRF y destrucción completa. Todas sus respuestas usan `no-store` y `X-Robots-Tag: noindex`.
+`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. El panel ofrece acceso a la galería/tienda y al Laboratorio Astronómico. `includes/store-admin-navigation.php` comparte entre panel, galería y laboratorio la navegación Inicio, Galería, Laboratorio y el formulario de cierre de sesión.
+
+`includes/store-admin-auth.php` conserva la autenticación histórica: cookie de sesión `aquellas_lunas_admin`, estado `store_admin_authenticated`, cookie HttpOnly/SameSite=Lax, validación mediante `password_verify()`, regeneración del ID, CSRF y destrucción completa. `admin/login.php` dirige al panel general después de autenticar y `admin/logout.php` mantiene el cierre por POST. Todas las respuestas administrativas usan `no-store` y `X-Robots-Tag: noindex`.
 
 `includes/store-admin-photos.php` consulta todas las fotos mediante la conexión PDO compartida y modifica con sentencias preparadas sólo disponibilidad, precio y los campos editoriales `titulo`, `descripcion` y `palabras_clave`. Estos últimos son opcionales, se recortan, validan a 255/5000/2000 caracteres y se guardan como texto o `NULL`. No interpreta HTML ni actualiza EXIF, `metadatos_json`, monedas o previews. La asignación múltiple de precios sigue siendo transaccional; el portal no muestra hashes, originales o nombres de archivo, no borra y no toca `pedido_fotos`.
+
+### Laboratorio Astronómico
+
+El laboratorio ofrece los modos excluyentes Serie diaria y Extremos locales. El segundo reutiliza las expresiones controladas de `includes/astronomy-laboratory.php`; `includes/astronomy-laboratory-extrema.php` limita las variables admitidas y calcula máximos y mínimos diarios mediante CTE, `LAG()` y `LEAD()`. No persiste indicadores ni modifica `datos_astronomicos`. La clave primaria `fecha` proporciona el índice usado para acotar cada consulta.
+
+Como referencia local del 31 de julio de 2026, sobre MariaDB 10.11 y distancia lunar, las medianas de tres ejecuciones fueron aproximadamente 68 ms para 5 años, 69 ms para 10, 85 ms para 20 y 168 ms para todo 1900–2100. Una expresión derivada (`duracion_dia`, 10 años) tardó aproximadamente 72 ms. Son mediciones orientativas del entorno local, no objetivos contractuales.
+
+La referencia completa de autenticación, estructura administrativa, contrato JSON,
+catálogo de variables, ejes, ambos modos de análisis y reglas de extensión está en
+[Administración y Laboratorio Astronómico](administracion-y-laboratorio.md).
 
 ## Planificador de direcciones
 
@@ -176,6 +372,11 @@ La tarjeta lunar conserva imagen y texto en dos columnas superiores y coloca el 
 
 El marcador interpola linealmente entre las dos muestras vecinas. Con reloj real se actualiza cada minuto sin volver a solicitar series. Con `debug_now` usa el instante simulado, queda fijo y no inicia temporizador.
 
+El nombre de la fase actual no usa la clasificación amplia de `daily`. El helper
+`astronomyMoonPhaseLabelForLocalDate()` consume eventos exactos: reserva los cuatro
+nombres principales para su día civil local y usa los cuatro nombres intermedios el
+resto de los días. Inicio y “El cielo hoy” comparten esa decisión.
+
 ## Próxima salida lunar
 
 La portada obtiene la salida del día desde `/v1/astronomy/daily`. Si la Luna está bajo el horizonte y esa salida ya ocurrió o falta, consulta condicionalmente el día siguiente por el mismo endpoint. `homeFutureMoonrise()` descarta cualquier salida que no sea futura respecto de `/v1/moon/instant`, respetando ubicación, zona horaria y reloj simulado.
@@ -192,12 +393,24 @@ Los tres niveles destacados se presentan con una banda sobria. El último usa un
 
 ## Presentación de eventos y Superluna
 
+### Búsqueda progresiva de “Lo próximo”
+
+`includes/home-upcoming-events.php` centraliza el límite de seis elementos, los tipos
+y los tramos `[0,7]`, `[7,7]` y `[14,16]`. Cada respuesta se combina con las
+anteriores, se filtra con las mismas reglas editoriales, se deduplica y se ordena
+cronológicamente antes de decidir si hace falta el tramo siguiente. La clave usa
+`id`, `event_id` o `uid` cuando existe; en su defecto usa `type + datetime`.
+
+El diagnóstico conserva una entrada separada por consulta:
+`home v2 upcoming 1-7`, `8-14` y `15-30`. Sólo aparecen los tramos realmente
+ejecutados, lo que permite observar el corte temprano y sumar sus tiempos.
+
 `includes/event-presentation.php` es compartido por portada y `eventos.php`. Devuelve `title`, `summary`, `show_time`, `time_label`, `technical_details`, `explanation`, `public_details`, `contact_points` y `alert` para:
 
 - fases y cuartos lunares;
 - perigeo y apogeo;
 - conjunciones y visibilidad simultánea;
-- ventanas de luz cenicienta;
+- oportunidades unificadas de Luna fina y luz cenicienta;
 - oportunidades `full_moon_observation`;
 - libraciones destacadas (`libration`);
 - eclipses (`eclipse`) lunares y solares;
@@ -205,11 +418,48 @@ Los tres niveles destacados se presentan con una banda sobria. El último usa un
 
 Sólo `moon_phase/full_moon` puede presentarse como **Superluna**. Si `details.apparent_size_percent` es numérico y alcanza el umbral, cambia el título y usa el resumen “La Luna llena se verá más grande de lo habitual.” No crea otro evento ni elimina sus datos: distancia, iluminación y porcentaje real permanecen en los detalles técnicos.
 
-La portada consulta 30 días con `types=moon_phase,apsis,conjunction,earthshine,full_moon_observation` y `max_difference_minutes=70`. `eventos.php` ofrece filtros para `moon_phase`, `apsis`, `conjunction`, `earthshine`, `libration` y `eclipse`; presenta sus datos técnicos mediante un popover accesible cuando corresponde.
+La portada y `eventos.php` solicitan `full_moon_observation` con
+`max_difference_minutes=70`. Ambos usan `astronomyFullMoonObservationMoment()` y la
+misma presentación para título, diferencia, salida/puesta lunar, explicación y
+nubosidad en la hora relevante. `eventos.php` también ofrece filtros para
+`moon_phase`, `apsis`, `conjunction`, `earthshine`, `libration` y `eclipse`.
+
+Los eventos `earthshine` también tienen una única construcción compartida.
+La API entrega los dos amaneceres anteriores y los dos atardeceres posteriores
+a cada Luna nueva; si una oportunidad además cumple la regla observacional
+histórica, `details.earthshine_visible=true`. La presentación combina ambos
+conceptos en una sola tarjeta con iluminación, separación Sol-Luna, diferencia
+y horarios de salida/puesta, intervalo útil y nubosidad. El día civil de Luna
+nueva se descarta si la iluminación real es menor que `0,4 %`; el filtro usa el
+valor recibido antes de formatearlo.
 
 Para libraciones, la presentación pública muestra título amigable por subtipo, hora local, borde favorecido en texto, amplitud aproximada con un decimal y fase/iluminación como dato secundario opcional. No se exponen en la interfaz pública `schema_version`, `generation`, `publication`, kernels, frame ni metadatos internos de persistencia o cálculo.
 
 Para eclipses, la presentación pública prioriza la visibilidad local (`not_visible`, `visible_partial`, `visible_total`, etc.) y muestra contactos horarios legibles por código. En eclipses solares, agrega magnitud, oscurecimiento y geometría local del máximo cuando existe. Si `near_central_path_boundary=true`, informa explícitamente que pequeñas variaciones de ubicación pueden cambiar duración y tipo central observado.
+
+## Exportación a calendario
+
+`includes/calendar-event.php` centraliza la elección del intervalo, las URLs de
+proveedores y la serialización RFC 5545. Inicio, Eventos lunares y Eclipses muestran
+una única acción **Agendar evento** sólo si existen inicio y fin confiables. El menú
+abre los formularios de confirmación de Google Calendar u Outlook, o descarga el
+`.ics` mediante `calendar-event.php` para Apple Calendar y otros clientes.
+
+`assets/js/calendar-scheduler.js` controla el menú compartido: sólo mantiene uno
+abierto, cierra al tocar fuera o al presionar Escape y devuelve el foco al botón.
+En móvil se presenta como un panel inferior ancho para evitar desbordes.
+
+Los instantes exactos de fases, conjunciones, ápsides y libraciones reciben una
+duración editorial de 15 minutos. Las oportunidades de Luna fina o luz cenicienta
+usan su intervalo útil completo. `full_moon_observation` comienza en el horario
+lunar relevante y dura 30 minutos. Los eclipses usan, en orden, inicio/final visible
+local, primer/último contacto disponible o, si sólo existe el máximo, una duración
+de 60 minutos desde ese instante.
+
+Para maximizar compatibilidad, `DTSTART` y `DTEND` se exportan en UTC. La zona activa
+se conserva en `X-WR-TIMEZONE` y en `DESCRIPTION`; de este modo el calendario del
+dispositivo convierte correctamente el evento, incluso al cruzar medianoche. No se
+generan eventos de día completo.
 
 ## Navegación móvil por gestos
 
@@ -232,6 +482,15 @@ Las regresiones de cancelación, continuidad Touch y persistencia del botón est
 `includes/analytics.php` contiene el ID fijo `G-GFZJ3D3MF3` y `renderAnalyticsTracking()` carga `gtag.js` una vez por petición. Se invoca en Inicio, Esta noche, Sol y Luna, Planificador, Eventos, Eclipses, Ubicación, Galería y Acerca. No existe variable de entorno, consentimiento propio ni supresión automática para localhost.
 
 La verificación consiste en revisar el HTML o Network/Tag Assistant y confirmar `googletagmanager.com/gtag/js?id=G-GFZJ3D3MF3`. La web no guarda identificadores de Analytics en cookies propias ni registra payloads en PHP, pero Google puede aplicar su propia política y almacenamiento. Las páginas dinámicas usan `no-store`; esto no modifica la caché ni privacidad del script externo.
+
+`assets/js/install-prompt.js` usa el helper seguro
+`window.aquellasLunasTrackAnalyticsEvent()` definido por ese mismo bloque de
+Analytics. Registra `pwa_install_open`, `pwa_install_prompt`,
+`pwa_install_accepted`, `pwa_install_dismissed`, `pwa_ios_instructions`,
+`pwa_favorite_help` y `pwa_promo_closed`, con `source`, `platform`, `browser`,
+`display_mode` y `action`. El clic sólo cuenta como intento; aceptación y
+rechazo requieren `userChoice`, y `appinstalled` funciona como confirmación
+alternativa sin duplicar una aceptación ya registrada.
 
 `seo.php` genera metadatos, canonical y JSON-LD. `favicon-links.php` publica SVG, ICO, PNG 32×32 y Apple Touch Icon. `versionedAssetUrl()` agrega `?v=<filemtime>` a CSS, JavaScript, favicon y miniaturas lunares cuando el archivo existe; si no puede leerlo conserva la ruta original.
 

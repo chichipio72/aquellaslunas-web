@@ -1,0 +1,23 @@
+{
+  "name": "Aquellas Lunas",
+  "short_name": "Aquellas Lunas",
+  "description": "El cielo de hoy, la Luna y los próximos eventos astronómicos para tu ubicación.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "assets/images/favicon/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/images/favicon/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

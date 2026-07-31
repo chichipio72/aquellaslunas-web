@@ -17,6 +17,12 @@ La copia de trabajo está en `/srv/proyectos/astronomia/web`. Docker Compose eje
 
 `Dockerfile` instala curl, mbstring, intl, mysqli y PDO MySQL, habilita `rewrite` y carga `php.ini` y `apache/astro.conf`. La zona horaria PHP es `America/Argentina/Buenos_Aires`; `display_errors` y `expose_php` están desactivados.
 
+Docker declara `APP_ENV=local`. La detección general vive en
+`includes/api-config.php`: sólo `local` habilita funciones de la mini PC; una
+variable ausente, vacía o inválida se interpreta como `production`. Las banderas de
+diagnóstico, navegación o cualquier otra función no deben usarse como detección del
+entorno.
+
 ## API local
 
 `docker-compose.yml` define:
@@ -35,7 +41,25 @@ La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-prof
 
 `MOBILE_SWIPE_NAVIGATION_ENABLED` habilita el recorrido táctil móvil entre Inicio, Esta noche, Sol y Luna, Planificador y Eventos. `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` controla por separado el aviso inicial guardado en `localStorage`. Ambas usan `true` de forma predeterminada. `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED` controla únicamente el panel visual y usa `false`: incluso en modo timings, el swipe navega automáticamente mientras esa opción siga apagada.
 
-`LOCAL_TIME_SIMULATION_ENABLED=true` habilita exclusivamente en la instalación local el control «Modo de prueba» del encabezado. La fecha y hora se guardan en una sesión PHP y se interpretan como hora local de la ubicación activa; al cambiar de zona horaria se conserva la hora de pared elegida. Con la opción ausente o en `false`, el servidor no inicia esta sesión, no renderiza el control e ignora `debug_now`.
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control «Modo de prueba» únicamente
+si además `APP_ENV=local`. La fecha y hora se guardan en una sesión PHP y se
+interpretan como hora local de la ubicación activa; al cambiar de zona horaria se
+conserva la hora de pared elegida. Con la opción ausente o en `false`, el servidor no
+inicia esta sesión, no renderiza el control e ignora `debug_now`.
+`CONTENT_ENABLED_IN_PRODUCTION=false` queda preparado para la futura sección de
+contenido; `isContentEnabled()` devuelve siempre `true` en local.
+
+La sección **Contenidos** usa archivos PHP bajo `includes/contenido/`. En la cabecera
+local aparece **Ver errores de contenido**: activa por sesión un diagnóstico que
+mantiene visibles los problemas de archivos, metadatos, Markdown, referencias,
+trivias, entradas “Sabías que…” e imágenes. El control no existe en producción y no
+requiere variables adicionales.
+
+Los recursos reutilizables de artículos, trivias y “Sabías que…” se colocan en
+`assets/images/tienda/previews/contenido/`. Si una referencia editorial no coincide con un
+archivo, localmente se usa otra imagen válida de esa carpeta; si no hay ninguna, el
+contenido continúa sin imagen. El modo debug informa el reemplazo como advertencia,
+no como error.
 
 La referencia completa de prioridad, claves externas y validación está en [configuracion.md](configuracion.md). La arquitectura funcional está en [arquitectura.md](arquitectura.md).
 
@@ -50,6 +74,9 @@ Si la variable no existe o está vacía, el cargador intenta `/home8/aquellaslun
 Docker Compose carga automáticamente `.env`. El archivo local actual contiene:
 
 ```dotenv
+APP_ENV=local
+LOCAL_TIME_SIMULATION_ENABLED=true
+CONTENT_ENABLED_IN_PRODUCTION=false
 ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
@@ -230,25 +257,39 @@ Generar el hash desde una consola segura. El comando lee la contraseña por entr
 docker compose run --rm -T web php -r '$password = rtrim(stream_get_contents(STDIN), "\r\n"); echo password_hash($password, PASSWORD_DEFAULT), PHP_EOL;'
 ```
 
-Copiar únicamente el resultado a `STORE_ADMIN_PASSWORD_HASH` en `.env`, definir `STORE_ADMIN_USER` y recrear el servicio. El portal queda en `http://localhost:18080/admin/` y no se enlaza desde el menú. El listado permite controlar publicación, administrar precios y editar título, descripción y palabras clave. Los campos editoriales pueden vaciarse para persistir `NULL`; se guardan como texto plano y no afectan metadatos técnicos.
+Copiar únicamente el resultado a `STORE_ADMIN_PASSWORD_HASH` en `.env`, definir `STORE_ADMIN_USER` y recrear el servicio. El punto de entrada es `http://localhost:18080/admin/` y no se enlaza desde el menú público. Después del login se abre el panel general, con accesos a Galería y tienda y al Laboratorio Astronómico. Las tres pantallas comparten la navegación Inicio, Galería, Laboratorio y Cerrar sesión mediante `includes/store-admin-navigation.php`, reutilizando la sesión administrativa existente.
+
+La galería administrativa permanece en `admin/fotos.php`; permite controlar publicación, administrar precios y editar título, descripción y palabras clave. Los campos editoriales pueden vaciarse para persistir `NULL`; se guardan como texto plano y no afectan metadatos técnicos.
 
 ```bash
 docker compose up -d --force-recreate web
 docker compose exec -T web php tests/store-admin.php
+docker compose exec -T web php tests/astronomy-laboratory-extrema.php
 docker compose exec -T web bash tests/store-admin-http.sh
 ```
 
-La prueba PHP usa credenciales efímeras y una transacción revertida para login, sesión, CSRF, logout, disponibilidad, precios y metadatos editoriales completos, parciales, vacíos y excesivos. Confirma que los datos técnicos y `pedido_fotos` no cambien. La prueba HTTP verifica redirecciones, listado autenticado, formularios administrativos, cabeceras privadas, logout sólo por POST y bloqueo de archivos internos.
+La prueba PHP administrativa usa credenciales efímeras y una transacción revertida para login, sesión, CSRF, logout, disponibilidad, precios y metadatos editoriales completos, parciales, vacíos y excesivos. La prueba de extremos valida catálogo, rangos y consultas reales con `LAG()`/`LEAD()`. La prueba HTTP verifica redirecciones, panel, ambos modos del laboratorio, formularios administrativos, cabeceras privadas, logout sólo por POST y bloqueo de archivos internos.
 
 Los nombres de portada son `moon instant`, `daily`, `home phases` y `home upcoming`. Como referencia no contractual, se observaron localmente unos 57 ms para `daily`, 90 ms para fases y 288 ms para próximos eventos. No dejar habilitado el diagnóstico en producción salvo durante una comprobación puntual.
 
 ### Reloj simulado
 
-`LOCAL_TIME_SIMULATION_ENABLED=true` muestra en el encabezado los campos de fecha y hora, **Aplicar** y, cuando corresponde, **Usar hora real**. `get_current_datetime()` aplica el valor guardado en sesión a consultas, fechas predeterminadas, descarte de eventos pasados y marcadores; cookies, timeouts y mediciones siguen usando tiempo real. En los perfiles simulados no se crea el temporizador por minuto.
+Con `APP_ENV=local` y `LOCAL_TIME_SIMULATION_ENABLED=true` se muestran en el
+encabezado los campos de fecha y hora, **Aplicar** y, cuando corresponde,
+**Usar hora real**. `get_current_datetime()` aplica el valor guardado en sesión a
+consultas, fechas predeterminadas, descarte de eventos pasados y marcadores; cookies,
+timeouts y mediciones siguen usando tiempo real. En los perfiles simulados no se crea
+el temporizador por minuto.
 
 ## Presentación de eventos
 
-La portada consulta 30 días con `types=moon_phase,apsis,conjunction,earthshine,full_moon_observation` y `max_difference_minutes=70`, descarta eventos pasados, ordena y muestra cinco. `includes/event-presentation.php` comparte con `eventos.php` los títulos, resúmenes, reglas horarias, explicaciones y datos técnicos.
+La portada consulta “Lo próximo” por tramos no superpuestos: 7 días, los 7
+siguientes y finalmente 16 días. Se detiene cuando, después de filtrar, deduplicar y
+ordenar, reúne los seis eventos visibles. Conserva
+`types=moon_phase,apsis,conjunction,earthshine,full_moon_observation` y
+`max_difference_minutes=70`. `eventos.php` mantiene su consulta normal independiente.
+`includes/event-presentation.php` comparte los títulos, resúmenes, reglas horarias,
+explicaciones y datos técnicos.
 
 La portada muestra una versión compacta. En `eventos.php`, el botón **Datos técnicos** abre un popover nativo accesible; separación, iluminación, altura, distancia y tamaño relativo no se muestran fuera de ese popover.
 
@@ -492,6 +533,9 @@ return [
 
 CSS, JavaScript y miniaturas lunares locales usan `includes/asset-url.php` para agregar una versión basada en `filemtime()`. No se deshabilita la caché de estáticos: al modificar un archivo cambia su URL y el navegador solicita la versión nueva.
 
-Producción no usa `.env` ni Docker y mantiene `local_time_simulation_enabled => false` —o simplemente omite la clave—. Por eso no inicia la sesión local, no renderiza el control, ignora `debug_now` y usa siempre la hora real, independientemente de la configuración de métricas.
+Producción no usa `.env` ni Docker. Puede omitir `APP_ENV`: el valor seguro
+predeterminado es `production`. El simulador no inicia sesión, no renderiza controles
+y no acepta `debug_now` salvo que coincidan `APP_ENV=local` y
+`LOCAL_TIME_SIMULATION_ENABLED=true`.
 
 Analytics no distingue entornos y también se carga en producción con el mismo ID. En el hosting, las páginas viven bajo `/astro/`; assets y endpoints del mismo origen deben resolver bajo ese prefijo.

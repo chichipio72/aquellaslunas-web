@@ -10,14 +10,20 @@ Salvo que se indique otra cosa, la prioridad es:
 
 El archivo externo está fuera de `public_html`. `loadAstronomyProductionConfig()` debe devolver un arreglo; las opciones inválidas producen una excepción que se registra y se maneja según el componente.
 
+`APP_ENV` es la excepción deliberada: se lee únicamente del entorno. Solo el valor
+`local` habilita capacidades locales. Si falta, está vacío o contiene cualquier otro
+valor, `appEnvironment()` devuelve `production`.
+
 ## Matriz de opciones
 
 | Variable | Clave externa | Predeterminado | Validación | Uso |
 |---|---|---:|---|---|
+| `APP_ENV` | — | `production` | únicamente `local`; todo otro valor es producción | entorno general de ejecución |
+| `CONTENT_ENABLED_IN_PRODUCTION` | — | `false` | booleano mediante `filter_var` | futura sección de contenido; local siempre habilitado |
 | `ASTRONOMY_API_BASE_URL` | `astronomy_api_base_url` | sin valor válido | URL HTTP/HTTPS | API server-side |
 | `ASTRONOMY_REVERSE_GEOCODER_URL` | — | URL de Nominatim | URL HTTPS | geocodificación inversa server-side |
 | `ASTRONOMY_REVERSE_GEOCODER_USER_AGENT` | — | identificación de Aquellas Lunas | texto | `User-Agent` para Nominatim |
-| `ASTRONOMY_SHOW_TIMINGS` | `astronomy_show_timings` | `false` | booleano mediante `filter_var` | tiempos, `debug_now` y requisito del panel swipe |
+| `ASTRONOMY_SHOW_TIMINGS` | `astronomy_show_timings` | `false` | booleano mediante `filter_var` | tiempos y requisito del panel swipe |
 | `LOCAL_TIME_SIMULATION_ENABLED` | `local_time_simulation_enabled` | `false` | booleano mediante `filter_var` | control y sesión local de simulación temporal |
 | `ALTITUDE_PROFILE_INTERVAL_MINUTES` | `altitude_profile_interval_minutes` | `15` | entero 5–60 | Sol y Luna, mismo intervalo |
 | `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` | `supermoon_min_apparent_size_percent` | `105` | número finito 90–120 | clasificación editorial de Luna llena |
@@ -53,7 +59,7 @@ El archivo externo está fuera de `public_html`. `loadAstronomyProductionConfig(
 
 `MERCADO_PAGO_NOTIFICATION_URL` documenta y valida la URL registrada centralmente en **Tus integraciones → Webhooks**. No se incluye como `notification_url` al crear preferencias, para no reemplazar el canal firmado configurado en el panel.
 
-`ASTRONOMY_SHOW_TIMINGS` usa la misma prioridad, aunque su cargador tolera cualquier valor que `FILTER_VALIDATE_BOOLEAN` interprete como falso. No existe una opción para Analytics: el ID `G-GFZJ3D3MF3` está definido en `includes/analytics.php` y se carga también en local.
+`ASTRONOMY_SHOW_TIMINGS` usa la misma prioridad, aunque su cargador tolera cualquier valor que `FILTER_VALIDATE_BOOLEAN` interprete como falso. Es una bandera de diagnóstico y no identifica el entorno. `LOCAL_TIME_SIMULATION_ENABLED` sólo se evalúa cuando `APP_ENV=local`; aun configurada en `true`, no habilita el simulador en producción. No existe una opción para Analytics: el ID `G-GFZJ3D3MF3` está definido en `includes/analytics.php` y se carga también en local.
 
 ## Docker Compose y `.env`
 
@@ -62,6 +68,9 @@ El archivo externo está fuera de `public_html`. `loadAstronomyProductionConfig(
 El `.env` local deseado contiene:
 
 ```dotenv
+APP_ENV=local
+LOCAL_TIME_SIMULATION_ENABLED=true
+CONTENT_ENABLED_IN_PRODUCTION=false
 ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
@@ -155,10 +164,21 @@ Los cuatro cargadores de previews resuelven por separado tamaño y calidad de ti
 
 `loadStoreDownloadExpiryHours()` y `loadStoreDownloadMaxCount()` aplican entorno → configuración externa → 72/5 y validan los rangos de la tabla. Estos valores sólo crean permisos en `descargas`; todavía no existe un endpoint público para consumirlos.
 
-Producción normalmente mantiene timings, diagnóstico visual del swipe y simulación temporal en falso. Timings muestra métricas pero no habilita por sí solo el reloj simulado. El panel y la pausa de navegación requieren además `mobile_swipe_navigation_debug_enabled => true`.
+Producción normalmente mantiene timings, diagnóstico visual del swipe y simulación temporal en falso. `APP_ENV` puede omitirse: ausencia, vacío y valores desconocidos se interpretan como producción. Timings muestra métricas pero no habilita por sí solo el reloj simulado. El panel y la pausa de navegación requieren además `mobile_swipe_navigation_debug_enabled => true`.
+
+La detección está centralizada en `appEnvironment()`, `isLocalEnvironment()` e
+`isProductionEnvironment()` dentro de `includes/api-config.php`.
+`isContentEnabled()` habilita siempre el contenido futuro en local y, en producción,
+únicamente con `CONTENT_ENABLED_IN_PRODUCTION=true`. Ninguna bandera correspondiente
+a una funcionalidad particular debe utilizarse como indicador general del entorno.
 
 ## Reloj simulado
 
-El reloj sólo se habilita con `LOCAL_TIME_SIMULATION_ENABLED=true` o `local_time_simulation_enabled => true`. El encabezado guarda fecha y hora local en una sesión PHP; no es necesario propagar parámetros. **Usar hora real** elimina la simulación. Con la bandera apagada, `debug_now`, sesiones previas y formularios de simulación se ignoran.
+El reloj sólo se habilita cuando `APP_ENV=local` y además
+`LOCAL_TIME_SIMULATION_ENABLED=true` —o su clave externa equivalente es verdadera—.
+Aunque la bandera específica quede activada por error en producción, el simulador
+permanece bloqueado. El encabezado guarda fecha y hora local en una sesión PHP; no es
+necesario propagar parámetros. **Usar hora real** elimina la simulación. Con la
+bandera apagada, `debug_now`, sesiones previas y formularios de simulación se ignoran.
 
 Con simulación, consultas, fechas predeterminadas, selección editorial y marcadores usan el instante indicado. Los perfiles se solicitan una vez y el marcador no crea temporizador. Cachés, logs, sesiones y expiraciones de seguridad conservan el reloj real.

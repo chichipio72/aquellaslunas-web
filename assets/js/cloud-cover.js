@@ -36,6 +36,29 @@
     Number.isFinite(value) && value >= 0 && value <= 100
   );
 
+  const cloudCategory = (value) => {
+    if (!validPercentage(value)) return null;
+    if (value <= 20) return { key: 'clear', label: 'Despejado' };
+    if (value <= 50) return { key: 'some', label: 'Algunas nubes' };
+    if (value <= 80) return { key: 'mostly', label: 'Mayormente nublado' };
+    return { key: 'overcast', label: 'Cubierto' };
+  };
+
+  const renderCloudIcon = (output, value, prefix = '') => {
+    const category = cloudCategory(value);
+    if (!output || !category) return false;
+    const image = output.ownerDocument.createElement('img');
+    image.src = `assets/images/weather/cloud-${category.key}.svg`;
+    image.alt = '';
+    image.width = 64;
+    image.height = 48;
+    output.replaceChildren(image);
+    output.title = `${category.label}: ${Math.round(value)} % de cobertura`;
+    output.setAttribute('aria-label', `${prefix ? `${prefix}. ` : ''}${category.label}. ${Math.round(value)} % de cobertura nubosa.`);
+    output.hidden = false;
+    return true;
+  };
+
   const parsePercentage = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const numericValue = Number(value);
@@ -221,14 +244,6 @@
     const documentRef = section.ownerDocument;
     if (points.length === 0 || !chart || !documentRef) return false;
 
-    const yAxis = documentRef.createElement('div');
-    yAxis.className = 'night-cloud-chart__y-axis';
-    ['100 %', '50 %', '0 %'].forEach((label) => {
-      const value = documentRef.createElement('span');
-      value.textContent = label;
-      yAxis.append(value);
-    });
-
     const plot = documentRef.createElement('div');
     plot.className = 'night-cloud-chart__plot';
     plot.style.setProperty('--night-cloud-points', String(points.length));
@@ -242,15 +257,14 @@
       const trigger = documentRef.createElement('button');
       trigger.type = 'button';
       trigger.className = 'night-cloud-chart__point';
-      trigger.style.setProperty('--cloud-cover-value', `${point.total}%`);
       const popoverId = `night-cloud-detail-${index}`;
       trigger.setAttribute('popovertarget', popoverId);
-      trigger.setAttribute('aria-label', `${hour}. Cobertura nubosa total: ${point.total} %`);
-
-      const bar = documentRef.createElement('span');
-      bar.className = 'night-cloud-chart__bar';
-      bar.setAttribute('aria-hidden', 'true');
-      trigger.append(bar);
+      renderCloudIcon(trigger, point.total, hour);
+      const percentage = documentRef.createElement('span');
+      percentage.className = 'night-cloud-chart__percentage';
+      percentage.textContent = `${point.total} %`;
+      percentage.setAttribute('aria-hidden', 'true');
+      trigger.append(percentage);
 
       const hourLabel = documentRef.createElement('span');
       hourLabel.className = 'night-cloud-chart__hour';
@@ -298,13 +312,15 @@
       plot.append(column);
     });
 
-    chart.replaceChildren(yAxis, plot);
+    chart.replaceChildren(plot);
     section.hidden = false;
     return true;
   };
 
   const renderEventOutput = (output, total, layers) => {
     const text = `Cobertura nubosa prevista: ${total} %`;
+    const inlineIcon = output.querySelector?.('[data-cloud-cover-inline-icon]');
+    if (inlineIcon) renderCloudIcon(inlineIcon, total);
     const textOutput = output.querySelector?.('[data-cloud-cover-text]');
     if (textOutput) textOutput.textContent = text;
     else output.textContent = text;
@@ -335,10 +351,14 @@
     const nightSection = root.querySelector('[data-cloud-cover-night]');
     const allOutputs = [...root.querySelectorAll('[data-cloud-cover-value]')];
     const targets = [...root.querySelectorAll('[data-cloud-cover-event]')]
-      .map((element) => ({
-        eventTimeMs: Date.parse(element.dataset.cloudCoverEvent || ''),
-        output: element.querySelector('[data-cloud-cover-value]'),
-      }))
+      .map((element) => {
+        const output = element.querySelector('[data-cloud-cover-value], [data-cloud-cover-icon]');
+        return {
+          eventTimeMs: Date.parse(element.dataset.cloudCoverEvent || ''),
+          output,
+          iconOnly: output?.hasAttribute?.('data-cloud-cover-icon') === true,
+        };
+      })
       .filter(({ eventTimeMs, output }) => (
         output
         && Number.isFinite(eventTimeMs)
@@ -368,13 +388,14 @@
       if (nightSection && !renderNightChart(nightSection, forecast, config.timezone)) {
         nightSection.remove();
       }
-      targets.forEach(({ eventTimeMs, output }) => {
+      targets.forEach(({ eventTimeMs, output, iconOnly }) => {
         const value = nearestCloudCover(forecast, eventTimeMs);
         if (value === null || value < 0 || value > 100) {
           output.remove();
           return;
         }
-        renderEventOutput(output, value, nearestCloudLayers(forecast, eventTimeMs));
+        if (iconOnly) renderCloudIcon(output, value);
+        else renderEventOutput(output, value, nearestCloudLayers(forecast, eventTimeMs));
       });
     } catch (_) {
       removeTargets(targets);
@@ -388,6 +409,8 @@
     nearestCloudCover,
     nearestCloudLayers,
     nightForecastPoints,
+    cloudCategory,
+    renderCloudIcon,
     parseForecast,
     requestForecast,
   };

@@ -9,6 +9,8 @@ La web usa PHP, HTML, CSS y JavaScript sin frameworks. La API, su infraestructur
 Documentación complementaria:
 
 - [arquitectura y comportamiento funcional](docs/arquitectura.md);
+- [administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md);
+- [reglas editoriales de presentación astronómica](docs/reglas-editoriales-astronomia.md);
 - [configuración completa](docs/configuracion.md);
 - [entorno local y validación](docs/entorno-local.md);
 - [despliegue operativo](docs/despliegue.md).
@@ -27,7 +29,8 @@ Documentación complementaria:
 - Reinicio: `unless-stopped`.
 - Código montado en `/var/www/html`.
 - Flujo de trabajo habitual: VS Code conectado a la mini PC mediante Remote SSH.
-- Configuración Compose local en `.env`; actualmente habilita `ASTRONOMY_SHOW_TIMINGS=true` para diagnóstico y reloj simulado.
+- Configuración Compose local en `.env`; `APP_ENV=local` identifica la mini PC y
+  `ASTRONOMY_SHOW_TIMINGS=true` habilita únicamente el diagnóstico.
 
 ### Producción
 
@@ -136,6 +139,9 @@ El tiempo de API es el valor interno informado mediante `X-Response-Time-Ms`. El
 El diagnóstico visible está deshabilitado por defecto en la aplicación. Docker Compose lee automáticamente el archivo local `.env`; con el valor actual:
 
 ```dotenv
+APP_ENV=local
+LOCAL_TIME_SIMULATION_ENABLED=true
+CONTENT_ENABLED_IN_PRODUCTION=false
 ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
@@ -179,7 +185,9 @@ Los derivados de tienda usan 800 px, calidad 72 y una marca semitransparente rep
 
 `galeria.php` presenta las fotos disponibles que ya tienen `archivo_preview_tienda`, ordenadas por creación descendente. La cuadrícula y el modal usan siempre esa versión comercial; no exponen la variante de contenido, originales ni rutas internas.
 
-El portal privado vive bajo `admin/` y no aparece en la navegación pública. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa sesiones protegidas y CSRF en todos los cambios. Permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
+El portal privado vive bajo `admin/` y no aparece en la navegación pública. `admin/index.php` es el panel general y enlaza la Galería y tienda y el Laboratorio Astronómico mediante una navegación administrativa compartida. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, reutiliza la sesión `aquellas_lunas_admin` y usa CSRF en todos los cambios. El laboratorio consulta de forma privada la tabla MySQL `datos_astronomicos` y ofrece los modos Serie diaria y Extremos locales mediante Apache ECharts. La arquitectura administrativa, el contrato JSON, el catálogo de variables y las reglas de extensión se describen en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
+
+La galería permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
 
 Mercado Pago Checkout Pro se integra server-side sin SDK. La galería crea pedidos pendientes y preferencias sin confiar en importes del navegador. `webhooks/mercado-pago.php` acepta sólo POST, valida `x-signature`, consulta el pago real por API y confirma en una transacción monto, moneda y `external_reference`. Un pago aprobado actualiza `pagos`/`pedidos` y crea una única fila en `descargas`; todavía no existe descarga pública ni email. En modo `test`, un secreto vacío sólo permite mocks desde loopback; toda notificación externa se rechaza. Las páginas de retorno continúan siendo informativas y nunca aprueban pedidos.
 
@@ -218,9 +226,34 @@ El panel del swipe requiere simultáneamente `ASTRONOMY_SHOW_TIMINGS=true` y `MO
 
 ## Reloj simulado local
 
-`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control de desarrollo del encabezado. El helper `includes/current-datetime.php` centraliza el instante mediante `get_current_datetime()` y persiste en sesión una fecha y hora local. La portada, consultas astronómicas, filtros de eventos pasados, fechas predeterminadas y marcadores usan ese valor; **Usar hora real** lo elimina.
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control de desarrollo del encabezado
+únicamente cuando `APP_ENV=local`. El helper `includes/current-datetime.php`
+centraliza el instante mediante `get_current_datetime()` y persiste en sesión una
+fecha y hora local. La portada, consultas astronómicas, filtros de eventos pasados,
+fechas predeterminadas y marcadores usan ese valor; **Usar hora real** lo elimina.
 
 El valor se interpreta nuevamente en la zona de la ubicación activa, por lo que un cambio de ubicación conserva la fecha y hora local elegidas. Producción debe omitir la opción o configurarla en `false`: en ese estado no se renderiza ni acepta el modo de prueba, incluso si llega `debug_now` o existe una cookie anterior.
+
+## Laboratorio visual local
+
+`pruebas-visuales.php` permite evaluar componentes experimentales dentro del diseño
+real del sitio y sólo responde cuando `isLocalEnvironment()` es verdadero. La primera
+prueba compara tres composiciones con publicaciones públicas insertadas mediante el
+embed oficial de Instagram. Las URLs se editan en el arreglo `$instagramPosts`, cerca
+del inicio de esa página; el renderer acepta la URL sencilla con la ruta de la cuenta
+y la normaliza al permalink canónico requerido por el embed.
+
+En entorno local, **Galería** y **Pruebas visuales** aparecen en el menú centralizado,
+independientemente de timings. En producción ambas entradas permanecen ocultas; la
+Galería conserva su acceso y comportamiento previos, mientras que la página
+experimental responde 404.
+
+La detección general está en `includes/api-config.php`: `appEnvironment()`,
+`isLocalEnvironment()` e `isProductionEnvironment()`. Solo `APP_ENV=local` activa
+funciones locales; todo otro valor es producción. `isContentEnabled()` deja preparada
+la futura sección editorial: siempre habilitada en local y, en producción, sólo con
+`CONTENT_ENABLED_IN_PRODUCTION=true`. Ninguna bandera funcional debe reutilizarse
+como indicador del entorno.
 
 ## Compatibilidad con PHP del hosting
 
@@ -243,8 +276,10 @@ La configuración pública vive en `ubicacion.php`. `assets/js/location.js` conc
 geolocalización y menú; `assets/js/astro-map.js` adapta Leaflet al marcador del
 observador. Una futura página local debe usar `astronomyLocationContext()`.
 
-Cookies propias (30 días, ruta `/`, `SameSite=Lax`): `astro_latitude`,
-`astro_longitude`, `astro_timezone`, `astro_location_mode` y `astro_location_name`.
+Cookies propias (400 días, ruta `/`, `SameSite=Lax`): `astro_latitude`,
+`astro_longitude`, `astro_timezone`, `astro_location_mode`, `astro_location_name`,
+`astro_location_confirmed` y `astro_location_intro_seen`. La confirmación identifica
+la fuente de verdad; la última sólo controla la ayuda de primera visita.
 Los modos finales son `default`, `geolocation` y `manual`; el valor histórico `custom`
 sigue siendo válido y se interpreta como `manual`.
 
@@ -326,7 +361,7 @@ opciones iniciales por grupo. Elegir o expandir opciones no consulta la API.
 La portada consulta `/v1/astronomy/daily` para el estado actual y separa las efemérides en dos consultas especializadas:
 
 - `home phases`: desde 35 días antes de hoy y durante 80 días, exclusivamente con `types=moon_phase`. Conserva para la interfaz la primera ocurrencia futura de cada fase principal y aporta las Lunas nuevas anterior y siguiente para clasificar la situación actual.
-- `home upcoming`: 30 días con `types=moon_phase,apsis,conjunction,earthshine,full_moon_observation` y `max_difference_minutes=70`; descarta eventos ya transcurridos, ordena los futuros cronológicamente y limita la portada a cinco resultados. La portada transforma esos datos en textos de observación cotidianos sin alterar la presentación detallada de `eventos.php`.
+- `home upcoming`: busca progresivamente los días 1–7, 8–14 y 15–30 con `types=moon_phase,apsis,conjunction,earthshine,full_moon_observation` y `max_difference_minutes=70`. Después de cada tramo descarta eventos pasados o no mostrables, deduplica, ordena y detiene las consultas al reunir los seis resultados que admite la portada. La presentación detallada y la consulta normal de `eventos.php` no cambian.
 
 No existe una tercera consulta amplia con todos los tipos. Las mediciones aparecen separadas con esos mismos nombres en el diagnóstico opcional.
 
@@ -396,9 +431,15 @@ Los filtros disponibles son:
 - libraciones destacadas (`libration`);
 - eclipses lunares y solares (`eclipse`).
 
-Los resultados se agrupan por fecha local y se presentan como eventos, no como datos técnicos. Las conjunciones son acercamientos geométricos: la indicación de visibilidad aclara si ambos cuerpos estaban simultáneamente sobre el horizonte desde la ubicación consultada. La luz cenicienta se muestra como una ventana observacional estimada, no como un instante exacto.
+Los resultados se agrupan por fecha local y se presentan como eventos, no como datos técnicos. Las conjunciones son acercamientos geométricos: la indicación de visibilidad aclara si ambos cuerpos estaban simultáneamente sobre el horizonte desde la ubicación consultada. Luna fina y luz cenicienta se integran en una sola tarjeta por oportunidad: dos amaneceres antes y dos atardeceres después de Luna nueva, conservando la ventana histórica de luz cenicienta cuando también se cumple.
 
 `includes/event-presentation.php` transforma los eventos de la API para la portada y para esta página mediante un único contrato de título, resumen, decisión y etiqueta horaria, detalles técnicos y explicación. La portada consume la versión compacta. En la página de eventos, los valores técnicos quedan ocultos en reposo y se consultan mediante el botón accesible **Datos técnicos**, que abre un popover nativo con una lista descriptiva.
+
+Los eventos con hora confiable ofrecen **Agendar evento**, con opciones para Google
+Calendar, Outlook y Apple Calendar/otros mediante `.ics`. El helper
+`includes/calendar-event.php` comparte criterios entre Inicio, Eventos lunares y
+Eclipses; el endpoint `calendar-event.php` entrega un `.ics` compatible con clientes
+móviles y de escritorio.
 
 El contrato común devuelve `title`, `summary`, `show_time`, `time_label`, `technical_details`, `explanation`, `public_details`, `contact_points` y `alert`. Centraliza las reglas humanas para conjunciones según separación, perigeo y apogeo, luz cenicienta, cuartos lunares, `full_moon_observation`, libraciones destacadas y eclipses. En libraciones (`type=libration`) la salida pública evita detalles internos de cálculo: presenta borde favorecido, amplitud aproximada y fase/iluminación sólo si están disponibles.
 
@@ -415,7 +456,12 @@ En eclipses (`type=eclipse`) la salida pública usa clasificación local de visi
 
 ### Eclipses
 
-`eclipses.php` consulta server-side `/v1/astronomy/events` exclusivamente con `types=eclipse`, admite hasta diez años y filtra por tipo y visibilidad desde la ubicación global. El listado muestra sólo el resumen; el detalle se abre en un `<dialog>` y separa **Datos generales**, **Desde tu ubicación** y **Visibilidad mundial**.
+`eclipses.php` consulta server-side `/v1/astronomy/events` exclusivamente con
+`types=eclipse`, admite bloques de hasta cinco años y filtra por tipo y visibilidad
+desde la ubicación global. El formulario limita la fecha final y el servidor rechaza
+el exceso antes de consultar la API. El listado muestra sólo el resumen; el detalle
+se abre en un `<dialog>` y separa **Datos generales**, **Desde tu ubicación** y
+**Visibilidad mundial**.
 
 Para lunares consume `details.eclipse_global`/`details.eclipse_local`; para solares, `details.solar_eclipse_global`/`details.solar_eclipse_local`. El bloque global puede incluir `visibility_map` con `status`, `available`, `source`, `catalog_url`, `source_url`, `local_filename`, `retrieved_at`, `map_kind` y `attribution`. La sección mundial exige `available === true`, `status === "available"` y un nombre simple seguro. La imagen usa `versionedAssetUrl("assets/images/eclipses/<local_filename>")`: resuelve `/assets/...` en Docker y `/astro/assets/...` en producción. `source_url` nunca se usa como imagen; sólo puede aparecer como enlace discreto. Metadatos ausentes, estados `not_found`, `ambiguous` o `download_error` y nombres inseguros ocultan la sección.
 
@@ -452,13 +498,17 @@ Valores predeterminados:
 La acción “Usar mi ubicación” existe sólo en `ubicacion.php`. JavaScript actualiza el
 mapa y PHP valida los valores al guardar. El navegador nunca llama a la API de cálculos.
 
-La selección se conserva durante 30 días con:
+La selección se conserva durante 400 días con:
 
 - `astro_latitude`;
 - `astro_longitude`;
 - `astro_timezone`;
-- `astro_location_mode`.
-- `astro_location_name`.
+- `astro_location_mode`;
+- `astro_location_name`;
+- `astro_location_confirmed`.
+
+`astro_location_intro_seen` tiene la misma duración, pero sólo evita repetir la ayuda:
+no confirma ni reemplaza una ubicación.
 
 “Usar Buenos Aires” restaura los valores en el mapa; “Guardar ubicación” los aplica. Además del arrastre principal del marcador, el `TapHold` nativo de Leaflet permite mantener pulsada una zona no interactiva para moverlo y ejecutar el mismo flujo de geocodificación y actualización de campos. Leaflet controla la tolerancia de 10 px, cancelación por movimiento, segundo dedo y fin del gesto sin agregar una capa propia de eventos sobre el mapa.
 Si la geolocalización falla, se conserva la ubicación activa y se informa el error.
@@ -671,6 +721,7 @@ find assets/images/moon-phases -maxdepth 1 -name 'moon_*.png' -type f | wc -l
 Probar el despliegue sin transferir:
 
 ```bash
+./scripts/desplegar.sh --list-local
 export ASTRONOMY_FTP_PASSWORD='contraseña'
 ./scripts/desplegar.sh --dry-run
 unset ASTRONOMY_FTP_PASSWORD

@@ -13,6 +13,37 @@ const MAX_MOONRISE_NOTICE_MAX_MINUTES = 1440;
 const DEFAULT_MOBILE_SWIPE_NAVIGATION_ENABLED = true;
 const DEFAULT_MOBILE_SWIPE_NAVIGATION_HINT_ENABLED = true;
 const DEFAULT_MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED = false;
+
+/**
+ * Sólo el valor explícito "local" habilita capacidades del entorno local.
+ * La ausencia, una cadena vacía o cualquier otro valor son producción.
+ */
+function appEnvironment(): string
+{
+    $value = strtolower(trim((string) getenv('APP_ENV')));
+    return $value === 'local' ? 'local' : 'production';
+}
+
+function isLocalEnvironment(): bool
+{
+    return appEnvironment() === 'local';
+}
+
+function isProductionEnvironment(): bool
+{
+    return appEnvironment() === 'production';
+}
+
+function isContentEnabled(): bool
+{
+    if (isLocalEnvironment()) {
+        return true;
+    }
+    return filter_var(
+        getenv('CONTENT_ENABLED_IN_PRODUCTION') ?: 'false',
+        FILTER_VALIDATE_BOOLEAN
+    ) === true;
+}
 const DEFAULT_STORE_PREVIEW_TIENDA_MAX_SIZE = 800;
 const DEFAULT_STORE_PREVIEW_CONTENIDO_MAX_SIZE = 400;
 const MIN_STORE_PREVIEW_MAX_SIZE = 320;
@@ -127,6 +158,42 @@ function loadStoreDatabaseConfig(?string $productionConfigPath = null): array
     }
     $databaseConfig['port'] = (int) $validatedPort;
 
+    return $databaseConfig;
+}
+
+function loadWebDatabaseConfig(?string $productionConfigPath = null): array
+{
+    $productionConfig = null;
+    $definitions = [
+        'host' => ['environment' => 'WEB_DB_HOST', 'production' => 'web_db_host'],
+        'port' => ['environment' => 'WEB_DB_PORT', 'production' => 'web_db_port'],
+        'name' => ['environment' => 'WEB_DB_NAME', 'production' => 'web_db_name'],
+        'user' => ['environment' => 'WEB_DB_USER', 'production' => 'web_db_user'],
+        'password' => ['environment' => 'WEB_DB_PASSWORD', 'production' => 'web_db_password'],
+    ];
+    $databaseConfig = [];
+
+    foreach ($definitions as $key => $definition) {
+        $environmentValue = getenv($definition['environment']);
+        if (is_string($environmentValue) && trim($environmentValue) !== '') {
+            $rawValue = $key === 'password' ? $environmentValue : trim($environmentValue);
+        } else {
+            $productionConfig ??= loadAstronomyProductionConfig($productionConfigPath);
+            $rawValue = $productionConfig[$definition['production']] ?? '';
+        }
+        if (!is_scalar($rawValue) || trim((string) $rawValue) === '') {
+            throw new RuntimeException('La configuración de la base de datos astronómica no está disponible.');
+        }
+        $databaseConfig[$key] = $key === 'password' ? (string) $rawValue : trim((string) $rawValue);
+    }
+
+    $validatedPort = filter_var($databaseConfig['port'], FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1, 'max_range' => 65535],
+    ]);
+    if ($validatedPort === false) {
+        throw new RuntimeException('La configuración de la base de datos astronómica no está disponible.');
+    }
+    $databaseConfig['port'] = (int) $validatedPort;
     return $databaseConfig;
 }
 

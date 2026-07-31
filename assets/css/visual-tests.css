@@ -1,0 +1,165 @@
+.visual-tests-container {
+  width: min(70rem, calc(100% - 2rem));
+}
+
+.visual-tests-hero,
+.visual-tests-section {
+  padding: clamp(1.15rem, 3vw, 2rem);
+}
+
+.visual-tests-hero {
+  margin-top: clamp(1rem, 3vw, 2rem);
+}
+
+.visual-tests-local-note {
+  display: inline-flex;
+  margin: 1rem 0 0;
+  padding: .35rem .55rem;
+  border: 1px solid rgba(212, 162, 94, .3);
+  border-radius: .4rem;
+  color: #d9ba8b;
+  background: rgba(212, 162, 94, .06);
+  font-size: .73rem;
+}
+
+.visual-tests-intro {
+  max-width: 48rem;
+  margin: clamp(1.5rem, 4vw, 2.5rem) 0 0;
+}
+
+.visual-tests-intro h2,
+.visual-tests-section h2,
+.visual-tests-related h3 {
+  margin: 0;
+  font-weight: 500;
+}
+
+.visual-tests-intro p,
+.visual-tests-related p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.visual-tests-section {
+  margin-top: 1rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 90% 0, rgba(121, 167, 255, .06), transparent 26rem),
+    rgba(16, 22, 38, .88);
+}
+
+.visual-tests-section > header {
+  margin-bottom: 1rem;
+}
+
+.visual-tests-section > header .eyebrow {
+  margin-bottom: .3rem;
+}
+
+.visual-tests-single {
+  width: min(100%, 35rem);
+  margin-inline: auto;
+}
+
+.visual-tests-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.visual-tests-instagram {
+  display: grid;
+  min-width: 0;
+  min-height: 30rem;
+  align-items: start;
+  padding: .55rem;
+  overflow: hidden;
+  border: 1px solid rgba(170, 178, 197, .18);
+  border-radius: .75rem;
+  background: rgba(5, 9, 18, .52);
+}
+
+.visual-tests-instagram .instagram-media {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 0;
+  border-radius: .55rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, .035);
+  line-height: 1.5;
+}
+
+.visual-tests-instagram .instagram-media a {
+  color: #dce7ff;
+  overflow-wrap: anywhere;
+}
+
+.visual-tests-instagram iframe {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-inline: auto !important;
+}
+
+.visual-tests-instagram--placeholder {
+  place-items: center;
+  border-style: dashed;
+  text-align: center;
+}
+
+.visual-tests-instagram--placeholder p {
+  max-width: 18rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.visual-tests-featured {
+  display: grid;
+  grid-template-columns: minmax(18rem, .9fr) minmax(18rem, 1.1fr);
+  align-items: center;
+  gap: clamp(1rem, 4vw, 2.5rem);
+}
+
+.visual-tests-related {
+  max-width: 30rem;
+}
+
+.visual-tests-related .button {
+  margin-top: .5rem;
+  text-decoration: none;
+}
+
+.visual-tests-related .button.is-disabled {
+  opacity: .55;
+}
+
+@media (max-width: 900px) {
+  .visual-tests-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .visual-tests-container {
+    width: min(100% - 1rem, 70rem);
+  }
+
+  .visual-tests-grid,
+  .visual-tests-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .visual-tests-instagram {
+    min-height: 27rem;
+    padding: .3rem;
+  }
+
+  .visual-tests-related {
+    max-width: none;
+  }
+}

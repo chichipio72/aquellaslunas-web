@@ -21,6 +21,27 @@ locationAssert(astronomyLocationMode('other') === null, 'Aceptó un modo descono
 locationAssert(astronomyLocationName(' Córdoba ') === 'Córdoba', 'No normalizó una localidad válida.');
 locationAssert(astronomyLocationName('Córdoba, Argentina') === null, 'Aceptó una dirección compuesta.');
 locationAssert(astronomyLocationCoordinateLabel(-34.525, -58.475) === '-34.53, -58.48', 'El fallback no redondeó las coordenadas.');
+locationAssert(ASTRONOMY_LOCATION_COOKIE_DAYS === 400, 'La persistencia de ubicación no quedó fijada en 400 días.');
+
+$_COOKIE = [];
+locationAssert(!astronomyLocationIsConfirmed(), 'Una visita sin cookies apareció confirmada.');
+locationAssert(!astronomyLocationIntroWasSeen(), 'Una visita nueva apareció con el aviso ya visto.');
+$_COOKIE = [
+    'astro_latitude' => '-34.499',
+    'astro_longitude' => '-58.5751',
+    'astro_timezone' => 'America/Argentina/Buenos_Aires',
+    'astro_location_mode' => 'manual',
+    'astro_location_name' => 'Boulogne Sur Mer',
+];
+locationAssert(astronomyLocationIsConfirmed(), 'Una selección manual histórica completa dejó de considerarse confirmada.');
+$_COOKIE['astro_location_mode'] = 'default';
+locationAssert(!astronomyLocationIsConfirmed(), 'El fallback predeterminado se confundió con Buenos Aires confirmado.');
+$_COOKIE['astro_location_confirmed'] = '1';
+locationAssert(astronomyLocationIsConfirmed(), 'Buenos Aires elegido explícitamente no quedó confirmado.');
+$_COOKIE['astro_location_intro_seen'] = '1';
+locationAssert(astronomyLocationIntroWasSeen(), 'No se reconoció la cookie independiente del aviso.');
+$_COOKIE = [];
+
 locationAssert(astronomyApiRejectedLocationParameters([
     'http_code' => 422,
     'body' => '{"detail":[{"loc":["query","timezone"],"msg":"invalid"}]}',

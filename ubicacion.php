@@ -15,7 +15,14 @@ $messageIsError = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = astronomySaveLocationRequest($_POST);
     if ($result['ok']) {
-        $target = astronomyInternalUrl('ubicacion.php') . '?saved=1';
+        $returnTo = is_string($_POST['return_to'] ?? null) ? trim($_POST['return_to']) : '';
+        $basePath = rtrim(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')), '/\\');
+        $validReturn = $returnTo !== ''
+            && str_starts_with($returnTo, ($basePath !== '' ? $basePath : '') . '/')
+            && !str_contains($returnTo, "\n")
+            && !str_contains($returnTo, "\r")
+            && parse_url($returnTo, PHP_URL_HOST) === null;
+        $target = $validReturn ? $returnTo : astronomyInternalUrl('ubicacion.php') . '?saved=1';
         header('Location: ' . $target, true, 303);
         exit;
     }

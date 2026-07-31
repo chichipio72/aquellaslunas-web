@@ -24,7 +24,7 @@
 .today-page-intro { max-width: 42rem; margin: -.55rem 0 1.15rem; color: var(--muted); font-size: .9rem; }
 .today-summary__body { display: grid; grid-template-columns: minmax(220px,320px) minmax(0,1fr); gap: clamp(1rem,4vw,3rem); align-items: center; }
 .today-moon-image { width: 100%; aspect-ratio: 1; object-fit: contain; }
-.today-summary__copy h3 { margin: 0; color: var(--lunar); font-size: clamp(1.5rem,3vw,2.25rem); font-weight: 500; }
+.today-summary__copy h2 { margin: 0; color: var(--lunar); font-size: clamp(1.5rem,3vw,2.25rem); font-weight: 500; }
 .today-lead { max-width: 46rem; font-size: clamp(1rem,2vw,1.2rem); line-height: 1.55; text-wrap: pretty; }
 .today-highlights,.today-sun-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .65rem; }
 .today-highlights p,.today-sun-summary p { display: grid; gap: .2rem; margin: 0; padding: .7rem; border-radius: .7rem; background: rgba(255,255,255,.035); }
@@ -71,7 +71,7 @@
   .today-container { width: min(100% - 1rem,70rem); }
   .today-date-dialog { width: calc(100% - 1rem); padding: 1rem; }
   .today-summary__body { grid-template-columns: minmax(115px,40%) minmax(0,1fr); gap: .7rem; align-items: start; }
-  .today-summary__copy h3 { font-size: 1.25rem; }
+  .today-summary__copy h2 { font-size: 1.25rem; }
   .today-lead { font-size: .86rem; line-height: 1.45; }
   .today-highlights { grid-template-columns: 1fr; gap: .3rem; }
   .today-highlights p { display: flex; justify-content: space-between; padding: .45rem .55rem; }

@@ -281,7 +281,7 @@ $nearestEventTitle = $nearestEventPresentation !== null ? capitalizeVisibleText(
 $nearestEventDetail = $nearestEventPresentation !== null ? capitalizeVisibleText($nearestEventPresentation['summary']) : '';
 $nearestEventShowsTime = ($nearestEventPresentation['show_time'] ?? false) === true;
 $hasApiError = $apiErrorMessage !== null || $phasesErrorMessage !== null || $upcomingErrorMessage !== null;
-$pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'El cielo de hoy, la Luna aparente y las próximas efemérides para tu ubicación.', '/');
+$pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'El cielo de hoy, la Luna aparente y los próximos eventos para tu ubicación.', '/');
 $pageSeo['robots'] = 'noindex, nofollow';
 if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));

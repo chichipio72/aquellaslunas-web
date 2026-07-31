@@ -82,3 +82,77 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+  const panel = document.querySelector('[data-location-intro]');
+  const trigger = document.querySelector('[data-location-intro-trigger]');
+  if (!panel || !trigger) return;
+
+  const status = panel.querySelector('[data-location-intro-status]');
+  const primaryAction = panel.querySelector('[data-location-intro-geolocate]');
+  const seenCookie = 'astro_location_intro_seen=1; Max-Age=34560000; Path=/; SameSite=Lax';
+  const markSeen = () => {
+    document.cookie = `${seenCookie}${window.location.protocol === 'https:' ? '; Secure' : ''}`;
+  };
+  const open = ({ focus = true } = {}) => {
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    if (focus) primaryAction?.focus();
+  };
+  const close = ({ remember = true, restoreFocus = true } = {}) => {
+    if (remember) markSeen();
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger.focus();
+  };
+
+  trigger.addEventListener('click', () => {
+    if (panel.hidden) open();
+    else close();
+  });
+  panel.querySelector('[data-location-intro-close]')?.addEventListener('click', () => close());
+  panel.querySelector('[data-location-intro-manual]')?.addEventListener('click', markSeen);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      event.preventDefault();
+      close();
+    }
+  });
+
+  primaryAction?.addEventListener('click', async () => {
+    primaryAction.disabled = true;
+    status.textContent = 'Solicitando ubicación al navegador…';
+    try {
+      const coordinates = await AstronomyLocation.geolocate();
+      const timezone = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : '';
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = panel.querySelector('form')?.action || 'ubicacion.php';
+      const values = {
+        location_name: `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        timezone: timezone || window.siteTimeContext?.timezone || AstronomyLocation.DEFAULT_LOCATION.timezone,
+        location_mode: 'geolocation',
+        return_to: window.location.pathname,
+      };
+      Object.entries(values).forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = String(value);
+        form.append(input);
+      });
+      document.body.append(form);
+      form.submit();
+    } catch (error) {
+      status.textContent = error.message;
+      primaryAction.disabled = false;
+      primaryAction.focus();
+    }
+  });
+
+  if (!panel.hidden) open({ focus: true });
+});

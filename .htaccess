@@ -1,6 +1,14 @@
 RewriteEngine On
 Options -Indexes
 
+# Protección disuasoria contra hotlinking de previews públicas de contenidos.
+# Se permiten solicitudes sin Referer, el dominio público y entornos locales.
+RewriteCond %{HTTP_REFERER} !^$ [NC]
+RewriteCond %{HTTP_REFERER} !^https?://(www\.)?aquellaslunas\.com\.ar(?::[0-9]+)?(?:/|$) [NC]
+RewriteCond %{HTTP_REFERER} !^https?://(?:localhost|127\.0\.0\.1|\[::1\]|[^/]+\.local)(?::[0-9]+)?(?:/|$) [NC]
+RewriteCond %{HTTP_REFERER} !^https?://(?:10\.[0-9.]+|192\.168\.[0-9.]+|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9.]+)(?::[0-9]+)?(?:/|$) [NC]
+RewriteRule ^assets/images/tienda/previews/contenido/ - [F,L,NC]
+
 RewriteRule ^includes(?:/|$) - [F,L,NC]
 RewriteRule ^scripts(?:/|$) - [F,L,NC]
 RewriteRule ^tests/.*\.(?:php|sh)$ - [F,L,NC]

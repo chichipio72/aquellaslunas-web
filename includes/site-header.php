@@ -3,6 +3,7 @@
 require_once __DIR__ . '/site-sections.php';
 require_once __DIR__ . '/location-context.php';
 require_once __DIR__ . '/current-datetime.php';
+require_once __DIR__ . '/content-debug.php';
 
 function astronomyHeaderLocalDate(DateTimeImmutable $date): string
 {
@@ -13,9 +14,16 @@ function astronomyHeaderLocalDate(DateTimeImmutable $date): string
 function renderAstronomySiteHeader(string $currentSectionId, ?array $location = null): void
 {
     $location ??= astronomyLocationContext();
+    $locationConfirmed = ($location['confirmed'] ?? false) === true;
+    $locationIsInitial = !$locationConfirmed && ($location['mode'] ?? 'default') === 'default';
+    $showLocationIntro = $locationIsInitial
+        && (!astronomyLocationIntroWasSeen() || ($location['stored_invalid'] ?? false) === true);
+    $locationUrl = astronomyInternalUrl('ubicacion.php');
+    $returnPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
     $localDate = get_current_datetime($location['timezone']);
     $simulationEnabled = astronomyLocalTimeSimulationEnabled();
     $simulationActive = astronomyCurrentDateTimeIsSimulated();
+    $contentDebugAvailable = astronomyContentDebugAvailable();
     ?>
     <header class="site-header">
         <div class="container header-inner">
@@ -23,8 +31,10 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
                 <span class="brand-name">Aquellas Lunas</span>
                 <span class="brand-tagline">Una Luna diferente cada noche</span>
             </a>
-            <?php if ($simulationEnabled): ?>
-            <details class="header-time-simulation" data-swipe-navigation-ignore>
+            <?php if ($simulationEnabled || $contentDebugAvailable): ?>
+            <div class="header-local-tools" data-swipe-navigation-ignore>
+                <?php if ($simulationEnabled): ?>
+                <details class="header-time-simulation">
                 <summary><?= $simulationActive ? 'Tiempo simulado' : 'Modo de prueba' ?></summary>
                 <form method="post" action="<?= htmlspecialchars((string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'), ENT_QUOTES, 'UTF-8') ?>">
                     <label><span class="visually-hidden">Fecha simulada</span><input type="date" name="site_time_date" value="<?= htmlspecialchars($localDate->format('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" required></label>
@@ -36,14 +46,29 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
                         <button type="submit" name="site_time_shift" value="1" data-site-time-shift="1" aria-label="Avanzar un día">+1 día</button>
                         <button type="submit" name="site_time_shift" value="7" data-site-time-shift="7" aria-label="Avanzar una semana">+1 sem</button>
                     </span>
-                    <?php if ($simulationActive): ?><button type="submit" name="site_time_reset" value="1" formnovalidate>Usar hora real</button><?php endif; ?>
+                    <?php if ($simulationActive): ?><button type="submit" form="site-time-reset-form">Usar hora real</button><?php endif; ?>
                 </form>
-            </details>
+                <?php if ($simulationActive): ?>
+                    <form id="site-time-reset-form" class="header-time-simulation__reset-form" method="post" action="<?= htmlspecialchars((string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="site_time_reset" value="1">
+                    </form>
+                <?php endif; ?>
+                </details>
+                <?php endif; ?>
+                <?php renderAstronomyContentDebugControl(); ?>
+            </div>
             <?php endif; ?>
             <div class="header-context">
-                <a class="header-location" href="<?= htmlspecialchars(astronomyInternalUrl('ubicacion.php'), ENT_QUOTES, 'UTF-8') ?>">
-                    <span class="visually-hidden">Ubicación activa: </span><?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?>
-                </a>
+                <span class="header-location-control">
+                    <?php if ($locationIsInitial): ?>
+                    <button class="header-location header-location--initial" type="button" data-location-intro-trigger aria-controls="location-intro" aria-expanded="<?= $showLocationIntro ? 'true' : 'false' ?>">
+                        <span class="visually-hidden">Ubicación activa: </span><?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?> <span aria-hidden="true">·</span> ubicación inicial
+                    </button>
+                    <?php else: ?>
+                    <span class="header-location"><span class="visually-hidden">Ubicación activa: </span><?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                    <a class="header-location-change" href="<?= htmlspecialchars($locationUrl, ENT_QUOTES, 'UTF-8') ?>">Cambiar</a>
+                </span>
                 <span class="header-context-separator" aria-hidden="true">·</span>
                 <time datetime="<?= htmlspecialchars($localDate->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars(astronomyHeaderLocalDate($localDate) . ', ' . $localDate->format('H:i'), ENT_QUOTES, 'UTF-8') ?>">
                     <span class="header-date-long"><?= htmlspecialchars(astronomyHeaderLocalDate($localDate), ENT_QUOTES, 'UTF-8') ?></span>
@@ -56,6 +81,28 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
             </button>
         </div>
     </header>
+        <?php if ($locationIsInitial): ?>
+        <section id="location-intro" class="location-intro" role="dialog" aria-modal="false" aria-labelledby="location-intro-title" aria-describedby="location-intro-description location-intro-privacy" data-location-intro<?= $showLocationIntro ? '' : ' hidden' ?>>
+            <button class="location-intro__close" type="button" data-location-intro-close aria-label="Cerrar ayuda de ubicación">×</button>
+            <h2 id="location-intro-title">Elegí tu ubicación</h2>
+            <p id="location-intro-description">Los horarios, la visibilidad de la Luna, los eclipses y otros datos cambian según el lugar desde donde observás.</p>
+            <p id="location-intro-privacy" class="location-intro__privacy">Tu ubicación se usa solamente para calcular los datos astronómicos.</p>
+            <div class="location-intro__actions">
+                <button class="button button-primary" type="button" data-location-intro-geolocate>Usar mi ubicación</button>
+                <a class="button compact-secondary-button" href="<?= htmlspecialchars($locationUrl, ENT_QUOTES, 'UTF-8') ?>" data-location-intro-manual>Elegir otra ubicación</a>
+            </div>
+            <form method="post" action="<?= htmlspecialchars($locationUrl, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="location_name" value="Buenos Aires">
+                <input type="hidden" name="latitude" value="<?= htmlspecialchars((string) ASTRONOMY_DEFAULT_LATITUDE, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="longitude" value="<?= htmlspecialchars((string) ASTRONOMY_DEFAULT_LONGITUDE, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="timezone" value="<?= htmlspecialchars(ASTRONOMY_DEFAULT_TIMEZONE, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="location_mode" value="default">
+                <input type="hidden" name="return_to" value="<?= htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8') ?>">
+                <button class="location-intro__continue" type="submit">Continuar con Buenos Aires</button>
+            </form>
+            <p class="location-intro__status" role="status" aria-live="polite" data-location-intro-status></p>
+        </section>
+        <?php endif; ?>
     <div class="menu-backdrop" data-menu-close data-swipe-navigation-ignore hidden></div>
     <aside id="site-menu-panel" class="site-menu-panel" aria-label="Menú del sitio" aria-hidden="true" data-swipe-navigation-ignore>
         <button class="menu-close" type="button" data-menu-close aria-label="Cerrar menú">×</button>
