@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/editorial-configuration.php';
+require_once __DIR__ . '/event-type-configuration.php';
 
 require_once __DIR__ . '/api-client.php';
 
@@ -137,8 +138,7 @@ function astronomyTonightCardText(
                 continue;
             }
             $encounterObjects = $objects;
-            $encounterSentence = astronomyTonightNaturalList($objects)
-                . ' podrán verse juntos alrededor de las ' . $date->format('H:i') . '.';
+            $encounterSentence = astronomyEditorialText('tonight.card.encounter', ['objetos' => astronomyTonightNaturalList($objects), 'hora' => $date->format('H:i')]);
             break;
         }
     }
@@ -148,21 +148,21 @@ function astronomyTonightCardText(
         $encounterObjects
     );
     $planetNames = [];
+    $planetMaximum = (int) astronomyEditorialNumber('tonight.card.planets_max');
     foreach ($planets as $planet) {
+        if (count($planetNames) >= $planetMaximum) break;
         $name = trim((string) ($planet['name'] ?? ''));
         if ($name === '' || in_array(astronomyTonightComparisonKey($name), $encounterLookup, true)) {
             continue;
         }
         $planetNames[] = $name;
-        if (count($planetNames) === 2) {
-            break;
-        }
     }
     $visibleSentence = '';
     if ($planetNames !== []) {
-        $visibleSentence = $encounterSentence !== '' ? 'También ' : 'Esta noche ';
-        $visibleSentence .= count($planetNames) === 1 ? 'estará visible ' : 'estarán visibles ';
-        $visibleSentence .= astronomyTonightNaturalList($planetNames) . '.';
+        $visibleSentence = astronomyEditorialText(count($planetNames) === 1 ? 'tonight.card.visible_one' : 'tonight.card.visible_many', [
+            'inicio' => astronomyEditorialText($encounterSentence !== '' ? 'tonight.card.prefix.also' : 'tonight.card.prefix.tonight'),
+            'objetos' => astronomyTonightNaturalList($planetNames),
+        ]);
     }
     if ($encounterSentence !== '' || $visibleSentence !== '') {
         return trim($encounterSentence . ' ' . $visibleSentence);
@@ -172,14 +172,12 @@ function astronomyTonightCardText(
         is_array($data['stars'] ?? null) ? $data['stars'] : [],
         astronomyTonightNightIsCurrent($data, $now, $timezone)
     );
-    if ($stars !== []) {
-        $names = array_slice(array_column($stars, 'name'), 0, 2);
-        return astronomyTonightNaturalList($names)
-            . (count($names) === 1
-                ? ' será una estrella notable para buscar esta noche.'
-                : ' serán dos estrellas notables para buscar esta noche.');
+    if ($stars !== [] && astronomyEditorialNumber('tonight.card.stars_max') > 0) {
+        $names = array_slice(array_column($stars, 'name'), 0, (int) astronomyEditorialNumber('tonight.card.stars_max'));
+        $starMessage = count($names) === 1 ? 'tonight.card.star_one' : (count($names) === 2 ? 'tonight.card.star_two' : 'tonight.card.star_many');
+        return astronomyEditorialText($starMessage, ['objetos' => astronomyTonightNaturalList($names)]);
     }
-    return 'Esta noche no habrá planetas visibles a simple vista desde tu ubicación.';
+    return astronomyEditorialText('tonight.card.no_planets');
 }
 
 function astronomyTonightNightIsCurrent(array $data, DateTimeImmutable $now, string $timezone): bool
@@ -206,7 +204,7 @@ function astronomyTonightDirection(array $object): ?string
     if ($direction === '') {
         return null;
     }
-    return $direction === 'arriba' ? 'arriba' : 'hacia el ' . $direction;
+    return $direction === 'arriba' ? astronomyEditorialText('tonight.direction.overhead') : astronomyEditorialText('tonight.direction.toward', ['direccion' => $direction]);
 }
 
 function astronomyTonightPlanetSentence(array $object, string $timezone): string
@@ -216,15 +214,13 @@ function astronomyTonightPlanetSentence(array $object, string $timezone): string
     $start = astronomyTonightTime($object['visibility_start'] ?? null, $timezone);
     $end = astronomyTonightTime($object['visibility_end'] ?? null, $timezone);
     if ($status === 'visible_now') {
-        $text = $name . ' está visible ahora';
         $direction = astronomyTonightDirection($object);
-        if ($direction !== null) {
-            $text .= ' ' . $direction;
-        }
-        return $text . ($end !== null ? ', hasta las ' . $end . '.' : '.');
+        return astronomyEditorialText($end !== null ? 'tonight.planet.now_until' : 'tonight.planet.now', [
+            'nombre' => $name, 'direccion' => $direction !== null ? ' ' . $direction : '', 'fin' => $end ?? '',
+        ]);
     }
     if ($status === 'visible_later') {
-        return $name . ($start !== null ? ' aparecerá desde las ' . $start . '.' : ' aparecerá más tarde.');
+        return astronomyEditorialText($start !== null ? 'tonight.planet.later_at' : 'tonight.planet.later', ['nombre' => $name, 'inicio' => $start ?? '']);
     }
     return '';
 }
@@ -241,15 +237,15 @@ function astronomyTonightSummaryPresentation(
     if ($planets === []) {
         return [
             'title' => 'El cielo esta noche',
-            'text' => 'Esta noche no habrá planetas visibles a simple vista desde tu ubicación.',
+            'text' => astronomyEditorialText('tonight.card.no_planets'),
             'planets' => [],
         ];
     }
     $count = count($planets);
     return [
         'title' => $count === 1
-            ? 'Esta noche se verá 1 planeta'
-            : 'Esta noche se verán ' . $count . ' planetas',
+            ? astronomyEditorialText('tonight.summary.one_planet')
+            : astronomyEditorialText('tonight.summary.many_planets', ['cantidad' => (string) $count]),
         'text' => implode(' ', array_values(array_filter(array_map(
             static fn(array $planet): string => astronomyTonightPlanetSentence($planet, $timezone),
             $planets
@@ -264,15 +260,15 @@ function astronomyTonightWindowLabel(array $data, string $timezone): string
     $end = astronomyTonightTime($data['night']['end'] ?? null, $timezone);
     $polarState = $data['night']['polar_state'] ?? null;
     if ($start !== null && $end !== null) {
-        return 'Esta noche: ' . $start . '–' . $end;
+        return astronomyEditorialText('tonight.window.current', ['inicio' => $start, 'fin' => $end]);
     }
     if ($polarState === 'continuous_darkness') {
-        return 'Oscuridad continua durante esta noche';
+        return astronomyEditorialText('tonight.window.continuous_darkness');
     }
     if ($polarState === 'no_civil_darkness') {
-        return 'Esta noche no tendrá oscuridad civil';
+        return astronomyEditorialText('tonight.window.no_civil_darkness');
     }
-    return 'Ventana nocturna no disponible';
+    return astronomyEditorialText('tonight.window.unavailable');
 }
 
 function astronomyTonightTemporalState(array $data, DateTimeImmutable $now, string $timezone): string
@@ -281,16 +277,16 @@ function astronomyTonightTemporalState(array $data, DateTimeImmutable $now, stri
     $end = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
     if ($start === null || $end === null) {
         return ($data['night']['polar_state'] ?? null) === 'no_civil_darkness'
-            ? 'No habrá una ventana de oscuridad civil para esta fecha.'
-            : 'La ventana nocturna no está disponible.';
+            ? astronomyEditorialText('tonight.temporal.no_civil_darkness')
+            : astronomyEditorialText('tonight.temporal.unavailable');
     }
     if ($now < $start) {
-        return 'La noche todavía no comenzó.';
+        return astronomyEditorialText('tonight.temporal.not_started');
     }
     if ($now <= $end) {
-        return 'La noche está en curso.';
+        return astronomyEditorialText('tonight.temporal.in_progress');
     }
-    return 'La ventana de esta noche ya terminó.';
+    return astronomyEditorialText('tonight.temporal.finished');
 }
 
 function astronomyTonightObjectSentence(array $object, string $timezone): string
@@ -299,28 +295,30 @@ function astronomyTonightObjectSentence(array $object, string $timezone): string
     $start = astronomyTonightTime($object['visibility_start'] ?? null, $timezone);
     $end = astronomyTonightTime($object['visibility_end'] ?? null, $timezone);
     $aid = match ($object['observation_aid'] ?? null) {
-        'naked_eye' => ' a simple vista',
-        'binoculars' => ', preferentemente con binoculares,',
-        'telescope' => ', con telescopio,',
+        'naked_eye' => astronomyEditorialText('tonight.aid.fragment.naked_eye'),
+        'binoculars' => astronomyEditorialText('tonight.aid.fragment.binoculars'),
+        'telescope' => astronomyEditorialText('tonight.aid.fragment.telescope'),
         default => '',
     };
     if ($status === 'visible_now') {
-        $text = 'Visible ahora' . $aid;
         $direction = astronomyTonightDirection($object);
+        $directionText = '';
         if ($direction !== null) {
-            $text .= $direction === 'arriba'
-                ? (str_ends_with($text, ',') ? ' arriba' : ', arriba')
+            $directionText = ($object['direction'] ?? null) === 'arriba'
+                ? (str_ends_with($aid, ',') ? ' ' . $direction : ', ' . $direction)
                 : ' ' . $direction;
         }
-        $separator = str_ends_with($text, ',') ? ' ' : ', ';
-        return $text . ($end !== null ? $separator . 'hasta las ' . $end . '.' : $separator . 'durante el resto de la noche.');
+        $separator = $directionText === '' && str_ends_with($aid, ',') ? ' ' : ', ';
+        return astronomyEditorialText($end !== null ? 'tonight.object.now_until' : 'tonight.object.now_rest', [
+            'ayuda' => $aid, 'direccion' => $directionText,
+            'separador' => $separator, 'fin' => $end ?? '',
+        ]);
     }
     if ($status === 'visible_later') {
         if ($start === null) {
-            return 'Será visible' . $aid . ' más tarde esta noche.';
+            return astronomyEditorialText('tonight.object.later', ['ayuda' => $aid]);
         }
-        return 'Será visible' . $aid . ' desde las ' . $start
-            . ($end !== null ? ' hasta las ' . $end . '.' : ' hasta el amanecer.');
+        return astronomyEditorialText($end !== null ? 'tonight.object.window' : 'tonight.object.until_dawn', ['ayuda' => $aid, 'inicio' => $start, 'fin' => $end ?? '']);
     }
     return '';
 }
@@ -328,9 +326,9 @@ function astronomyTonightObjectSentence(array $object, string $timezone): string
 function astronomyTonightObservationAid($value): ?string
 {
     return match ($value) {
-        'naked_eye' => 'A simple vista',
-        'binoculars' => 'Mejor con binoculares',
-        'telescope' => 'Requiere telescopio',
+        'naked_eye' => astronomyEditorialText('tonight.aid.naked_eye'),
+        'binoculars' => astronomyEditorialText('tonight.aid.binoculars'),
+        'telescope' => astronomyEditorialText('tonight.aid.telescope'),
         default => null,
     };
 }
@@ -355,8 +353,8 @@ function astronomyTonightMoonProximity(array $object): ?string
         return null;
     }
     return match ($object['moon_proximity'] ?? null) {
-        'very_close' => 'Se verá muy cerca de la Luna.',
-        'close' => 'Se verá cerca de la Luna.',
+        'very_close' => astronomyEditorialText('tonight.proximity.very_close'),
+        'close' => astronomyEditorialText('tonight.proximity.close'),
         default => null,
     };
 }
@@ -444,8 +442,6 @@ function astronomyTonightHasRelevantMoonEvent(array $data, array $events, string
         return false;
     }
     $nightDates = [$nightStart->format('Y-m-d') => true, $nightEnd->format('Y-m-d') => true];
-    $exceptionalTypes = ['conjunction', 'eclipse', 'earthshine', 'full_moon_observation', 'apsis', 'libration'];
-
     foreach ($events as $event) {
         if (!is_array($event)) {
             continue;
@@ -456,10 +452,10 @@ function astronomyTonightHasRelevantMoonEvent(array $data, array $events, string
         if ($date === null) {
             continue;
         }
-        if ($type === 'moon_phase' && $subtype === 'full_moon' && isset($nightDates[$date->format('Y-m-d')])) {
+        if ($type === 'moon_phase' && $subtype === 'full_moon' && astronomyEventRelevantTonight($event) && isset($nightDates[$date->format('Y-m-d')])) {
             return true;
         }
-        if (in_array($type, $exceptionalTypes, true) && $date >= $nightStart && $date <= $nightEnd) {
+        if (astronomyEventRelevantTonight($event) && $date >= $nightStart && $date <= $nightEnd) {
             return true;
         }
     }
@@ -496,16 +492,16 @@ function astronomyTonightNaturalSentence(array $object, array $data, DateTimeImm
         return astronomyEditorialText('tonight.future.all_night');
     }
     if ($fromDusk) {
-        return 'Estará visible al comenzar la noche, hasta las ' . $end->format('H:i') . '.';
+        return astronomyEditorialText('tonight.future.from_dusk', ['fin' => $end->format('H:i')]);
     }
     if ($untilDawn) {
-        return 'Aparecerá a las ' . $start->format('H:i') . ' y podrá verse hasta el amanecer.';
+        return astronomyEditorialText('tonight.future.until_dawn', ['inicio' => $start->format('H:i')]);
     }
     $durationMinutes = (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60);
     if ($durationMinutes >= astronomyEditorialNumber('tonight.long_window_minutes')) {
         return astronomyEditorialText('tonight.future.long', ['inicio' => $start->format('H:i')]);
     }
-    return 'Aparecerá a las ' . $start->format('H:i') . ' y seguirá visible hasta las ' . $end->format('H:i') . '.';
+    return astronomyEditorialText('tonight.future.until_time', ['inicio' => $start->format('H:i'), 'fin' => $end->format('H:i')]);
 }
 
 function astronomyTonightMomentLabel(array $object): string
@@ -519,10 +515,10 @@ function astronomyTonightMomentLabel(array $object): string
 
 function astronomyTonightRelevantWindowLabel(array $data, DateTimeImmutable $now, string $timezone): string
 {
-    $prefix = astronomyTonightNightIsCurrent($data, $now, $timezone) ? 'Esta noche' : 'La próxima noche';
+    $prefix = astronomyEditorialText(astronomyTonightNightIsCurrent($data, $now, $timezone) ? 'tonight.relevant.current' : 'tonight.relevant.next');
     $start = astronomyTonightTime($data['night']['start'] ?? null, $timezone);
     $end = astronomyTonightTime($data['night']['end'] ?? null, $timezone);
-    return $start !== null && $end !== null ? $prefix . ': ' . $start . '–' . $end : $prefix;
+    return $start !== null && $end !== null ? astronomyEditorialText('tonight.relevant.range', ['periodo' => $prefix, 'inicio' => $start, 'fin' => $end]) : $prefix;
 }
 
 function astronomyTonightRelevantState(array $data, DateTimeImmutable $now, string $timezone): string
@@ -530,10 +526,10 @@ function astronomyTonightRelevantState(array $data, DateTimeImmutable $now, stri
     $start = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
     $end = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
     if ($start === null || $end === null) {
-        return 'La ventana nocturna no está disponible.';
+        return astronomyEditorialText('tonight.temporal.unavailable');
     }
     if ($now < $start) {
-        return 'La noche comenzará a las ' . $start->format('H:i') . '.';
+        return astronomyEditorialText('tonight.state.starts', ['inicio' => $start->format('H:i')]);
     }
     $remainingMinutes = max(0, (int) floor(($end->getTimestamp() - $now->getTimestamp()) / 60));
     return $remainingMinutes >= astronomyEditorialNumber('tonight.long_remaining_minutes')
@@ -543,14 +539,22 @@ function astronomyTonightRelevantState(array $data, DateTimeImmutable $now, stri
 
 function astronomyTonightHighlights(array $sections): array
 {
-    $highlights = array_slice($sections['planets'] ?? [], 0, 2);
     $stars = $sections['stars'] ?? [];
     usort($stars, static fn(array $a, array $b): int => ((float) ($a['magnitude'] ?? 99)) <=> ((float) ($b['magnitude'] ?? 99)));
-    if (count($highlights) < 3 && $stars !== []) {
-        $highlights[] = $stars[0];
+    $categories = [
+        'planets' => ['items' => $sections['planets'] ?? [], 'max' => (int) astronomyEditorialNumber('tonight.highlights.planets_max'), 'order' => astronomyEditorialNumber('tonight.highlights.planets_order')],
+        'stars' => ['items' => $stars, 'max' => (int) astronomyEditorialNumber('tonight.highlights.stars_max'), 'order' => astronomyEditorialNumber('tonight.highlights.stars_order')],
+        'moon' => ['items' => $sections['moon'] ?? [], 'max' => (int) astronomyEditorialNumber('tonight.highlights.moon_max'), 'order' => astronomyEditorialNumber('tonight.highlights.moon_order'), 'fill_below' => (int) astronomyEditorialNumber('tonight.highlights.moon_fill_below')],
+    ];
+    uasort($categories, static fn(array $a, array $b): int => $a['order'] <=> $b['order']);
+    $highlights = [];
+    $generalMaximum = (int) astronomyEditorialNumber('tonight.highlights.max');
+    foreach ($categories as $category) {
+        if (isset($category['fill_below']) && count($highlights) >= $category['fill_below']) continue;
+        foreach (array_slice($category['items'], 0, $category['max']) as $item) {
+            if (count($highlights) >= $generalMaximum) break 2;
+            $highlights[] = $item;
+        }
     }
-    if (count($highlights) < 2 && ($sections['moon'][0] ?? null) !== null) {
-        $highlights[] = $sections['moon'][0];
-    }
-    return array_slice($highlights, 0, (int) astronomyEditorialNumber('tonight.highlights.max'));
+    return $highlights;
 }

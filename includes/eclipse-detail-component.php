@@ -203,7 +203,7 @@ function renderAstronomyEclipseDetailTemplate(
             <section class="eclipse-detail-local" aria-labelledby="<?= $templateId ?>-local">
                 <h3 id="<?= $templateId ?>-local">Desde tu ubicación</h3>
                 <p class="eclipse-visibility"><?= htmlspecialchars($model['visibility']) ?></p>
-                <?php if ($model['not_visible']): ?><p class="eclipse-badge">No visible desde tu ubicación</p><?php endif; ?>
+                <?php if ($model['not_visible']): ?><p class="eclipse-badge"><?= htmlspecialchars(astronomyEditorialText('eclipse.page.visibility.not_visible')) ?></p><?php endif; ?>
                 <?php if ($model['local_rows'] !== []): ?><dl class="eclipse-detail-facts"><?php foreach ($model['local_rows'] as $row): ?><div><dt><?= htmlspecialchars($row['label']) ?></dt><dd><?= htmlspecialchars($row['value']) ?></dd></div><?php endforeach; ?></dl><?php endif; ?>
                 <?php if ($model['contacts'] !== []): ?><section class="eclipse-detail-contacts"><h3>Contactos</h3><ul><?php foreach ($model['contacts'] as $contact): ?><li><strong><?= htmlspecialchars($contact['label']) ?>:</strong> <span><?= htmlspecialchars($contact['time']) ?></span><?php if ($contact['extra'] !== []): ?> <span class="eclipse-contact-extra">(<?= htmlspecialchars($contact['body'] . ' ' . implode(' · ', $contact['extra'])) ?>)</span><?php endif; ?></li><?php endforeach; ?></ul></section><?php endif; ?>
                 <?php if ($model['observation'] !== ''): ?><p class="event-note"><?= htmlspecialchars($model['observation']) ?></p><?php endif; ?>

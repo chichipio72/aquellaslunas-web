@@ -11,6 +11,7 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/explore-sky.php';
+require_once __DIR__ . '/includes/editorial-configuration.php';
 sendDynamicNoCacheHeaders();
 
 $defaultDays = 30;
@@ -62,20 +63,20 @@ function formatLongDateValue(string $value): string
 function formatVisibilitySummary(array $intervals): string
 {
     if ($intervals === []) {
-        return 'No visible durante el día';
+        return astronomyEditorialText('sun_moon.not_visible');
     }
 
     if (count($intervals) === 1) {
         $start = $intervals[0]['start'] ?? '';
         $end = $intervals[0]['end'] ?? '';
         if (is_string($start) && is_string($end) && str_contains($start, 'T00:00:00') && str_contains($end, 'T00:00:00')) {
-            return 'Visible todo el día';
+            return astronomyEditorialText('sun_moon.all_day');
         }
 
-        return '1 intervalo de visibilidad';
+        return astronomyEditorialText('sun_moon.one_interval');
     }
 
-    return count($intervals) . ' intervalos de visibilidad';
+    return astronomyEditorialText('sun_moon.many_intervals', ['cantidad' => (string) count($intervals)]);
 }
 
 function formatHourValue(?string $value, string $timezoneName): string

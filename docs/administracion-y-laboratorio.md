@@ -15,8 +15,9 @@ laboratorio es una herramienta de consulta: lee la tabla MySQL
 `/admin/presentacion/` administra la primera capa de presentación editorial de los
 eventos astronómicos. El catálogo se muestra por familias comprensibles (fases,
 órbita, libraciones, conjunciones, eclipses y observaciones derivadas) y permite
-editar el nombre amigable, la habilitación global y las superficies públicas en
-las que aparece cada tipo. Los identificadores técnicos y el renderer no se
+editar el nombre amigable, la habilitación global, las superficies públicas en
+las que aparece cada tipo y su relevancia para “El cielo esta noche”. Los
+identificadores técnicos y el renderer no se
 exponen como campos editables.
 
 La configuración vive en MySQL en `admin_tipos_eventos` y
@@ -24,8 +25,9 @@ La configuración vive en MySQL en `admin_tipos_eventos` y
 catálogo conocido y sus superficies iniciales, pero nunca pisa cambios
 editoriales ya guardados. Las superficies forman un catálogo cerrado: Lo
 próximo, Próximas fases, El cielo hoy, El cielo esta noche, Eventos lunares y
-Eclipses. La prioridad visual continúa siendo cronológica; esta etapa no agrega
-prioridades numéricas ni reordena efemérides.
+Eclipses. La prioridad de las listas continúa siendo cronológica. La selección
+resumida nocturna permite administrar cupos y orden de categorías sin exponer
+prioridades numéricas ni reordenar efemérides.
 
 La web aplica la habilitación global y por superficie mediante
 `includes/event-type-configuration.php`. Si MySQL no está disponible, usa el
@@ -33,9 +35,6 @@ catálogo incorporado que reproduce el comportamiento anterior. Un tipo
 desconocido no se publica y se registra en el log. La configuración sólo controla
 visibilidad y presentación: la API y PostgreSQL siguen siendo la fuente técnica,
 y ningún cálculo ni evento astronómico se duplica en MySQL.
-
-La primera etapa quedó limitada a tipos de eventos; no mezcló umbrales, mensajes
-editoriales ni reglas combinadas en ese catálogo.
 
 La segunda área, `/admin/presentacion/reglas.php`, administra reglas y mensajes
 por contexto. Umbral y texto aparecen juntos en cada bloque, con unidades y

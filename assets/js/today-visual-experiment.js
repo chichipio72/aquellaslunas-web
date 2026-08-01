@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!document.body.classList.contains('today-visual-experiment')) return;
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
+  const editorial = globalThis.AstronomyEditorialConfiguration?.today || {};
   let lightPeriods = {};
   try {
     lightPeriods = JSON.parse(document.body.dataset.todayLightPeriods || '{}');
@@ -125,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (label.includes('crepúsculo civil vespertino')) {
       const help = document.createElement('small');
       help.className = 'today-venus-help';
-      help.textContent = 'Con el horizonte despejado, mirá en dirección opuesta al Sol: a veces puede distinguirse el cinturón de Venus.';
+      help.textContent = editorial.venusBeltHelp || '';
       row.append(help);
     }
   });
@@ -136,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!venusOpportunity || !summaryCloud) return false;
     const match = summaryCloud.textContent.match(/(\d{1,3})\s*%/);
     if (!match) return false;
-    venusOpportunity.hidden = Number(match[1]) > 80;
+    venusOpportunity.hidden = Number(match[1]) > Number(editorial.venusBeltMaxCloudPercent);
     return true;
   };
   if (venusOpportunity && summaryCloud && !updateVenusOpportunity()) {

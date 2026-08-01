@@ -88,7 +88,7 @@ $sections = astronomyTonightApplyMoonEditorialPriority(
 $highlights = astronomyTonightHighlights($sections);
 $featuredStars = $sections['stars'] ?? [];
 usort($featuredStars, static fn(array $a, array $b): int => ((float) ($a['magnitude'] ?? 99)) <=> ((float) ($b['magnitude'] ?? 99)));
-$featuredStars = array_slice($featuredStars, 0, 3);
+$featuredStars = array_slice($featuredStars, 0, (int) astronomyEditorialNumber('tonight.stars.display_max'));
 $featuredStarIds = array_column($featuredStars, 'id');
 $remainingStars = array_values(array_filter($sections['stars'] ?? [], static fn(array $star): bool => !in_array($star['id'] ?? null, $featuredStarIds, true)));
 $nightStartLabel = $tonightData !== null ? astronomyTonightTime($tonightData['night']['start'] ?? null, $timezoneName) : null;

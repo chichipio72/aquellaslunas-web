@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const editorial = globalThis.AstronomyEditorialConfiguration?.today || {};
+  const message = (template, values = {}) => Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    String(template || '')
+  );
   const dateToggle = document.querySelector('.today-date-toggle');
   const dateDialog = document.querySelector('[data-today-date-dialog]');
   dateToggle?.addEventListener('click', () => {
@@ -58,10 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }).filter((point) => point.date === date && Number.isFinite(point.cloud));
       if (points.length === 0) throw new Error('date unavailable');
       const average = Math.round(points.reduce((total, point) => total + point.cloud, 0) / points.length);
-      summary.textContent = `Nubosidad media prevista: ${average} %.`;
+      summary.textContent = message(editorial.cloudAverage, { porcentaje: average });
       const summaryCloud = document.querySelector('[data-today-summary-cloud]');
       if (summaryCloud) {
-        summaryCloud.textContent = `Nubosidad general prevista: ${average} %.`;
+        summaryCloud.textContent = message(editorial.cloudGeneral, { porcentaje: average });
         summaryCloud.hidden = false;
       }
       const hours = section.querySelector('[data-today-cloud-hours]');
@@ -80,12 +85,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
       const best = (visible.length ? visible : points).reduce((current, point) => point.cloud < current.cloud ? point : current);
       const recommendation = section.querySelector('[data-today-cloud-recommendation]');
-      recommendation.textContent = visible.length
-        ? `La menor nubosidad mientras la Luna esté sobre el horizonte se prevé cerca de las ${best.hour}:00 (${Math.round(best.cloud)} %).`
-        : `La menor nubosidad del día se prevé cerca de las ${best.hour}:00 (${Math.round(best.cloud)} %).`;
+      recommendation.textContent = message(
+        visible.length ? editorial.cloudBestMoon : editorial.cloudBestDay,
+        { hora: best.hour, porcentaje: Math.round(best.cloud) }
+      );
       recommendation.hidden = false;
     } catch (_) {
-      summary.textContent = 'El pronóstico de nubosidad no está disponible para esta fecha.';
+      summary.textContent = editorial.cloudUnavailable || '';
       document.querySelector('[data-today-summary-cloud]')?.remove();
     }
   };

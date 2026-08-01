@@ -1,18 +1,26 @@
 <?php
 
-const ASTRONOMY_MAJOR_MOON_PHASE_LABELS = [
-    'new_moon' => 'Luna nueva',
-    'first_quarter' => 'Cuarto creciente',
-    'full_moon' => 'Luna llena',
-    'last_quarter' => 'Cuarto menguante',
-];
+require_once __DIR__ . '/event-type-configuration.php';
+require_once __DIR__ . '/editorial-configuration.php';
 
-const ASTRONOMY_INTERMEDIATE_MOON_PHASE_LABELS = [
-    'new_moon' => 'Luna creciente',
-    'first_quarter' => 'Luna gibosa creciente',
-    'full_moon' => 'Luna gibosa menguante',
-    'last_quarter' => 'Luna menguante',
-];
+function astronomyMajorMoonPhaseLabels(): array
+{
+    $labels = [];
+    foreach (['new_moon', 'first_quarter', 'full_moon', 'last_quarter'] as $subtype) {
+        $labels[$subtype] = astronomyEventFriendlyName(['type' => 'moon_phase', 'subtype' => $subtype]);
+    }
+    return $labels;
+}
+
+function astronomyIntermediateMoonPhaseLabels(): array
+{
+    return [
+        'new_moon' => astronomyEditorialText('event.phase.waxing_crescent'),
+        'first_quarter' => astronomyEditorialText('event.phase.waxing_gibbous'),
+        'full_moon' => astronomyEditorialText('event.phase.waning_gibbous'),
+        'last_quarter' => astronomyEditorialText('event.phase.waning_crescent'),
+    ];
+}
 
 function astronomyMoonPhaseEventDateTime($value, string $timezoneName): ?DateTimeImmutable
 {
@@ -49,12 +57,13 @@ function astronomyMoonPhaseLabelForLocalDate(
     }
 
     $normalized = [];
+    $majorLabels = astronomyMajorMoonPhaseLabels();
     foreach ($phaseEvents as $event) {
         if (!is_array($event) || ($event['type'] ?? null) !== 'moon_phase') {
             continue;
         }
         $subtype = is_string($event['subtype'] ?? null) ? $event['subtype'] : '';
-        if (!isset(ASTRONOMY_MAJOR_MOON_PHASE_LABELS[$subtype])) {
+        if (!isset($majorLabels[$subtype])) {
             continue;
         }
         $instant = astronomyMoonPhaseEventDateTime($event['datetime'] ?? null, $timezoneName);
@@ -66,7 +75,7 @@ function astronomyMoonPhaseLabelForLocalDate(
 
     foreach ($normalized as $phase) {
         if ($phase['instant']->format('Y-m-d') === $localDate) {
-            return ASTRONOMY_MAJOR_MOON_PHASE_LABELS[$phase['subtype']];
+            return $majorLabels[$phase['subtype']];
         }
     }
 
@@ -79,7 +88,8 @@ function astronomyMoonPhaseLabelForLocalDate(
         $previousSubtype = $phase['subtype'];
     }
 
+    $intermediateLabels = astronomyIntermediateMoonPhaseLabels();
     return $previousSubtype !== null
-        ? ASTRONOMY_INTERMEDIATE_MOON_PHASE_LABELS[$previousSubtype]
+        ? $intermediateLabels[$previousSubtype]
         : null;
 }

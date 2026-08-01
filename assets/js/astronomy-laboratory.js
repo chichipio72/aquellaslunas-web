@@ -330,12 +330,33 @@ const astronomyLaboratoryBuildRelation = (rows, fieldA, fieldB, method = 'produc
   });
 };
 
-const astronomyLaboratoryRelationControlState = (fields) => ({
+const astronomyLaboratoryRelationControlState = (fields, requestedMethods = []) => ({
   enabled: fields.length >= 2,
   automatic: fields.length === 2,
   showSelectors: fields.length > 2,
   fields: fields.length === 2 ? fields : null,
+  requestedMethods: [...requestedMethods],
+  renderedMethods: fields.length >= 2 ? [...requestedMethods] : [],
 });
+
+const astronomyLaboratoryCreateDebouncedRequest = (callback, delay = 250, timers = window) => {
+  let timer = null;
+  return {
+    schedule() {
+      if (timer !== null) timers.clearTimeout(timer);
+      timer = timers.setTimeout(() => {
+        timer = null;
+        callback();
+      }, delay);
+    },
+    flush() {
+      if (timer !== null) timers.clearTimeout(timer);
+      timer = null;
+      callback();
+    },
+    pending: () => timer !== null,
+  };
+};
 
 const astronomyLaboratoryRelationGridEdges = (chartWidth, mainRect) => ({
   left: mainRect.x,
@@ -365,12 +386,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!form || !chartElement || !config) return;
 
   let chart = null;
+  let lastDailyPayload = null;
+  let lastDailyFields = [];
+  let activeRequest = null;
+  let lastRequestKey = '';
+  let scheduleBackendUpdate = () => {};
+  const preferredRelationFields = { a: '', b: '' };
   let axisInteractionCleanup = () => {};
   let alignRelationBands = () => {};
   const colors = ['#8eb4ff', '#f2d486', '#89d6c6', '#d9a5ff', '#ff9f9f', '#9ccf75', '#f7b267'];
   const setLoading = (active) => {
     loading.hidden = !active;
-    form.querySelector('button[type="submit"]').disabled = active;
   };
   const showError = (message = '') => {
     error.textContent = message;
@@ -416,23 +442,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = astronomyLaboratoryRelationControlState(fields);
     relationToggles.forEach((toggle) => { toggle.disabled = !state.enabled; });
     if (!state.enabled) {
-      relationToggles.forEach((toggle) => { toggle.checked = false; });
       relationSelectors.hidden = true;
       relationHelp.textContent = 'Seleccioná al menos dos variables para habilitar el análisis.';
       return;
     }
     if (state.automatic) {
       relationSelectors.hidden = true;
-      relationSelectA.replaceChildren();
-      relationSelectB.replaceChildren();
       relationHelp.textContent = `Se analizarán ${config.labels[fields[0]]} y ${config.labels[fields[1]]}.`;
       return;
     }
-    const previousA = relationSelectA.value;
-    const previousB = relationSelectB.value;
-    fillRelationSelect(relationSelectA, fields, previousA || fields[0]);
-    fillRelationSelect(relationSelectB, fields, previousB || fields[1]);
+    fillRelationSelect(relationSelectA, fields, preferredRelationFields.a || fields[0]);
+    fillRelationSelect(relationSelectB, fields, preferredRelationFields.b || fields[1]);
     preventDuplicateRelationVariables();
+    preferredRelationFields.a = relationSelectA.value;
+    preferredRelationFields.b = relationSelectB.value;
     relationSelectors.hidden = false;
     relationHelp.textContent = 'Elegí dos de las variables seleccionadas para construir la banda.';
   };
@@ -457,6 +480,17 @@ document.addEventListener('DOMContentLoaded', () => {
     extremaSummary.hidden = true;
     extremaSummary.replaceChildren();
     showError();
+  };
+
+  const rerenderDailyAnalysis = () => {
+    const fields = selectedFields();
+    if (
+      analysisMode() === 'diario'
+      && lastDailyPayload
+      && fields.join(',') === lastDailyFields.join(',')
+    ) {
+      renderChart(lastDailyPayload, lastDailyFields);
+    }
   };
 
   const installAxisInteractions = (axes, definitions) => {
@@ -658,16 +692,19 @@ document.addEventListener('DOMContentLoaded', () => {
         select.dataset.yearSelect === 'fecha_desde' ? 'start' : 'end'
       );
       updateExtremaRangeGuidance();
+      scheduleBackendUpdate();
     });
   });
   [form.elements.fecha_desde, form.elements.fecha_hasta].forEach((input) => {
     input.addEventListener('change', () => {
       syncYearSelect(input);
       updateExtremaRangeGuidance();
+      scheduleBackendUpdate();
     });
     input.addEventListener('input', () => {
       syncYearSelect(input);
       updateExtremaRangeGuidance();
+      scheduleBackendUpdate();
     });
   });
   form.querySelectorAll('[data-range-years]').forEach((button) => {
@@ -682,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.elements.fecha_desde.value = fromValue;
         syncYearSelect(form.elements.fecha_desde);
         updateExtremaRangeGuidance();
+        scheduleBackendUpdate();
       }
     });
   });
@@ -697,6 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
         form.elements.fecha_hasta.value = toValue;
         syncYearSelect(form.elements.fecha_hasta);
         updateExtremaRangeGuidance();
+        scheduleBackendUpdate();
       }
     });
   });
@@ -706,25 +745,45 @@ document.addEventListener('DOMContentLoaded', () => {
     syncYearSelect(form.elements.fecha_desde);
     syncYearSelect(form.elements.fecha_hasta);
     updateExtremaRangeGuidance();
+    scheduleBackendUpdate();
   });
   form.querySelectorAll('input[name="modo"]').forEach((input) => {
-    input.addEventListener('change', () => updateAnalysisMode({ initializeRange: input.value === 'extremos' }));
+    input.addEventListener('change', () => {
+      updateAnalysisMode({ initializeRange: input.value === 'extremos' });
+      scheduleBackendUpdate();
+    });
   });
   form.elements.variable_extremos.addEventListener('change', () => {
     updateExtremaRangeGuidance();
     clearResult();
+    scheduleBackendUpdate();
   });
   form.querySelectorAll('input[name="tipo_extremo"]').forEach((input) => {
-    input.addEventListener('change', clearResult);
+    input.addEventListener('change', () => {
+      clearResult();
+      scheduleBackendUpdate();
+    });
   });
   form.querySelectorAll('input[name="campos[]"]').forEach((input) => {
     input.addEventListener('change', () => {
       updateScaleGroupHelp();
       updateRelationControls();
+      scheduleBackendUpdate();
     });
   });
+  form.querySelectorAll('input[name="fases[]"]').forEach((input) => {
+    input.addEventListener('change', () => scheduleBackendUpdate());
+  });
   [relationSelectA, relationSelectB].forEach((select) => {
-    select.addEventListener('change', () => preventDuplicateRelationVariables(select));
+    select.addEventListener('change', () => {
+      preventDuplicateRelationVariables(select);
+      preferredRelationFields.a = relationSelectA.value;
+      preferredRelationFields.b = relationSelectB.value;
+      rerenderDailyAnalysis();
+    });
+  });
+  relationToggles.forEach((toggle) => {
+    toggle.addEventListener('change', rerenderDailyAnalysis);
   });
   form.querySelectorAll('[data-clear-selection]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -735,6 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateScaleGroupHelp();
         updateRelationControls();
       }
+      scheduleBackendUpdate();
     });
   });
   updateScaleGroupHelp();
@@ -1086,8 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const requestGraph = async () => {
     showError();
     extremaSummary.hidden = true;
     const mode = analysisMode();
@@ -1095,6 +1154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (mode === 'diario') {
       if (fields.length === 0) {
         showError('Seleccioná al menos una variable.');
+        clearResult();
+        lastRequestKey = '';
         return;
       }
       const scaleGroups = selectedScaleGroups(fields);
@@ -1109,24 +1170,31 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
+    const parameters = new URLSearchParams({
+      modo: mode,
+      fecha_desde: form.elements.fecha_desde.value,
+      fecha_hasta: form.elements.fecha_hasta.value,
+    });
+    if (mode === 'diario') {
+      parameters.set('campos', fields.join(','));
+      const phases = selectedPhases();
+      if (phases.length > 0) parameters.set('fases', phases.join(','));
+    } else {
+      parameters.set('variable', form.elements.variable_extremos.value);
+      parameters.set('tipo_extremo', form.elements.tipo_extremo.value);
+    }
+    const requestKey = parameters.toString();
+    if (requestKey === lastRequestKey) return;
+    lastRequestKey = requestKey;
+    activeRequest?.abort();
+    const request = new AbortController();
+    activeRequest = request;
     setLoading(true);
     try {
-      const parameters = new URLSearchParams({
-        modo: mode,
-        fecha_desde: form.elements.fecha_desde.value,
-        fecha_hasta: form.elements.fecha_hasta.value,
-      });
-      if (mode === 'diario') {
-        parameters.set('campos', fields.join(','));
-        const phases = selectedPhases();
-        if (phases.length > 0) parameters.set('fases', phases.join(','));
-      } else {
-        parameters.set('variable', form.elements.variable_extremos.value);
-        parameters.set('tipo_extremo', form.elements.tipo_extremo.value);
-      }
       const response = await fetch(`${config.endpoint}?${parameters}`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
+        signal: request.signal,
       });
       const payload = await response.json().catch(() => null);
       const validPayload = mode === 'diario'
@@ -1136,6 +1204,8 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(payload?.error || 'No se pudieron obtener los datos.');
       }
       if (mode === 'diario') {
+        lastDailyPayload = payload;
+        lastDailyFields = [...fields];
         count.textContent = `${payload.rows.length.toLocaleString('es-AR')} registros obtenidos.`;
         renderChart(payload, fields);
       } else {
@@ -1144,11 +1214,26 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExtremaChart(payload);
       }
     } catch (exception) {
+      if (exception.name === 'AbortError') return;
+      lastRequestKey = '';
       count.textContent = 'No se obtuvieron registros.';
       showError(exception.message || 'No se pudo actualizar el gráfico.');
     } finally {
-      setLoading(false);
+      if (activeRequest === request) {
+        activeRequest = null;
+        setLoading(false);
+      }
     }
+  };
+  const debouncedRequest = astronomyLaboratoryCreateDebouncedRequest(requestGraph);
+  scheduleBackendUpdate = () => {
+    activeRequest?.abort();
+    lastRequestKey = '';
+    debouncedRequest.schedule();
+  };
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    debouncedRequest.flush();
   });
 
   window.addEventListener('resize', () => {
@@ -1156,5 +1241,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alignRelationBands();
   });
   updateAnalysisMode();
-  form.requestSubmit();
+  debouncedRequest.flush();
 });

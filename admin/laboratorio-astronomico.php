@@ -186,7 +186,6 @@ $extremaClientVariables = array_map(
                     <?php endforeach; ?>
                     </div>
                 </fieldset>
-                <button type="submit">Actualizar gráfico</button>
             </form>
         </section>
         <section class="card astronomy-laboratory__results" aria-labelledby="astronomy-laboratory-chart-title">

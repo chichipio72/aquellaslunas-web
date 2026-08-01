@@ -56,6 +56,8 @@ grep -q "event.key === 'Escape'" "$work_dir/admin-authenticated"
 grep -q '!navigation.contains(event.target)' "$work_dir/admin-authenticated"
 grep -q 'class="store-admin-navigation__logout"' "$work_dir/admin-authenticated"
 grep -q '>Cerrar sesión</button>' "$work_dir/admin-authenticated"
+grep -Fq 'body.store-admin .store-admin-main {' /var/www/html/assets/css/styles.css
+grep -Fq 'width: calc(100% - clamp(1rem, 3vw, 3rem));' /var/www/html/assets/css/styles.css
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/login-authenticated" -D "$work_dir/login-authenticated-headers" -w '%{http_code}' "$base_url/admin/login.php")"
 test "$status" = "303"
@@ -86,6 +88,7 @@ grep -Fq 'name="relacion_producto"' "$work_dir/admin-laboratory-authenticated"
 grep -Fq 'name="relacion_promedio"' "$work_dir/admin-laboratory-authenticated"
 grep -Fq 'data-relation-variable="a"' "$work_dir/admin-laboratory-authenticated"
 grep -Fq 'data-relation-variable="b"' "$work_dir/admin-laboratory-authenticated"
+! grep -Fq '>Actualizar gráfico</button>' "$work_dir/admin-laboratory-authenticated"
 grep -q 'Shift + arrastrar:</strong> mover eje Y activo' "$work_dir/admin-laboratory-authenticated"
 grep -q 'class="astronomy-laboratory__chart-help"' "$work_dir/admin-laboratory-authenticated"
 grep -q 'href="laboratorio-astronomico.php" aria-current="page"' "$work_dir/admin-laboratory-authenticated"
@@ -171,6 +174,11 @@ grep -q '<strong>Visibilidad de eventos</strong>' "$work_dir/admin-presentation-
 grep -q 'Nombre mostrado' "$work_dir/admin-presentation-authenticated"
 grep -q 'Lo próximo' "$work_dir/admin-presentation-authenticated"
 grep -q 'Eventos lunares' "$work_dir/admin-presentation-authenticated"
+grep -q 'Destacar en El cielo esta noche' "$work_dir/admin-presentation-authenticated"
+test "$(grep -c '<details class="presentation-category">' "$work_dir/admin-presentation-authenticated")" = "6"
+! grep -q '<details class="presentation-category" open' "$work_dir/admin-presentation-authenticated"
+! grep -q '<details class="presentation-event" open' "$work_dir/admin-presentation-authenticated"
+grep -q 'presentation-category__indicator' "$work_dir/admin-presentation-authenticated"
 ! grep -q 'name="renderer' "$work_dir/admin-presentation-authenticated"
 ! grep -q 'name="event_type' "$work_dir/admin-presentation-authenticated"
 
@@ -182,12 +190,29 @@ test "$status" = "200"
 grep -q '<h2>Reglas y mensajes</h2>' "$work_dir/admin-editorial-authenticated"
 grep -q 'Cómo describir la Luna' "$work_dir/admin-editorial-authenticated"
 grep -q 'Visibilidad local de eclipses' "$work_dir/admin-editorial-authenticated"
+grep -q 'Resúmenes de visibilidad' "$work_dir/admin-editorial-authenticated"
+grep -q 'Orden de consideración' "$work_dir/admin-editorial-authenticated"
+grep -q 'Las categorías se consideran de arriba hacia abajo hasta completar los destacados disponibles.' "$work_dir/admin-editorial-authenticated"
+grep -Fq 'name="parameters[tonight.highlights.planets_order]"' "$work_dir/admin-editorial-authenticated"
+grep -q 'Nubosidad máxima para recomendar el Cinturón de Venus' "$work_dir/admin-editorial-authenticated"
 grep -q 'Restaurar valores predeterminados' "$work_dir/admin-editorial-authenticated"
+grep -q '<details class="presentation-category editorial-rule-block" data-editorial-search-section>' "$work_dir/admin-editorial-authenticated"
+! grep -q '<details class="presentation-category editorial-rule-block" open' "$work_dir/admin-editorial-authenticated"
+grep -q 'presentation-category__content.*name="texts\[' "$work_dir/admin-editorial-authenticated" || php -r '$html=file_get_contents($argv[1]); if (!preg_match("/<details class=\"presentation-category editorial-rule-block\"[^>]*>.*?<input[^>]+name=\"parameters\[.*?<textarea[^>]+name=\"texts\[/s", $html)) exit(1);' "$work_dir/admin-editorial-authenticated"
+grep -Fq 'grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));' /var/www/html/assets/css/admin-presentation.css
+grep -Fq 'grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));' /var/www/html/assets/css/admin-presentation.css
 grep -q 'Podés usar: {objeto}' "$work_dir/admin-editorial-authenticated"
 grep -q '>Predeterminado</span>' "$work_dir/admin-editorial-authenticated"
 grep -q 'data-editorial-origin="default"' "$work_dir/admin-editorial-authenticated"
 grep -Fq '>Está visible, muy baja hacia {direccion}.</textarea>' "$work_dir/admin-editorial-authenticated"
 grep -Fq 'Vista previa:</strong> Está visible, muy baja hacia este.' "$work_dir/admin-editorial-authenticated"
+grep -q '>Buscar en reglas y mensajes</label>' "$work_dir/admin-editorial-authenticated"
+grep -q 'data-editorial-search-input' "$work_dir/admin-editorial-authenticated"
+grep -q 'data-editorial-search-count' "$work_dir/admin-editorial-authenticated"
+grep -q 'admin-editorial-search.js' "$work_dir/admin-editorial-authenticated"
+grep -q 'data-editorial-search-item' "$work_dir/admin-editorial-authenticated"
+grep -q 'data-editorial-search-field' "$work_dir/admin-editorial-authenticated"
+! grep -Fq 'fetch(' assets/js/admin-editorial-search.js
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/admin-editorial-invalid-csrf" -w '%{http_code}' -X POST --data-urlencode 'csrf_token=invalid' "$base_url/admin/presentacion/reglas.php")"
 test "$status" = "200"
 grep -q 'token CSRF no es válido' "$work_dir/admin-editorial-invalid-csrf"
@@ -323,6 +348,9 @@ test "$status" = "403"
 
 grep -Fq "type: isEvent ? 'scatter' : 'line'" assets/js/astronomy-laboratory.js
 grep -Fq 'smooth: false' assets/js/astronomy-laboratory.js
+grep -Fq "toggle.addEventListener('change', rerenderDailyAnalysis)" assets/js/astronomy-laboratory.js
+grep -Fq 'const debouncedRequest = astronomyLaboratoryCreateDebouncedRequest(requestGraph);' assets/js/astronomy-laboratory.js
+grep -Fq 'activeRequest?.abort();' assets/js/astronomy-laboratory.js
 grep -Fq '.astronomy-laboratory__bodies {' assets/css/styles.css
 grep -Fq '.astronomy-laboratory__field-pair {' assets/css/styles.css
 grep -Fq 'grid-template-columns: repeat(2, minmax(0, 1fr));' assets/css/styles.css

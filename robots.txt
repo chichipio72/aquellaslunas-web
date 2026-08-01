@@ -5,7 +5,6 @@ Disallow: /astro/scripts/
 Disallow: /astro/storage/
 Disallow: /astro/tests/
 Disallow: /astro/pruebas-visuales.php
-Disallow: /astro/index-backup.php
 Disallow: /astro/tienda/
 Disallow: /astro/webhooks/
 Disallow: /astro/altitude-profile.php

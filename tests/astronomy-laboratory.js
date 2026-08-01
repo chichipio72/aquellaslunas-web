@@ -213,9 +213,43 @@ assert(Math.abs((durationScale.max - durationScale.min) - durationScale.interval
 const differenceScale = astronomyLaboratoryNiceScale([8, 47], scaleDefinitions.difference_minutes);
 assert([1, 2, 5, 10, 15, 30, 60].includes(differenceScale.interval), 'La diferencia no usa un salto permitido.');
 assert(astronomyLaboratoryRelationControlState(['a']).enabled === false, 'Una variable no deshabilitó el análisis de relación.');
+const suspendedRelation = astronomyLaboratoryRelationControlState(['a'], ['product', 'average']);
+assert(
+  suspendedRelation.requestedMethods.join(',') === 'product,average'
+    && suspendedRelation.renderedMethods.length === 0,
+  'Al suspender la relación se perdieron las dos modalidades solicitadas.'
+);
 const twoVariableRelation = astronomyLaboratoryRelationControlState(['a', 'b']);
 assert(twoVariableRelation.automatic === true && twoVariableRelation.fields.join(',') === 'a,b', 'Dos variables no se eligieron automáticamente.');
+const restoredRelation = astronomyLaboratoryRelationControlState(['a', 'c'], suspendedRelation.requestedMethods);
+assert(
+  restoredRelation.renderedMethods.join(',') === 'product,average',
+  'Las modalidades solicitadas no reaparecieron al volver a dos variables.'
+);
 assert(astronomyLaboratoryRelationControlState(['a', 'b', 'c']).showSelectors === true, 'Más de dos variables no habilitaron los selectores.');
+
+let debouncedCalls = 0;
+let nextTimerId = 0;
+const pendingTimers = new Map();
+const fakeTimers = {
+  setTimeout(callback) {
+    nextTimerId += 1;
+    pendingTimers.set(nextTimerId, callback);
+    return nextTimerId;
+  },
+  clearTimeout(timerId) { pendingTimers.delete(timerId); },
+};
+const debouncedRequest = astronomyLaboratoryCreateDebouncedRequest(
+  () => { debouncedCalls += 1; },
+  250,
+  fakeTimers
+);
+debouncedRequest.schedule();
+debouncedRequest.schedule();
+debouncedRequest.schedule();
+assert(pendingTimers.size === 1 && debouncedCalls === 0, 'El debounce generó solicitudes duplicadas.');
+[...pendingTimers.values()][0]();
+assert(debouncedCalls === 1 && !debouncedRequest.pending(), 'El cambio agrupado no produjo una única solicitud.');
 const normalizedRelationValues = astronomyLaboratoryNormalizeValues([10, 20, 30, null]);
 assert(
   normalizedRelationValues.values[0] === -1

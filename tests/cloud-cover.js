@@ -1,3 +1,11 @@
+globalThis.AstronomyEditorialConfiguration = globalThis.AstronomyEditorialConfiguration || {
+  clouds: {
+    clearMaxPercent: 20, someMaxPercent: 50, mostlyMaxPercent: 80,
+    eventToleranceMinutes: 30,
+    labels: { clear: 'Despejado', some: 'Algunas nubes', mostly: 'Mayormente nublado', overcast: 'Cubierto' },
+  },
+};
+
 const cloudCoverTest = async () => {
   const storageValues = new Map();
   const storage = {

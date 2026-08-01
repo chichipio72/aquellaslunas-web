@@ -135,7 +135,7 @@ if (!is_array($daily['moon'] ?? null)) {
     $daily = null;
     $hasApiError = true;
 }
-$phaseLabels = ['new_moon' => 'Luna nueva', 'first_quarter' => 'Cuarto creciente', 'full_moon' => 'Luna llena', 'last_quarter' => 'Cuarto menguante'];
+$phaseLabels = astronomyMajorMoonPhaseLabels();
 $nextPhases = [];
 foreach (($phasesData['items'] ?? []) as $event) {
     $subtype = is_array($event) ? ($event['subtype'] ?? '') : '';
@@ -228,7 +228,7 @@ $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
                     </div><?php endif; ?>
                     <?php if ($moonSituation !== null): ?><p class="home-v2-situation<?= $moonriseNoticeLevel !== null ? ' moonrise-notice moonrise-notice--' . htmlspecialchars($moonriseNoticeLevel) : '' ?>"><?= htmlspecialchars($moonSituation) ?></p><?php endif; ?>
                     <?php if ($illumination !== null): ?><p class="home-v2-illumination"><strong><?= htmlspecialchars($illumination) ?></strong> iluminada</p><?php endif; ?>
-                    <?php if ($isSupermoon): ?><p class="home-v2-supermoon">Tamaño aparente: <?= htmlspecialchars(number_format($apparentSizeNumber, 1, ',', '.')) ?>% del promedio</p><?php endif; ?>
+                    <?php if ($isSupermoon): ?><p class="home-v2-supermoon"><?= htmlspecialchars(astronomyEditorialText('event.supermoon.size', ['porcentaje' => number_format($apparentSizeNumber, 1, ',', '.')])) ?></p><?php endif; ?>
                     <p class="event-cloud-cover home-v2-clouds" data-current-cloud-cover hidden></p>
                 </div>
             </div>

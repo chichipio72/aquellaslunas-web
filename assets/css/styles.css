@@ -4111,9 +4111,10 @@ body :is(
   color: #fff;
 }
 
-.store-admin-header,
-.store-admin-main {
-  width: min(72rem, calc(100% - 2rem));
+body.store-admin .store-admin-header,
+body.store-admin .store-admin-main {
+  width: calc(100% - clamp(1rem, 3vw, 3rem));
+  max-width: none;
   margin-inline: auto;
 }
 

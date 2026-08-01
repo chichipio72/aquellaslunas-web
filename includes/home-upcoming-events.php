@@ -2,14 +2,6 @@
 
 require_once __DIR__ . '/editorial-configuration.php';
 
-const HOME_UPCOMING_EVENT_LIMIT = 6;
-const HOME_UPCOMING_EVENT_TYPES = 'moon_phase,apsis,conjunction,earthshine,full_moon_observation';
-const HOME_UPCOMING_SEGMENTS = [
-    ['offset_days' => 0, 'days' => 7, 'label' => '1-7'],
-    ['offset_days' => 7, 'days' => 7, 'label' => '8-14'],
-    ['offset_days' => 14, 'days' => 16, 'label' => '15-30'],
-];
-
 function homeUpcomingEventDateTime($value, string $timezoneName): ?DateTimeImmutable
 {
     if (!is_string($value) || trim($value) === '') {

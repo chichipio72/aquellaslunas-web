@@ -35,7 +35,7 @@ $first = homeUpcomingProgressiveSearch($now, 'America/Argentina/Buenos_Aires', s
 });
 upcomingAssert(count($calls) === 1, 'No se detuvo después del primer tramo completo.');
 upcomingAssert($calls[0] === ['2026-07-28', 7, '1-7'], 'El primer tramo no coincide con 7 días desde la fecha local.');
-upcomingAssert(count($first['events']) === HOME_UPCOMING_EVENT_LIMIT, 'No se conservaron seis eventos.');
+upcomingAssert(count($first['events']) === (int) astronomyEditorialNumber('home.upcoming.max_items'), 'No se conservó el máximo editorial de eventos.');
 
 $calls = [];
 $second = homeUpcomingProgressiveSearch($now, 'America/Argentina/Buenos_Aires', static function ($start, $days, $label) use (&$calls): array {

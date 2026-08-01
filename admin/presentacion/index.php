@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updates[$id] = [
                     'name' => (string) ($input['name'] ?? ''),
                     'enabled' => isset($input['enabled']),
+                    'relevant_tonight' => isset($input['relevant_tonight']),
                     'surfaces' => array_values(is_array($input['surfaces'] ?? null) ? $input['surfaces'] : []),
                 ];
             }
@@ -102,16 +103,19 @@ $surfaces = astronomyEventSurfaceCatalog();
         <input type="hidden" name="csrf_token" value="<?= eventAdminHtml(storeAdminCsrfToken()) ?>">
         <?php foreach ($categories as $categoryKey => $categoryLabel): ?>
             <?php if (($grouped[$categoryKey] ?? []) === []) continue; ?>
-            <section class="presentation-category" aria-labelledby="category-<?= eventAdminHtml($categoryKey) ?>">
-                <h3 id="category-<?= eventAdminHtml($categoryKey) ?>"><?= eventAdminHtml($categoryLabel) ?></h3>
+            <details class="presentation-category">
+                <summary id="category-<?= eventAdminHtml($categoryKey) ?>"><h3><?= eventAdminHtml($categoryLabel) ?></h3><span class="presentation-category__indicator" aria-hidden="true"></span></summary>
+                <div class="presentation-category__content">
                 <div class="presentation-category__items">
                 <?php foreach ($grouped[$categoryKey] as $index => $row): ?>
                     <?php $id = (int) $row['id']; $enabled = (int) $row['habilitado'] === 1; $selectedSurfaces = is_array($row['surfaces'] ?? null) ? $row['surfaces'] : []; ?>
-                    <details class="presentation-event"<?= $index === 0 ? ' open' : '' ?>>
+                    <details class="presentation-event">
                         <summary><span><?= eventAdminHtml($row['nombre_amigable']) ?></span><small><?= $enabled ? 'Se muestra' : 'Oculto' ?></small></summary>
                         <div class="presentation-event__body">
                             <label class="presentation-event__name">Nombre mostrado<input type="text" name="types[<?= $id ?>][name]" value="<?= eventAdminHtml($row['nombre_amigable']) ?>" maxlength="150" required></label>
                             <label class="presentation-event__enabled"><input type="checkbox" name="types[<?= $id ?>][enabled]" value="1"<?= $enabled ? ' checked' : '' ?>><span>Mostrar este evento</span></label>
+                            <?php $relevantTonight = $row['relevante_esta_noche'] !== null ? (int) $row['relevante_esta_noche'] === 1 : (($row['relevantTonight'] ?? false) === true); ?>
+                            <label class="presentation-event__enabled"><input type="checkbox" name="types[<?= $id ?>][relevant_tonight]" value="1"<?= $relevantTonight ? ' checked' : '' ?>><span>Destacar en El cielo esta noche</span></label>
                             <fieldset>
                                 <legend>Dónde mostrarlo</legend>
                                 <div class="presentation-event__surfaces">
@@ -124,7 +128,8 @@ $surfaces = astronomyEventSurfaceCatalog();
                     </details>
                 <?php endforeach; ?>
                 </div>
-            </section>
+                </div>
+            </details>
         <?php endforeach; ?>
         <div class="presentation-admin__actions"><button class="button button-primary" type="submit">Guardar presentación</button><a class="button compact-secondary-button" href="../index.php">Volver al panel</a></div>
     </form>

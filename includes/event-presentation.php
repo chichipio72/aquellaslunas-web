@@ -54,7 +54,7 @@ function astronomyEventConjunctionObject(array $event): string
 {
     $title = is_string($event['title'] ?? null) ? trim($event['title']) : '';
     $name = preg_replace('/^Conjunción\s+Luna\s*[–-]\s*/u', '', $title);
-    return is_string($name) && $name !== '' && $name !== $title ? $name : 'Otro astro';
+    return is_string($name) && $name !== '' && $name !== $title ? $name : astronomyEditorialText('event.fallback.object');
 }
 
 function astronomyEventMinuteQuantity(int $minutes): string
@@ -70,15 +70,15 @@ function astronomyFullMoonObservationSummary(string $subtype, array $details): s
     $minutes = abs((int) round((float) $details['difference_minutes']));
     if ($minutes === 0) {
         return $subtype === 'morning'
-            ? 'La Luna se pondrá al mismo tiempo que salga el Sol.'
-            : ($subtype === 'evening' ? 'La Luna saldrá al mismo tiempo que se ponga el Sol.' : '');
+            ? astronomyEditorialText('event.full_moon.simultaneous_morning')
+            : ($subtype === 'evening' ? astronomyEditorialText('event.full_moon.simultaneous_evening') : '');
     }
     $quantity = astronomyEventMinuteQuantity($minutes);
     return match ($details['temporal_classification']) {
-        'before_sunrise' => 'La Luna se pondrá ' . $quantity . ' antes de la salida del Sol.',
-        'after_sunrise' => 'La Luna se pondrá ' . $quantity . ' después de la salida del Sol.',
-        'before_sunset' => 'La Luna saldrá ' . $quantity . ' antes de la puesta del Sol.',
-        'after_sunset' => 'La Luna saldrá ' . $quantity . ' después de la puesta del Sol.',
+        'before_sunrise' => astronomyEditorialText('event.full_moon.before_sunrise', ['diferencia' => $quantity]),
+        'after_sunrise' => astronomyEditorialText('event.full_moon.after_sunrise', ['diferencia' => $quantity]),
+        'before_sunset' => astronomyEditorialText('event.full_moon.before_sunset', ['diferencia' => $quantity]),
+        'after_sunset' => astronomyEditorialText('event.full_moon.after_sunset', ['diferencia' => $quantity]),
         default => '',
     };
 }
@@ -117,17 +117,17 @@ function astronomyEarthshineEventIsDisplayable(array $event): bool
     return !($offsetDays === 0 && $illumination !== null && $illumination < astronomyEditorialNumber('event.new_moon.max_illumination_percent'));
 }
 
-function astronomyEventRelationText(int $minutes, string $before, string $after): string
+function astronomyEventRelationText(int $minutes): string
 {
     $absolute = abs($minutes);
     $quantity = $absolute . ' min';
     if ($minutes < 0) {
-        return $quantity . ' ' . $before;
+        return astronomyEditorialText('event.earthshine.relation_before', ['cantidad' => $quantity]);
     }
     if ($minutes > 0) {
-        return $quantity . ' ' . $after;
+        return astronomyEditorialText('event.earthshine.relation_after', ['cantidad' => $quantity]);
     }
-    return 'al mismo tiempo';
+    return astronomyEditorialText('event.earthshine.relation_same');
 }
 
 function astronomyEarthshineObservationDetails(array $event, string $timezoneName): ?array
@@ -165,13 +165,15 @@ function astronomyEarthshineObservationDetails(array $event, string $timezoneNam
         return null;
     }
     $morning = $subtype === 'morning';
-    $relation = astronomyEventRelationText($difference, 'antes', 'después');
+    $relation = astronomyEventRelationText($difference);
     $moonLabel = $morning ? 'Salida de la Luna' : 'Puesta de la Luna';
     $solarLabel = $morning ? 'Salida del Sol' : 'Puesta del Sol';
     return [
-        'period_label' => $morning ? 'Antes del amanecer' : 'Después del atardecer',
-        'summary' => 'Iluminación ' . $illuminationLabel . ' % · Separación del Sol '
-            . $separationLabel . '° · La Luna ' . ($morning ? 'saldrá ' : 'se pondrá ') . $relation,
+        'period_label' => astronomyEditorialText($morning ? 'event.earthshine.period_morning' : 'event.earthshine.period_evening'),
+        'summary' => astronomyEditorialText('event.earthshine.details', [
+            'iluminacion' => $illuminationLabel, 'separacion' => $separationLabel,
+            'accion' => $morning ? 'saldrá' : 'se pondrá', 'relacion' => $relation,
+        ]),
         'moon_label' => $moonLabel,
         'moon_time' => $moonTime,
         'solar_label' => $solarLabel,
@@ -201,10 +203,10 @@ function astronomyEventTechnicalDetails(array $fields): array
 function astronomyLibrationDirectionMetadata(string $subtype, array $details): ?array
 {
     $fromSubtype = match ($subtype) {
-        'libration_east' => ['direction' => 'este', 'title' => 'Libración favorable hacia el este'],
-        'libration_west' => ['direction' => 'oeste', 'title' => 'Libración favorable hacia el oeste'],
-        'libration_north' => ['direction' => 'norte', 'title' => 'Libración favorable hacia el norte'],
-        'libration_south' => ['direction' => 'sur', 'title' => 'Libración favorable hacia el sur'],
+        'libration_east' => ['direction' => 'este'],
+        'libration_west' => ['direction' => 'oeste'],
+        'libration_north' => ['direction' => 'norte'],
+        'libration_south' => ['direction' => 'sur'],
         default => null,
     };
     if ($fromSubtype !== null) {
@@ -213,10 +215,10 @@ function astronomyLibrationDirectionMetadata(string $subtype, array $details): ?
 
     $direction = is_string($details['direction'] ?? null) ? trim(strtolower((string) $details['direction'])) : '';
     return match ($direction) {
-        'east', 'este' => ['direction' => 'este', 'title' => 'Libración favorable hacia el este'],
-        'west', 'oeste' => ['direction' => 'oeste', 'title' => 'Libración favorable hacia el oeste'],
-        'north', 'norte' => ['direction' => 'norte', 'title' => 'Libración favorable hacia el norte'],
-        'south', 'sur' => ['direction' => 'sur', 'title' => 'Libración favorable hacia el sur'],
+        'east', 'este' => ['direction' => 'este'],
+        'west', 'oeste' => ['direction' => 'oeste'],
+        'north', 'norte' => ['direction' => 'norte'],
+        'south', 'sur' => ['direction' => 'sur'],
         default => null,
     };
 }
@@ -233,14 +235,14 @@ function astronomyMoonPhaseFriendlyLabel($phaseName): ?string
         return null;
     }
     $labels = [
-        'new moon' => 'Luna nueva',
-        'first quarter' => 'Cuarto creciente',
-        'full moon' => 'Luna llena',
-        'last quarter' => 'Cuarto menguante',
-        'waxing crescent' => 'Luna creciente fina',
-        'waning crescent' => 'Luna menguante fina',
-        'waxing gibbous' => 'Luna gibosa creciente',
-        'waning gibbous' => 'Luna gibosa menguante',
+        'new moon' => astronomyEventFriendlyName(['type' => 'moon_phase', 'subtype' => 'new_moon']),
+        'first quarter' => astronomyEventFriendlyName(['type' => 'moon_phase', 'subtype' => 'first_quarter']),
+        'full moon' => astronomyEventFriendlyName(['type' => 'moon_phase', 'subtype' => 'full_moon']),
+        'last quarter' => astronomyEventFriendlyName(['type' => 'moon_phase', 'subtype' => 'last_quarter']),
+        'waxing crescent' => astronomyEditorialText('event.phase.waxing_crescent'),
+        'waning crescent' => astronomyEditorialText('event.phase.waning_crescent'),
+        'waxing gibbous' => astronomyEditorialText('event.phase.waxing_gibbous'),
+        'waning gibbous' => astronomyEditorialText('event.phase.waning_gibbous'),
     ];
     return $labels[$normalized] ?? capitalizeVisibleText($normalized);
 }
@@ -251,13 +253,13 @@ function astronomyLibrationPhaseSummary(array $details): string
     $phaseLabel = astronomyMoonPhaseFriendlyLabel($moonPhase['name'] ?? null);
     $illumination = astronomyEventPercent($moonPhase['illumination_percent'] ?? null);
     if ($phaseLabel !== null && $illumination !== null) {
-        return $phaseLabel . ', ' . $illumination . ' iluminada.';
+        return astronomyEditorialText('event.libration.phase_illumination', ['fase' => $phaseLabel, 'iluminacion' => $illumination]);
     }
     if ($phaseLabel !== null) {
-        return $phaseLabel . '.';
+        return astronomyEditorialText('event.libration.phase', ['fase' => $phaseLabel]);
     }
     if ($illumination !== null) {
-        return $illumination . ' iluminada.';
+        return astronomyEditorialText('event.libration.illumination', ['iluminacion' => $illumination]);
     }
     return '';
 }
@@ -328,18 +330,18 @@ function astronomyEclipseVisibilityKey(string $subtype, ?string $classification)
     $normalized = strtolower(trim($classification));
     return match ($subtype) {
         'lunar_eclipse' => match ($normalized) {
-            'not_visible' => 'No visible',
-            'visible_penumbral_only' => 'Sólo fase penumbral',
-            'visible_partial' => 'Visible parcialmente',
-            'visible_total' => 'Visible en totalidad',
+            'not_visible' => astronomyEditorialText('eclipse.short.not_visible'),
+            'visible_penumbral_only' => astronomyEditorialText('eclipse.short.penumbral'),
+            'visible_partial' => astronomyEditorialText('eclipse.short.lunar_partial'),
+            'visible_total' => astronomyEditorialText('eclipse.short.lunar_total'),
             default => null,
         },
         'solar_eclipse' => match ($normalized) {
-            'not_visible' => 'No visible',
-            'visible_partial', 'partial' => 'Parcial',
-            'visible_annular', 'annular' => 'Anular',
-            'visible_total', 'total' => 'Total',
-            'visible_hybrid', 'hybrid' => 'Híbrido',
+            'not_visible' => astronomyEditorialText('eclipse.short.not_visible'),
+            'visible_partial', 'partial' => astronomyEditorialText('eclipse.short.partial'),
+            'visible_annular', 'annular' => astronomyEditorialText('eclipse.short.annular'),
+            'visible_total', 'total' => astronomyEditorialText('eclipse.short.total'),
+            'visible_hybrid', 'hybrid' => astronomyEditorialText('eclipse.short.hybrid'),
             default => null,
         },
         default => null,
@@ -411,21 +413,21 @@ function astronomyEclipseDurationLabel($seconds): ?string
 function astronomyLunarEclipseTitle(?string $globalType): string
 {
     return match ($globalType) {
-        'penumbral' => 'Eclipse lunar penumbral',
-        'partial' => 'Eclipse lunar parcial',
-        'total' => 'Eclipse lunar total',
-        default => 'Eclipse lunar',
+        'penumbral' => astronomyEditorialText('eclipse.title.lunar.penumbral'),
+        'partial' => astronomyEditorialText('eclipse.title.lunar.partial'),
+        'total' => astronomyEditorialText('eclipse.title.lunar.total'),
+        default => astronomyEditorialText('eclipse.title.lunar.generic'),
     };
 }
 
 function astronomySolarEclipseTitle(?string $globalType): string
 {
     return match ($globalType) {
-        'partial' => 'Eclipse solar parcial',
-        'annular' => 'Eclipse solar anular',
-        'total' => 'Eclipse solar total',
-        'hybrid' => 'Eclipse solar híbrido',
-        default => 'Eclipse solar',
+        'partial' => astronomyEditorialText('eclipse.title.solar.partial'),
+        'annular' => astronomyEditorialText('eclipse.title.solar.annular'),
+        'total' => astronomyEditorialText('eclipse.title.solar.total'),
+        'hybrid' => astronomyEditorialText('eclipse.title.solar.hybrid'),
+        default => astronomyEditorialText('eclipse.title.solar.generic'),
     };
 }
 
@@ -434,7 +436,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
     $type = is_string($event['type'] ?? null) ? $event['type'] : '';
     $subtype = is_string($event['subtype'] ?? null) ? $event['subtype'] : '';
     $details = is_array($event['details'] ?? null) ? $event['details'] : [];
-    $title = capitalizeVisibleText(is_string($event['title'] ?? null) && trim($event['title']) !== '' ? trim($event['title']) : 'Evento lunar');
+    $title = capitalizeVisibleText(is_string($event['title'] ?? null) && trim($event['title']) !== '' ? trim($event['title']) : astronomyEditorialText('event.fallback.title'));
     $date = astronomyEventDateTime($event['datetime'] ?? null, $timezoneName);
     $endDate = astronomyEventDateTime($event['end_datetime'] ?? null, $timezoneName);
     $timeLabel = $date?->format('H:i') ?? 'Hora no disponible';
@@ -477,8 +479,8 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
     if ($type === 'apsis' && in_array($subtype, ['perigee', 'apogee'], true)) {
         $isPerigee = $subtype === 'perigee';
         $presentation['title'] = $isPerigee
-            ? 'La Luna estará en su punto más cercano a la Tierra'
-            : 'La Luna estará en su punto más lejano de la Tierra';
+            ? astronomyEditorialText('event.perigee.title')
+            : astronomyEditorialText('event.apogee.title');
         $presentation['summary'] = $isPerigee
             ? astronomyEditorialText('event.perigee.summary')
             : astronomyEditorialText('event.apogee.summary');
@@ -496,11 +498,11 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         $observation = astronomyEarthshineObservationDetails($event, $timezoneName);
         $earthshineVisible = ($details['earthshine_visible'] ?? null) !== false;
         $presentation['title'] = $earthshineVisible
-            ? 'La parte oscura de la Luna también será visible'
-            : ($subtype === 'morning' ? 'Luna fina antes del amanecer' : 'Luna fina después del atardecer');
+            ? astronomyEditorialText('event.earthshine.title')
+            : astronomyEditorialText($subtype === 'morning' ? 'event.earthshine.morning_title' : 'event.earthshine.evening_title');
         $presentation['summary'] = $observation['summary'] ?? match ($subtype) {
-            'morning' => 'Poco antes del amanecer, hacia el este.',
-            'evening' => 'Poco después del atardecer, hacia el oeste.',
+            'morning' => astronomyEditorialText('event.earthshine.morning_summary'),
+            'evening' => astronomyEditorialText('event.earthshine.evening_summary'),
             default => '',
         };
         $presentation['time_label'] = $timeLabel . ($endDate !== null ? '–' . $endDate->format('H:i') : '');
@@ -550,7 +552,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         $directionMeta = astronomyLibrationDirectionMetadata($subtype, $details);
         $directionLabel = $directionMeta['direction'] ?? null;
         if ($directionMeta !== null) {
-            $presentation['title'] = $directionMeta['title'];
+            $presentation['title'] = astronomyEditorialText('event.libration.title', ['direccion' => $directionLabel]);
         }
 
         $amplitudeValue = null;
@@ -562,13 +564,13 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         $amplitudeLabel = astronomyEventNumber($amplitudeValue, 1);
 
         if ($directionLabel !== null) {
-            $summaryParts = ['En estos días la Luna deja ver un poco más de su borde ' . $directionLabel . '.'];
+            $summaryParts = [astronomyEditorialText('event.libration.summary', ['direccion' => $directionLabel])];
             if ($amplitudeLabel !== null) {
-                $summaryParts[] = 'Amplitud aproximada: ' . $amplitudeLabel . '°.';
+                $summaryParts[] = astronomyEditorialText('event.libration.amplitude', ['amplitud' => $amplitudeLabel]);
             }
             $presentation['summary'] = implode(' ', $summaryParts);
         } elseif ($amplitudeLabel !== null) {
-            $presentation['summary'] = 'Amplitud aproximada: ' . $amplitudeLabel . '°.';
+            $presentation['summary'] = astronomyEditorialText('event.libration.amplitude', ['amplitud' => $amplitudeLabel]);
         }
 
         $phaseSummary = astronomyLibrationPhaseSummary($details);
@@ -663,23 +665,23 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         );
 
         if (($local['near_central_path_boundary'] ?? false) === true) {
-            $presentation['alert'] = 'Tu ubicación está muy cerca del límite calculado de la franja central. La duración y el tipo observado pueden variar con pequeños cambios de ubicación.';
+            $presentation['alert'] = astronomyEditorialText('eclipse.boundary_alert');
         }
 
         if ($visibilityClassification === null || trim($visibilityClassification) === '') {
-            $presentation['explanation'] = 'No se pudo determinar la visibilidad local.';
+            $presentation['explanation'] = astronomyEditorialText('eclipse.explanation.unknown');
         }
         return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'full_moon_observation' && in_array($subtype, ['morning', 'evening'], true)) {
         $presentation['title'] = $subtype === 'morning'
-            ? 'Luna llena cerca de la salida del Sol'
-            : 'Luna llena cerca de la puesta del Sol';
+            ? astronomyEditorialText('event.full_moon.morning_title')
+            : astronomyEditorialText('event.full_moon.evening_title');
         $presentation['summary'] = astronomyFullMoonObservationSummary($subtype, $details);
         $presentation['explanation'] = $subtype === 'morning'
-            ? 'Una oportunidad para observar la Luna llena baja mientras comienza el día.'
-            : 'Una oportunidad para observar la Luna llena baja mientras termina el día.';
+            ? astronomyEditorialText('event.full_moon.morning_explanation')
+            : astronomyEditorialText('event.full_moon.evening_explanation');
         $difference = is_numeric($details['difference_minutes'] ?? null)
             ? astronomyEventMinuteQuantity(abs((int) round((float) $details['difference_minutes'])))
             : null;

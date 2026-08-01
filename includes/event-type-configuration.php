@@ -52,9 +52,10 @@ function astronomyEventTypeDefinition(
     string $name,
     string $renderer,
     bool $enabled,
-    array $surfaces
+    array $surfaces,
+    bool $relevantTonight = false
 ): array {
-    return compact('scope', 'group', 'type', 'publicType', 'publicSubtype', 'category', 'name', 'renderer', 'enabled', 'surfaces');
+    return compact('scope', 'group', 'type', 'publicType', 'publicSubtype', 'category', 'name', 'renderer', 'enabled', 'surfaces', 'relevantTonight');
 }
 
 /** @return array<string,array> keyed by stable scope/group/type identity. */
@@ -78,16 +79,16 @@ function astronomyEventTypeCatalog(): array
         'full_moon' => 'Luna llena',
         'last_quarter' => 'Cuarto menguante',
     ] as $type => $name) {
-        $add(astronomyEventTypeDefinition('persisted', 'moon_phase', $type, 'moon_phase', $type, 'phases', $name, 'phase', true, $phaseSurfaces));
+        $add(astronomyEventTypeDefinition('persisted', 'moon_phase', $type, 'moon_phase', $type, 'phases', $name, 'phase', true, $phaseSurfaces, $type === 'full_moon'));
     }
     foreach (['perigee' => 'Perigeo lunar', 'apogee' => 'Apogeo lunar'] as $type => $name) {
-        $add(astronomyEventTypeDefinition('persisted', 'lunar_apsis', $type, 'apsis', $type, 'orbit', $name, 'apsis', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS]));
+        $add(astronomyEventTypeDefinition('persisted', 'lunar_apsis', $type, 'apsis', $type, 'orbit', $name, 'apsis', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     foreach (['ascending_node' => 'Nodo lunar ascendente', 'descending_node' => 'Nodo lunar descendente'] as $type => $name) {
         $add(astronomyEventTypeDefinition('persisted', 'lunar_orbit', $type, 'lunar_nodes', $type, 'orbit', $name, 'node', false, []));
     }
     foreach (['libration_east' => 'Libración hacia el este', 'libration_west' => 'Libración hacia el oeste', 'libration_north' => 'Libración hacia el norte', 'libration_south' => 'Libración hacia el sur'] as $type => $name) {
-        $add(astronomyEventTypeDefinition('persisted', 'lunar_libration', $type, 'libration', $type, 'librations', $name, 'libration', true, [ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS]));
+        $add(astronomyEventTypeDefinition('persisted', 'lunar_libration', $type, 'libration', $type, 'librations', $name, 'libration', true, [ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     $conjunctions = [
         'mercury' => 'Mercurio', 'venus' => 'Venus', 'mars' => 'Marte', 'jupiter' => 'Júpiter', 'saturn' => 'Saturno',
@@ -98,16 +99,16 @@ function astronomyEventTypeCatalog(): array
     ];
     foreach ($conjunctions as $body => $label) {
         $type = 'moon_' . $body . '_conjunction';
-        $add(astronomyEventTypeDefinition('persisted', 'lunar_conjunction', $type, 'conjunction', $body, 'conjunctions', 'Conjunción Luna–' . $label, 'conjunction', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS]));
+        $add(astronomyEventTypeDefinition('persisted', 'lunar_conjunction', $type, 'conjunction', $body, 'conjunctions', 'Conjunción Luna–' . $label, 'conjunction', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     foreach (['lunar_eclipse' => 'Eclipse lunar', 'solar_eclipse' => 'Eclipse solar'] as $type => $name) {
-        $add(astronomyEventTypeDefinition('persisted', 'eclipse', $type, 'eclipse', $type, 'eclipses', $name, 'eclipse', true, [ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS, ASTRONOMY_EVENT_SURFACE_ECLIPSES]));
+        $add(astronomyEventTypeDefinition('persisted', 'eclipse', $type, 'eclipse', $type, 'eclipses', $name, 'eclipse', true, [ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS, ASTRONOMY_EVENT_SURFACE_ECLIPSES], true));
     }
     foreach (['morning' => 'Luz cenicienta matutina', 'evening' => 'Luz cenicienta vespertina'] as $subtype => $name) {
-        $add(astronomyEventTypeDefinition('derived', 'earthshine', 'earthshine_' . $subtype, 'earthshine', $subtype, 'derived', $name, 'earthshine', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS]));
+        $add(astronomyEventTypeDefinition('derived', 'earthshine', 'earthshine_' . $subtype, 'earthshine', $subtype, 'derived', $name, 'earthshine', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     foreach (['morning' => 'Luna llena cerca de la salida del Sol', 'evening' => 'Luna llena cerca de la puesta del Sol'] as $subtype => $name) {
-        $add(astronomyEventTypeDefinition('derived', 'local_full_moon', 'full_moon_' . $subtype, 'full_moon_observation', $subtype, 'derived', $name, 'full_moon_observation', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS]));
+        $add(astronomyEventTypeDefinition('derived', 'local_full_moon', 'full_moon_' . $subtype, 'full_moon_observation', $subtype, 'derived', $name, 'full_moon_observation', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     return $catalog;
 }
@@ -133,6 +134,11 @@ function astronomyEventTypeInitialize(PDO $connection): array
         . "KEY idx_admin_tipo_evento_publico (public_type,public_subtype)"
         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+    try {
+        $connection->exec('ALTER TABLE admin_tipos_eventos ADD COLUMN relevante_esta_noche TINYINT(1) NULL DEFAULT NULL AFTER habilitado');
+    } catch (Throwable) {
+        // La columna ya existe.
+    }
     $connection->exec(
         "CREATE TABLE IF NOT EXISTS admin_tipos_eventos_superficies ("
         . "tipo_evento_id BIGINT UNSIGNED NOT NULL, superficie VARCHAR(50) NOT NULL, posicion INT UNSIGNED NOT NULL DEFAULT 0, "
@@ -142,8 +148,8 @@ function astronomyEventTypeInitialize(PDO $connection): array
         . ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
     $insertType = $connection->prepare(
-        'INSERT INTO admin_tipos_eventos (scope,event_group,event_type,public_type,public_subtype,category_key,nombre_amigable,habilitado,renderer_key) '
-        . 'VALUES (:scope,:event_group,:event_type,:public_type,:public_subtype,:category_key,:nombre_amigable,:habilitado,:renderer_key) '
+        'INSERT INTO admin_tipos_eventos (scope,event_group,event_type,public_type,public_subtype,category_key,nombre_amigable,habilitado,relevante_esta_noche,renderer_key) '
+        . 'VALUES (:scope,:event_group,:event_type,:public_type,:public_subtype,:category_key,:nombre_amigable,:habilitado,:relevante_esta_noche,:renderer_key) '
         . 'ON DUPLICATE KEY UPDATE id=id'
     );
     $findId = $connection->prepare('SELECT id FROM admin_tipos_eventos WHERE scope=:scope AND event_group=:event_group AND event_type=:event_type');
@@ -158,6 +164,7 @@ function astronomyEventTypeInitialize(PDO $connection): array
             'public_type' => $definition['publicType'], 'public_subtype' => $definition['publicSubtype'],
             'category_key' => $definition['category'], 'nombre_amigable' => $definition['name'],
             'habilitado' => $definition['enabled'] ? 1 : 0, 'renderer_key' => $definition['renderer'],
+            'relevante_esta_noche' => $definition['relevantTonight'] ? 1 : 0,
         ]);
         $wasInserted = $insertType->rowCount() === 1;
         if ($wasInserted) {
@@ -197,13 +204,17 @@ function astronomyEventTypeConfigLoad(?callable $connectionFactory = null): arra
     try {
         $connection = $connectionFactory !== null ? $connectionFactory() : getWebDatabaseConnection();
         $types = $connection->query(
-            'SELECT id,scope,event_group,event_type,public_type,public_subtype,category_key,nombre_amigable,habilitado,renderer_key '
+            'SELECT id,scope,event_group,event_type,public_type,public_subtype,category_key,nombre_amigable,habilitado,relevante_esta_noche,renderer_key '
             . 'FROM admin_tipos_eventos ORDER BY id'
         )->fetchAll();
         $surfaceStatement = $connection->prepare('SELECT superficie,posicion FROM admin_tipos_eventos_superficies WHERE tipo_evento_id=:id ORDER BY posicion,superficie');
         foreach ($types as $row) {
             $surfaceStatement->execute(['id' => (int) $row['id']]);
             $row['surfaces'] = array_column($surfaceStatement->fetchAll(), 'superficie');
+            if ($row['relevante_esta_noche'] === null) {
+                $fallback = astronomyEventTypeCatalog()[$row['scope'] . '/' . $row['event_group'] . '/' . $row['event_type']] ?? null;
+                $row['relevantTonight'] = ($fallback['relevantTonight'] ?? false) === true;
+            }
             $state['rows'][] = $row;
         }
         $state['available'] = true;
@@ -301,6 +312,16 @@ function astronomyEventFriendlyNameIsCustomized(array $event, ?callable $connect
     return $configured !== null && is_array($fallback) && $configured !== $fallback['name'];
 }
 
+function astronomyEventRelevantTonight(array $event, ?callable $connectionFactory = null): bool
+{
+    $row = astronomyEventTypeConfiguredRow($event, $connectionFactory);
+    if ($row === null) return false;
+    if (array_key_exists('relevante_esta_noche', $row) && $row['relevante_esta_noche'] !== null) {
+        return (int) $row['relevante_esta_noche'] === 1;
+    }
+    return ($row['relevantTonight'] ?? false) === true;
+}
+
 function astronomyEventPublicTypesForSurface(string $surface, ?callable $connectionFactory = null): array
 {
     if (!array_key_exists($surface, astronomyEventSurfaceCatalog())) {
@@ -358,11 +379,18 @@ function astronomyEventTypeUpdate(PDO $connection, array $updates): void
     }
     $connection->beginTransaction();
     try {
-        $updateType = $connection->prepare('UPDATE admin_tipos_eventos SET nombre_amigable=:name,habilitado=:enabled WHERE id=:id');
+        $updateType = $connection->prepare('UPDATE admin_tipos_eventos SET nombre_amigable=:name,habilitado=:enabled,relevante_esta_noche=:relevant WHERE id=:id');
         $deleteSurfaces = $connection->prepare('DELETE FROM admin_tipos_eventos_superficies WHERE tipo_evento_id=:id');
         $insertSurface = $connection->prepare('INSERT INTO admin_tipos_eventos_superficies (tipo_evento_id,superficie,posicion) VALUES (:id,:surface,:position)');
         foreach ($updates as $id => $update) {
-            $updateType->execute(['id' => $id, 'name' => trim((string) $update['name']), 'enabled' => ($update['enabled'] ?? false) ? 1 : 0]);
+            $currentRelevant = $byId[$id]['relevante_esta_noche'] !== null
+                ? (int) $byId[$id]['relevante_esta_noche'] === 1
+                : (($byId[$id]['relevantTonight'] ?? false) === true);
+            $updateType->execute([
+                'id' => $id, 'name' => trim((string) $update['name']),
+                'enabled' => ($update['enabled'] ?? false) ? 1 : 0,
+                'relevant' => array_key_exists('relevant_tonight', $update) ? ($update['relevant_tonight'] ? 1 : 0) : ($currentRelevant ? 1 : 0),
+            ]);
             $deleteSurfaces->execute(['id' => $id]);
             foreach (array_values($update['surfaces'] ?? []) as $position => $surface) {
                 $insertSurface->execute(['id' => $id, 'surface' => $surface, 'position' => $position]);

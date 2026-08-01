@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/eclipse-query-policy.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/eclipse-detail-component.php';
 require_once __DIR__ . '/includes/event-type-configuration.php';
+require_once __DIR__ . '/includes/event-presentation.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -73,16 +74,16 @@ function eclipsesIsVisible(?string $classification): bool
 function eclipsesVisibilityLabel(?string $classification): string
 {
     if ($classification === null) {
-        return 'Visibilidad sin determinar';
+        return astronomyEditorialText('eclipse.page.visibility.unknown');
     }
     return match ($classification) {
-        'not_visible' => 'No visible desde tu ubicación',
-        'visible_penumbral_only' => 'Visible: sólo fase penumbral',
-        'visible_partial', 'partial' => 'Visible: fase parcial',
-        'visible_total', 'total' => 'Visible: fase total',
-        'visible_annular', 'annular' => 'Visible: fase anular',
-        'visible_hybrid', 'hybrid' => 'Visible: fase híbrida',
-        default => 'Visibilidad sin determinar',
+        'not_visible' => astronomyEditorialText('eclipse.page.visibility.not_visible'),
+        'visible_penumbral_only' => astronomyEditorialText('eclipse.page.visibility.penumbral'),
+        'visible_partial', 'partial' => astronomyEditorialText('eclipse.page.visibility.partial'),
+        'visible_total', 'total' => astronomyEditorialText('eclipse.page.visibility.total'),
+        'visible_annular', 'annular' => astronomyEditorialText('eclipse.page.visibility.annular'),
+        'visible_hybrid', 'hybrid' => astronomyEditorialText('eclipse.page.visibility.hybrid'),
+        default => astronomyEditorialText('eclipse.page.visibility.unknown'),
     };
 }
 
@@ -95,40 +96,29 @@ function eclipsesTypeLabel(array $event): string
         $globalType = is_string($details['eclipse_global']['global_type'] ?? null)
             ? strtolower(trim((string) $details['eclipse_global']['global_type']))
             : '';
-        return match ($globalType) {
-            'penumbral' => 'Eclipse lunar penumbral',
-            'partial' => 'Eclipse lunar parcial',
-            'total' => 'Eclipse lunar total',
-            default => 'Eclipse lunar',
-        };
+        return astronomyLunarEclipseTitle($globalType);
     }
 
     if ($subtype === 'solar_eclipse') {
         $classification = eclipsesVisibilityClassification($event);
         $localType = match ($classification) {
-            'visible_partial', 'partial' => 'parcial',
-            'visible_annular', 'annular' => 'anular',
-            'visible_total', 'total' => 'total',
-            'visible_hybrid', 'hybrid' => 'híbrido',
+            'visible_partial', 'partial' => astronomyEditorialText('eclipse.page.type.partial'),
+            'visible_annular', 'annular' => astronomyEditorialText('eclipse.page.type.annular'),
+            'visible_total', 'total' => astronomyEditorialText('eclipse.page.type.total'),
+            'visible_hybrid', 'hybrid' => astronomyEditorialText('eclipse.page.type.hybrid'),
             default => '',
         };
         if ($localType !== '') {
-            return 'Eclipse solar ' . $localType . ' (local)';
+            return astronomyEditorialText('eclipse.page.solar_local', ['tipo' => $localType]);
         }
 
         $globalType = is_string($details['solar_eclipse_global']['global_type'] ?? null)
             ? strtolower(trim((string) $details['solar_eclipse_global']['global_type']))
             : '';
-        return match ($globalType) {
-            'partial' => 'Eclipse solar parcial',
-            'annular' => 'Eclipse solar anular',
-            'total' => 'Eclipse solar total',
-            'hybrid' => 'Eclipse solar híbrido',
-            default => 'Eclipse solar',
-        };
+        return astronomySolarEclipseTitle($globalType);
     }
 
-    return 'Eclipse';
+    return astronomyEditorialText('eclipse.page.generic');
 }
 
 function eclipsesTypeGroup(array $event): string

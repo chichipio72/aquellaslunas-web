@@ -175,6 +175,14 @@ tonightAssert(
     array_column($fullSections['Estrellas'], 'name') === ['Sirio', 'Vega'],
     'Se alter처 el orden recibido o se mostr처 una estrella no observable.'
 );
+$defaultHighlights = astronomyTonightHighlights([
+    'planets' => [['id' => 'venus'], ['id' => 'mars'], ['id' => 'saturn']],
+    'stars' => [['id' => 'dim', 'magnitude' => 2], ['id' => 'bright', 'magnitude' => -1]],
+    'moon' => [['id' => 'moon']],
+]);
+tonightAssert(array_column($defaultHighlights, 'id') === ['venus', 'mars', 'bright'], 'Los cupos y el orden predeterminados alteraron los destacados hist처ricos.');
+$sparseHighlights = astronomyTonightHighlights(['planets' => [['id' => 'venus']], 'moon' => [['id' => 'moon']]]);
+tonightAssert(array_column($sparseHighlights, 'id') === ['venus', 'moon'], 'La Luna dej처 de completar una selecci처n nocturna escasa.');
 
 $temporalData = [
     'night' => [
@@ -213,6 +221,7 @@ tonightAssert(isset($nightWithoutMoonEvent['planets']), 'El filtro lunar elimin�
 
 $conjunction = [[
     'type' => 'conjunction',
+    'subtype' => 'jupiter',
     'datetime' => '2026-07-26T00:30:00-03:00',
 ]];
 tonightAssert(

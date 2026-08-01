@@ -12,6 +12,7 @@ editorialAssert(astronomyEditorialNumber('home.altitude.very_low_max', $unavaila
 editorialAssert(astronomyEditorialText('event.conjunction.visible', [], $unavailable) === 'Se podrán ver juntos alrededor de esa hora.', 'El fallback no devolvió el texto histórico.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', '{objeto} y {planeta}'), 'Se aceptó un placeholder desconocido.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', 'Estarán muy juntas'), 'Se eliminó un placeholder obligatorio.');
+editorialRejects(fn() => astronomyEditorialValidateText('cloud.today.best_moon', 'Mirar {codigo}'), 'La recomendación de nubosidad aceptó lógica o placeholders libres.');
 editorialRejects(fn() => astronomyEditorialValidateValues(['home.altitude.very_low_max' => 40, 'home.altitude.low_max' => 30], []), 'Se aceptaron bandas fuera de orden.');
 editorialRejects(fn() => astronomyEditorialValidateValues(['event.supermoon.min_percent' => 200], []), 'Se aceptó un límite físico inválido.');
 
@@ -38,6 +39,12 @@ try {
     editorialAssert((int) $connection->query("SELECT COUNT(*) FROM admin_textos_editoriales WHERE clave='event.conjunction.very_close'")->fetchColumn() === 0, 'Restaurar no eliminó el override.');
     editorialAssert(astronomyEditorialNumber('event.conjunction.very_close_degrees') === 1.0, 'La restauración no recuperó el umbral predeterminado.');
     editorialAssert(astronomyEditorialText('event.conjunction.very_close', ['objeto' => 'Venus']) === 'Venus y la Luna estarán muy juntas', 'La restauración no recuperó el texto predeterminado.');
+    editorialAssert(astronomyEditorialNumber('today.venus_belt.max_cloud_percent') === 80.0, 'Cambió el umbral histórico de nubosidad del cinturón de Venus.');
+    editorialAssert(astronomyEditorialFrontendConfiguration()['today']['cloudBestMoon'] === 'La menor nubosidad mientras la Luna esté sobre el horizonte se prevé cerca de las {hora}:00 ({porcentaje} %).', 'El frontend no recibió el mensaje validado de nubosidad.');
+    astronomyEditorialSave($connection, ['tonight.highlights.planets_max' => 1], []);
+    editorialAssert(astronomyEditorialNumber('tonight.highlights.planets_max') === 1.0, 'El cupo editable de planetas no creó un override.');
+    astronomyEditorialRestoreBlock($connection, 'tonight');
+    editorialAssert(astronomyEditorialNumber('tonight.highlights.planets_max') === 2.0, 'Restaurar no recuperó el cupo nocturno histórico.');
     $precedence = homeMoonSituationPresentation(['above_horizon' => true, 'altitude_degrees' => 85.0, 'azimuth_degrees' => 90.0, 'instant' => new DateTimeImmutable('2026-01-01T20:00:00Z')], .5);
     editorialAssert($precedence['text'] === 'Está sobre el horizonte, pero es prácticamente imposible verla.', 'Una regla posterior de altura desplazó la precedencia de Luna nueva.');
 } finally {

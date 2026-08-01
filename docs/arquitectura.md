@@ -309,7 +309,8 @@ La confirmación bloquea pedido y pago dentro de una transacción. Exige referen
 
 La configuración editorial de tipos de eventos se mantiene separada de
 `admin_configuracion_sitio`: `admin_tipos_eventos` identifica de forma estable
-cada tipo persistido o derivado y guarda nombre, habilitación y renderer cerrado;
+cada tipo persistido o derivado y guarda nombre, habilitación, relevancia
+nocturna y renderer cerrado;
 `admin_tipos_eventos_superficies` relaciona esos tipos con un catálogo cerrado de
 superficies públicas. `includes/event-type-configuration.php` centraliza el
 catálogo, la inicialización idempotente, la resolución de los eventos recibidos y
@@ -325,7 +326,10 @@ placeholders permitidos/obligatorios. MySQL guarda sólo diferencias en
 como secuencias estrictamente crecientes y todas las escrituras son preparadas y
 transaccionales. Ante una falla administrativa, los lectores usan los defaults y
 registran un diagnóstico genérico. Para nubosidad, PHP publica únicamente un JSON
-escapado con valores ya validados; JavaScript no interpreta expresiones.
+escapado con valores ya validados; JavaScript no interpreta expresiones. El
+catálogo también controla cupos y orden de categorías de destacados, nombres de
+fases, compositores lunares y de eclipses, cinturón de Venus, recomendaciones de
+nubosidad y resúmenes de “Sol y Luna”.
 
 La ruta canónica de contenidos es `/admin/contenidos/`. La navegación calcula rutas válidas según la ubicación del script actual en `/admin` para evitar prefijos relativos frágiles.
 

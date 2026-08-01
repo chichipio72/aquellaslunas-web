@@ -17,9 +17,6 @@ require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/moon-phase-presentation.php';
 sendDynamicNoCacheHeaders();
 
-// Prueba visual reversible: cambiar a false restaura los gráficos y la nubosidad anteriores.
-const TODAY_VISUAL_EXPERIMENT_ENABLED = true;
-
 function todayApiRequest(string $url, string $context, int $timeout, bool $customLocation): ?array
 {
     $result = astronomyApiRequest($url, $context, $timeout);
@@ -128,9 +125,9 @@ function todayMoonSummary(array $moon, string $timezone, DateTimeImmutable $refe
     $first = $normalized[0];
     $last = $normalized[count($normalized) - 1];
     if (count($normalized) > 1) {
-        return 'Se verá durante ' . todayDayPart($first['start']) . ' y volverá a aparecer durante ' . todayDayPart($last['start']) . '.';
+        return astronomyEditorialText('today.moon.multiple_intervals', ['primera_parte' => todayDayPart($first['start']), 'ultima_parte' => todayDayPart($last['start'])]);
     }
-    return 'Se verá durante ' . todayDayPart($first['start']) . ' desde tu ubicación.';
+    return astronomyEditorialText('today.moon.single_interval', ['parte_dia' => todayDayPart($first['start'])]);
 }
 
 function todayNextHorizonEvent(array $moonDays, string $key, DateTimeImmutable $reference, string $timezone): ?DateTimeImmutable
@@ -224,8 +221,7 @@ $sunset = todayDateTime($sun['set'] ?? null, $timezoneName);
 $eveningCivil = todayPeriod(is_array($light['twilight']['evening']['civil'] ?? null) ? $light['twilight']['evening']['civil'] : [], $timezoneName);
 $moonRiseAzimuth = $moonDirections['rise']['azimuth_degrees'] ?? null;
 $moonRiseDirection = is_numeric($moonRiseAzimuth) ? homeMoonDirection((float) $moonRiseAzimuth) : null;
-$venusBeltOpportunity = TODAY_VISUAL_EXPERIMENT_ENABLED
-    && $illumination !== null
+$venusBeltOpportunity = $illumination !== null
     && $illumination >= astronomyEditorialNumber('today.venus_belt.min_illumination_percent')
     && $moonRise !== null
     && $sunset !== null
@@ -265,18 +261,18 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today.css'), ENT_QUOTES, 'UTF-8') ?>">
-    <?php if (TODAY_VISUAL_EXPERIMENT_ENABLED): ?><link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today-visual-experiment.css'), ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today-visual-experiment.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/home-sky.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
-    <?php if (TODAY_VISUAL_EXPERIMENT_ENABLED): ?><script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today-visual-experiment.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script><?php endif; ?>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today-visual-experiment.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyMobileSwipeNavigationScript('today'); ?>
 </head>
-<body<?= TODAY_VISUAL_EXPERIMENT_ENABLED ? ' class="today-visual-experiment"' : '' ?> data-api-state="<?= $apiError ? 'error' : 'ok' ?>" data-cloud-cover-latitude="<?= htmlspecialchars((string) $latitude) ?>" data-cloud-cover-longitude="<?= htmlspecialchars((string) $longitude) ?>" data-cloud-cover-timezone="<?= htmlspecialchars($timezoneName) ?>" data-cloud-cover-cache-scope="<?= htmlspecialchars($requestedDate) ?>" data-today-date="<?= htmlspecialchars($requestedDate) ?>" data-moon-intervals="<?= htmlspecialchars(json_encode($moon['visibility_intervals'] ?? []), ENT_QUOTES, 'UTF-8') ?>" data-today-light-periods="<?= htmlspecialchars(json_encode($visualLightData, JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"<?= astronomyMobileSwipeNavigationAttributes('today') ?>>
+<body class="today-visual-experiment" data-api-state="<?= $apiError ? 'error' : 'ok' ?>" data-cloud-cover-latitude="<?= htmlspecialchars((string) $latitude) ?>" data-cloud-cover-longitude="<?= htmlspecialchars((string) $longitude) ?>" data-cloud-cover-timezone="<?= htmlspecialchars($timezoneName) ?>" data-cloud-cover-cache-scope="<?= htmlspecialchars($requestedDate) ?>" data-today-date="<?= htmlspecialchars($requestedDate) ?>" data-moon-intervals="<?= htmlspecialchars(json_encode($moon['visibility_intervals'] ?? []), ENT_QUOTES, 'UTF-8') ?>" data-today-light-periods="<?= htmlspecialchars(json_encode($visualLightData, JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"<?= astronomyMobileSwipeNavigationAttributes('today') ?>>
     <?php require __DIR__ . '/includes/navigation-indicator.php'; ?>
     <?php renderAstronomyDebugClock($now); ?>
     <?php renderAstronomySiteHeader('today', $location); ?>
@@ -342,7 +338,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
 
         <?php if ($events !== []): ?><article class="today-card atmosphere-card--night" aria-labelledby="today-events-title">
             <h2 id="today-events-title">Qué sucede hoy</h2>
-            <div class="today-events"><?php foreach ($events as $event): $eventDate = astronomyEventDateTime($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $isEveningFullMoonObservation = TODAY_VISUAL_EXPERIMENT_ENABLED && ($event['type'] ?? '') === 'full_moon_observation' && ($event['subtype'] ?? '') === 'evening'; ?><section><?php renderAstronomyIcon($event, $latitude, 'today-event-icon'); ?><time datetime="<?= htmlspecialchars($eventDate?->format(DateTimeInterface::ATOM) ?? '') ?>"><?= htmlspecialchars($eventDate?->format('H:i') ?? '—') ?></time><div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if (($presentation['visibility'] ?? '') !== ''): ?><p><?= htmlspecialchars($presentation['visibility']) ?></p><?php endif; ?><?php if ($isEveningFullMoonObservation): ?><p class="today-event-editorial">Buscala hacia el este: si el horizonte está despejado, puede aparecer sobre el cinturón de Venus.</p><?php endif; ?></div></section><?php endforeach; ?></div>
+            <div class="today-events"><?php foreach ($events as $event): $eventDate = astronomyEventDateTime($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $isEveningFullMoonObservation = ($event['type'] ?? '') === 'full_moon_observation' && ($event['subtype'] ?? '') === 'evening'; ?><section><?php renderAstronomyIcon($event, $latitude, 'today-event-icon'); ?><time datetime="<?= htmlspecialchars($eventDate?->format(DateTimeInterface::ATOM) ?? '') ?>"><?= htmlspecialchars($eventDate?->format('H:i') ?? '—') ?></time><div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if (($presentation['visibility'] ?? '') !== ''): ?><p><?= htmlspecialchars($presentation['visibility']) ?></p><?php endif; ?><?php if ($isEveningFullMoonObservation): ?><p class="today-event-editorial"><?= htmlspecialchars(astronomyEditorialText('today.venus_belt.full_moon')) ?></p><?php endif; ?></div></section><?php endforeach; ?></div>
         </article><?php endif; ?>
 
         <?php if ($isToday): ?><article class="today-card today-conditions atmosphere-card--night" aria-labelledby="today-conditions-title" data-today-conditions>
