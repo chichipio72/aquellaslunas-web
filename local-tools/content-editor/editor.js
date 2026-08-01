@@ -37,7 +37,7 @@
       <label>Opción<input name="trivias[${triviaIndex}][opciones][${optionIndex}][texto]" required></label>
       <button class="editor-button editor-button--quiet" type="button" data-remove-option>Quitar</button>
     </div>`;
-  const triviaMarkup = (index, id, slug) => `
+  const triviaMarkup = (index, id) => `
     <fieldset id="trivia-editor-${index}" class="editor-block" data-trivia-block data-item-editor="${index}">
       <legend>Editar trivia</legend>
       <div class="editor-grid">
@@ -45,15 +45,13 @@
         <label class="editor-check"><input type="checkbox" name="trivias[${index}][visible]" checked> Visible</label>
         <label class="editor-wide">Pregunta<textarea name="trivias[${index}][pregunta]" rows="2" required></textarea></label>
         ${imageFieldMarkup(`trivias[${index}][imagen]`)}
-        <label>Artículo de referencia<input name="trivias[${index}][referencia_articulo]" value="${slug}" required></label>
-        <label>Ancla de referencia<input name="trivias[${index}][referencia_ancla]"></label>
       </div>
       <div class="editor-options" data-options>${optionMarkup(index, 0)}${optionMarkup(index, 1)}</div>
       <button class="editor-button editor-button--quiet" type="button" data-add-option>Agregar opción</button>
       <label class="editor-explanation">Explicación de la respuesta correcta<textarea name="trivias[${index}][explicacion]" rows="3" required></textarea></label>
       <button class="editor-button editor-button--danger" type="button" data-remove-block>Eliminar trivia</button>
     </fieldset>`;
-  const factMarkup = (index, id, slug) => `
+  const factMarkup = (index, id) => `
     <fieldset id="fact-editor-${index}" class="editor-block" data-fact-block data-item-editor="${index}">
       <legend>Editar “Sabías que…”</legend>
       <div class="editor-grid">
@@ -62,8 +60,6 @@
         <label class="editor-wide">Título<textarea name="sabias_que[${index}][titulo]" rows="2" required></textarea></label>
         <label class="editor-wide">Respuesta<textarea name="sabias_que[${index}][respuesta]" rows="3" required></textarea></label>
         ${imageFieldMarkup(`sabias_que[${index}][imagen]`)}
-        <label>Artículo de referencia<input name="sabias_que[${index}][referencia_articulo]" value="${slug}" required></label>
-        <label>Ancla de referencia<input name="sabias_que[${index}][referencia_ancla]"></label>
       </div>
       <button class="editor-button editor-button--danger" type="button" data-remove-block>Eliminar bloque</button>
     </fieldset>`;
@@ -139,7 +135,6 @@
     button.innerHTML = `<strong data-item-label>${label}</strong><span data-item-visibility>${visibility}</span>`;
     collection.querySelector('[data-item-list]').append(button);
   };
-  const currentSlug = () => form.elements.original_slug?.value || form.elements.slug?.value || '';
   const updateFocal = (x, y) => {
     const focal = form.querySelector('[data-focal-editor]');
     if (!focal) return;
@@ -345,7 +340,7 @@
       const collection = addTrivia.closest('[data-collection]');
       const detail = collection.querySelector('[data-trivia-list]');
       const index = nextIndex(detail, '[name^="trivias["]', /^trivias\[(\d+)\]/);
-      detail.insertAdjacentHTML('beforeend', triviaMarkup(index, uniqueId(collection, 'tr'), currentSlug()));
+      detail.insertAdjacentHTML('beforeend', triviaMarkup(index, uniqueId(collection, 'tr')));
       addListItem(collection, index, 'Sin pregunta', 'Visible');
       refreshEmpty(collection);
       selectItem(collection, index, true);
@@ -357,7 +352,7 @@
       const collection = addFact.closest('[data-collection]');
       const detail = collection.querySelector('[data-fact-list]');
       const index = nextIndex(detail, '[name^="sabias_que["]', /^sabias_que\[(\d+)\]/);
-      detail.insertAdjacentHTML('beforeend', factMarkup(index, uniqueId(collection, 'sq'), currentSlug()));
+      detail.insertAdjacentHTML('beforeend', factMarkup(index, uniqueId(collection, 'sq')));
       addListItem(collection, index, 'Sin título', 'Visible');
       refreshEmpty(collection);
       selectItem(collection, index, true);

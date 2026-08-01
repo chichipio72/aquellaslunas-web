@@ -62,7 +62,7 @@ errores por artículo, trivia o entrada “Sabías que…” sin propagar una fa
 de la página.
 
 La validación cubre contrato y metadatos, Markdown, identificadores y opciones de
-trivia, referencias a artículos y anclas, imágenes locales y marcadores
+trivia, imágenes locales y marcadores
 `[[imagen]]`, `[[esquema]]` y `[[trivia]]`. El renderizador Markdown propio implementa
 un subconjunto deliberadamente pequeño y escapa primero todo texto. Los componentes
 futuros se emiten como marcadores visibles, sin ejecutar contenido arbitrario.
@@ -120,7 +120,7 @@ serialización y persistencia.
 Antes de guardar, el editor serializa el candidato en un directorio temporal junto
 con el resto de los artículos y lo recarga mediante `astronomyLoadContentCatalog()`.
 Así reutiliza las validaciones públicas de estructura, Markdown, componentes,
-trivias, referencias e IDs. Sólo agrega controles propios de entrada, como la regla
+trivias e IDs. Sólo agrega controles propios de entrada, como la regla
 segura del slug y la protección CSRF.
 
 Los archivos se regeneran completos con un heredoc `MD` para `articulo`. En una
@@ -153,17 +153,26 @@ principal como porcentajes de 0 a 100. La ausencia o un valor inválido se norma
 a 50. El índice muestra una miniatura apaisada 16:9 en una columna editorial del
 35 % a la izquierda del texto; bajo 700 px, imagen y texto se apilan. La página individual
 separa el H1 del cuerpo Markdown y ordena título, resumen, cabecera y desarrollo.
-Allí la imagen principal usa un hero propio de ancho completo, proporción 16:9,
-conserva el mismo punto focal almacenado y centra la fotografía. El editor conserva el original como
-referencia y muestra aparte una preview 16:9 fiel al resultado público; habilita el
-selector de foco cuando hay recorte. Una relación fuera del rango tolerante
-1.70–1.85 produce una advertencia no bloqueante.
+Las páginas editoriales usan una columna de lectura propia: el artículo completo
+admite hasta 1050 px y los bloques de texto se limitan a una línea de lectura más
+estrecha (aprox. 800–850 px). Es la única excepción a la regla general de márgenes
+uniformes del sitio. Dentro de ese ancho, la imagen principal se muestra centrada en
+un contenedor ajustado al tamaño real de la fotografía, con un margen interno breve.
+Como excepción editorial, cuando sobra espacio horizontal la imagen principal puede
+ampliarse de forma proporcional hasta un 30 % sobre su tamaño natural, sin recorte
+y sin deformación. El editor
+conserva el original como referencia y muestra aparte una preview 16:9 fiel al
+resultado público; habilita el selector de foco cuando hay recorte. Una relación fuera
+del rango tolerante 1.70–1.85 produce una advertencia no bloqueante.
 
 Ninguna presentación amplía un archivo por encima de sus dimensiones naturales.
 El resolver expone ancho y alto reales como límites CSS; hero, índice, componentes
 internos y previews pueden reducir la fotografía con `contain`, pero nunca aplican
 zoom. Si el marco disponible es mayor, la imagen queda centrada y el espacio
 restante permanece libre.
+
+La única excepción es la imagen principal de la página editorial individual: allí puede
+escalar hasta 1.3x de su ancho natural cuando el ancho disponible lo permita.
 
 Esta política no se propaga a otras clases de recurso. Una fotografía independiente
 usa `[[imagen src="archivo.jpg" alt="Descripción"]]` y siempre queda centrada. Para
@@ -205,7 +214,19 @@ Las advertencias de imagen se etiquetan por origen: imagen principal, trivia,
 “Sabías que…” o imagen embebida. Los componentes Markdown conservan número ordinal
 y línea aproximada calculada desde el offset del marcador. El editor ofrece
 **Ir al componente**, activa la solapa Contenido y selecciona esa línea en el
-textarea; nunca reemplaza automáticamente la referencia editorial.
+textarea; nunca reemplaza automáticamente el nombre de imagen escrito en Markdown.
+
+Trivias y tarjetas “Sabías que…” no mantienen destinos editoriales. Los bloques
+`referencia` presentes en archivos históricos se ignoran silenciosamente al cargar
+y se eliminan al volver a serializar el artículo. Por eso estas entidades no pueden
+fallar por un artículo o ancla inexistentes y “Sabías que…” no muestra un enlace
+“Leer más” sin destino.
+
+Si un POST no supera la validación, el editor conserva el modelo normalizado en el
+formulario y presenta **No se guardaron los cambios**, la cantidad de errores y el
+detalle. Cada solapa afectada recibe un contador y cada colección mantiene sus
+indicadores por elemento; un guardado exitoso continúa con redirección 303 y una
+confirmación inequívoca.
 
 En la solapa Contenido, slug, versión y visibilidad forman una fila compacta. La
 imagen principal vive en un único panel con el original —máximo 220×390 px— y la

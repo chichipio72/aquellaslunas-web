@@ -53,7 +53,7 @@ $pageSeo['robots'] = 'noindex, nofollow';
     <?php require __DIR__ . '/includes/navigation-indicator.php'; ?>
     <?php renderAstronomyDebugClock($now); ?>
     <?php renderAstronomySiteHeader('content', $location); ?>
-    <main class="page"><div class="container public-page-container content-container">
+    <main class="page"><div class="container public-page-container content-container content-container--article-reading">
         <?php if ($article === null): ?>
             <section class="card"><h1>Contenido no encontrado</h1></section>
         <?php elseif (!$article['valid']): ?>

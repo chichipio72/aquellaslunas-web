@@ -43,6 +43,10 @@ contentEditorInterfaceAssert(
 );
 contentEditorInterfaceAssert(str_contains($html, 'editor-image-option__format'), 'La galería no distingue el formato de las imágenes.');
 contentEditorInterfaceAssert(
+    !str_contains($html, 'Artículo de referencia') && !str_contains($html, 'Ancla de referencia'),
+    'El editor todavía muestra campos de referencia en trivias o “Sabías que…”.'
+);
+contentEditorInterfaceAssert(
     str_contains($html, 'data-image-block-builder')
         && str_contains($html, 'data-image-block-position')
         && str_contains($html, 'data-insert-image-block'),
@@ -59,6 +63,10 @@ contentEditorInterfaceAssert(
 );
 contentEditorInterfaceAssert(!str_contains($javascript, 'window.confirm'), 'La eliminación conserva un diálogo nativo sin integrar.');
 contentEditorInterfaceAssert(str_contains($javascript, '[[bloque-imagen src="${image}"'), 'El editor no construye la sintaxis del bloque automáticamente.');
+contentEditorInterfaceAssert(
+    !str_contains($javascript, 'referencia_articulo') && !str_contains($javascript, 'referencia_ancla'),
+    'Los formularios dinámicos todavía generan referencias.'
+);
 
 $editorStyles = file_get_contents(__DIR__ . '/../local-tools/content-editor/editor.css');
 contentEditorInterfaceAssert(

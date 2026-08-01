@@ -42,6 +42,19 @@ function editorHasErrors(array $errors, string $prefix): bool
     )) > 0;
 }
 
+function editorTabErrorCounts(array $errors): array
+{
+    $counts = ['content' => 0, 'facts' => 0, 'trivias' => 0];
+    foreach ($errors as $error) {
+        $field = (string) ($error['field'] ?? '');
+        $tab = str_starts_with($field, 'sabias_que.') || $field === 'sabias_que'
+            ? 'facts'
+            : (str_starts_with($field, 'trivias.') || $field === 'trivias' ? 'trivias' : 'content');
+        $counts[$tab]++;
+    }
+    return $counts;
+}
+
 function renderEditorImageSelector(string $name, ?string $selected, string $label, array $gallery): void
 {
     $available = [];
@@ -93,8 +106,6 @@ function renderEditorTrivia(array $trivia, int $index, array $errors, array $gal
             <label class="editor-check"><input type="checkbox" name="trivias[<?= $index ?>][visible]"<?= ($trivia['visible'] ?? false) ? ' checked' : '' ?>> Visible<?php editorFieldErrors($errors, 'trivias.' . $index . '.visible'); ?></label>
             <label class="editor-wide">Pregunta<textarea name="trivias[<?= $index ?>][pregunta]" rows="2" required><?= editorHtml($trivia['pregunta'] ?? '') ?></textarea><?php editorFieldErrors($errors, 'trivias.' . $index . '.pregunta'); ?></label>
             <div><?php renderEditorImageSelector('trivias[' . $index . '][imagen]', contentEditorNullableText($trivia['imagen'] ?? null), 'Imagen opcional', $gallery); ?><?php editorFieldErrors($errors, 'trivias.' . $index . '.imagen'); ?></div>
-            <label>Artículo de referencia<input name="trivias[<?= $index ?>][referencia_articulo]" value="<?= editorHtml($trivia['referencia']['articulo'] ?? '') ?>" required><?php editorFieldErrors($errors, 'trivias.' . $index . '.referencia.articulo'); ?></label>
-            <label>Ancla de referencia<input name="trivias[<?= $index ?>][referencia_ancla]" value="<?= editorHtml($trivia['referencia']['ancla'] ?? '') ?>"><?php editorFieldErrors($errors, 'trivias.' . $index . '.referencia.ancla'); ?></label>
         </div>
         <div class="editor-options" data-options>
             <?php foreach (array_values(is_array($trivia['opciones'] ?? null) ? $trivia['opciones'] : []) as $optionIndex => $option): ?>
@@ -124,8 +135,6 @@ function renderEditorFact(array $fact, int $index, array $errors, array $gallery
             <label class="editor-wide">Título<textarea name="sabias_que[<?= $index ?>][titulo]" rows="2" required><?= editorHtml($fact['titulo'] ?? '') ?></textarea><?php editorFieldErrors($errors, 'sabias_que.' . $index . '.titulo'); ?></label>
             <label class="editor-wide">Respuesta<textarea name="sabias_que[<?= $index ?>][respuesta]" rows="3" required><?= editorHtml($fact['respuesta'] ?? '') ?></textarea><?php editorFieldErrors($errors, 'sabias_que.' . $index . '.respuesta'); ?></label>
             <div><?php renderEditorImageSelector('sabias_que[' . $index . '][imagen]', contentEditorNullableText($fact['imagen'] ?? null), 'Imagen opcional', $gallery); ?><?php editorFieldErrors($errors, 'sabias_que.' . $index . '.imagen'); ?></div>
-            <label>Artículo de referencia<input name="sabias_que[<?= $index ?>][referencia_articulo]" value="<?= editorHtml($fact['referencia']['articulo'] ?? '') ?>" required><?php editorFieldErrors($errors, 'sabias_que.' . $index . '.referencia.articulo'); ?></label>
-            <label>Ancla de referencia<input name="sabias_que[<?= $index ?>][referencia_ancla]" value="<?= editorHtml($fact['referencia']['ancla'] ?? '') ?>"><?php editorFieldErrors($errors, 'sabias_que.' . $index . '.referencia.ancla'); ?></label>
         </div>
         <button class="editor-button editor-button--danger" type="button" data-remove-block>Quitar bloque</button>
     </fieldset>
@@ -139,7 +148,7 @@ $activeTab = in_array($requestedTab, ['content', 'facts', 'trivias'], true) ? $r
 $isNew = $action === 'new';
 $errors = [];
 $warnings = [];
-$notice = isset($_GET['saved']) ? 'El contenido se guardó correctamente.' : '';
+$notice = isset($_GET['saved']) ? 'Los cambios fueron guardados correctamente.' : '';
 $raw = contentEditorEmptyArticle();
 
 if ($action === 'edit' && $slug !== '') {
@@ -151,24 +160,38 @@ if ($action === 'edit' && $slug !== '') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $isNew = ($_POST['mode'] ?? '') === 'new';
-    $slug = $isNew ? trim((string) ($_POST['slug'] ?? '')) : trim((string) ($_POST['original_slug'] ?? ''));
-    $raw = contentEditorNormalizePost($_POST);
-    if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
-        $errors[] = astronomyContentError('archivo', 'La sesión del formulario venció. Recargá la página e intentá nuevamente.');
+    $requestContentLength = filter_var($_SERVER['CONTENT_LENGTH'] ?? 0, FILTER_VALIDATE_INT);
+    $requestContentLength = $requestContentLength !== false ? $requestContentLength : 0;
+    if ($_POST === [] && $requestContentLength > 0) {
+        $errors[] = astronomyContentError(
+            'archivo',
+            'El envío llegó vacío o incompleto. Puede deberse a límites de tamaño/cantidad de campos del servidor (por ejemplo post_max_size o max_input_vars). Recargá la página y volvé a guardar.'
+        );
     } else {
-        $result = contentEditorSave($slug, $raw, $isNew);
-        $errors = $result['errors'];
-        if ($result['saved']) {
-            header(
-                'Location: index.php?action=edit&slug=' . rawurlencode($slug)
-                . '&saved=1&tab=' . rawurlencode($activeTab),
-                true,
-                303
+        $isNew = ($_POST['mode'] ?? '') === 'new';
+        $slug = $isNew ? trim((string) ($_POST['slug'] ?? '')) : trim((string) ($_POST['original_slug'] ?? ''));
+        $raw = contentEditorNormalizePost($_POST);
+        if (($_POST['content_editor_form_complete'] ?? null) !== '1') {
+            $errors[] = astronomyContentError(
+                'archivo',
+                'El formulario llegó incompleto y no se guardó para evitar pérdida de datos. Revisá límites del servidor (max_input_vars/post_max_size) e intentá nuevamente.'
             );
-            exit;
+        } elseif (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+            $errors[] = astronomyContentError('archivo', 'La sesión del formulario venció. Recargá la página e intentá nuevamente.');
+        } else {
+            $result = contentEditorSave($slug, $raw, $isNew);
+            $errors = $result['errors'];
+            if ($result['saved']) {
+                header(
+                    'Location: index.php?action=edit&slug=' . rawurlencode($slug)
+                    . '&saved=1&tab=' . rawurlencode($activeTab),
+                    true,
+                    303
+                );
+                exit;
+            }
+            $warnings = contentEditorValidateCandidate($slug, $raw)['warnings'];
         }
-        $warnings = contentEditorValidateCandidate($slug, $raw)['warnings'];
     }
     $action = $isNew ? 'new' : 'edit';
 }
@@ -186,6 +209,8 @@ if (
     $errors = contentEditorCatalogArticleIssues($catalog, $slug, 'errors');
     $warnings = contentEditorCatalogArticleIssues($catalog, $slug, 'warnings');
 }
+$saveFailed = $_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [];
+$tabErrorCounts = editorTabErrorCounts($errors);
 ?>
 <!doctype html>
 <html lang="es">
@@ -253,7 +278,13 @@ if (
         <a class="editor-link" href="index.php">Volver al listado</a>
     </div>
     <?php if ($notice !== ''): ?><p class="editor-notice" role="status"><?= editorHtml($notice) ?></p><?php endif; ?>
-    <?php if ($errors !== []): ?><section class="editor-errors" role="alert"><h2><?= $_SERVER['REQUEST_METHOD'] === 'POST' ? 'No se guardó el contenido' : 'El contenido presenta errores' ?></h2><ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'contenido') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
+    <?php if ($errors !== []): ?>
+        <section class="editor-errors<?= $saveFailed ? ' editor-save-failure' : '' ?>" role="alert">
+            <h2><?= $saveFailed ? 'No se guardaron los cambios.' : 'El contenido presenta errores' ?></h2>
+            <?php if ($saveFailed): ?><p>Corregí los errores indicados antes de volver a intentar. Se encontraron <strong><?= count($errors) ?> error<?= count($errors) === 1 ? '' : 'es' ?></strong>.</p><?php endif; ?>
+            <ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'contenido') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul>
+        </section>
+    <?php endif; ?>
     <?php if ($warnings !== []): ?><section class="editor-warnings" role="status"><h2>Advertencias del contenido</h2><ul><?php foreach ($warnings as $warning): ?><li><code><?= editorHtml($warning['field'] ?? 'contenido') ?></code>: <?= editorHtml($warning['message'] ?? 'Advertencia') ?><?php if (($warning['kind'] ?? null) === 'embedded_image' && isset($warning['line'])): ?> <button class="editor-warning-action" type="button" data-goto-markdown-line="<?= (int) $warning['line'] ?>">Ir al componente</button><?php endif; ?></li><?php endforeach; ?></ul></section><?php endif; ?>
     <form class="editor-form" method="post" data-content-editor novalidate>
         <input type="hidden" name="csrf_token" value="<?= editorHtml(contentEditorCsrfToken()) ?>">
@@ -263,7 +294,7 @@ if (
         <div class="editor-tabs" role="tablist" aria-label="Secciones del artículo">
             <?php foreach (['content' => 'Contenido', 'facts' => 'Sabías que', 'trivias' => 'Trivias'] as $tabKey => $tabLabel): ?>
                 <?php $tabIsActive = $activeTab === $tabKey; ?>
-                <button id="editor-tab-<?= $tabKey ?>" class="editor-tab<?= $tabIsActive ? ' is-active' : '' ?>" type="button" role="tab" aria-selected="<?= $tabIsActive ? 'true' : 'false' ?>" aria-controls="editor-panel-<?= $tabKey ?>" tabindex="<?= $tabIsActive ? '0' : '-1' ?>"><?= $tabLabel ?></button>
+                <button id="editor-tab-<?= $tabKey ?>" class="editor-tab<?= $tabIsActive ? ' is-active' : '' ?><?= $tabErrorCounts[$tabKey] > 0 ? ' has-errors' : '' ?>" type="button" role="tab" aria-selected="<?= $tabIsActive ? 'true' : 'false' ?>" aria-controls="editor-panel-<?= $tabKey ?>" tabindex="<?= $tabIsActive ? '0' : '-1' ?>"><?= $tabLabel ?><?php if ($tabErrorCounts[$tabKey] > 0): ?> <span class="editor-tab__error-count" aria-label="<?= $tabErrorCounts[$tabKey] ?> error<?= $tabErrorCounts[$tabKey] === 1 ? '' : 'es' ?>"><?= $tabErrorCounts[$tabKey] ?></span><?php endif; ?></button>
             <?php endforeach; ?>
         </div>
         <div id="editor-panel-content" class="editor-tab-panel" role="tabpanel" aria-labelledby="editor-tab-content"<?= $activeTab === 'content' ? '' : ' hidden' ?>>
@@ -408,6 +439,7 @@ if (
                 <div class="editor-collection__detail" data-trivia-list><?php foreach (array_values(is_array($raw['trivias'] ?? null) ? $raw['trivias'] : []) as $index => $trivia) renderEditorTrivia($trivia, $index, $errors, $editorImageGallery); ?></div>
             </section>
         </div>
+        <input type="hidden" name="content_editor_form_complete" value="1">
         <div class="editor-actions"><button class="editor-button editor-button--primary" type="submit">Guardar artículo</button><a class="editor-button editor-button--quiet" href="index.php">Cancelar</a></div>
     </form>
     <dialog class="editor-image-dialog" data-image-dialog aria-labelledby="editor-image-dialog-title">

@@ -266,25 +266,6 @@ function astronomyContentProtectedImageHtml(array $image, string $alt = '', stri
         . '" loading="lazy" draggable="false"' . $dimensionAttributes . '>';
 }
 
-function astronomyContentValidateReference($value, string $field, array $articles): array
-{
-    if (!is_array($value)) {
-        return [astronomyContentError($field, 'La referencia interna debe ser un array.')];
-    }
-    $slug = $value['articulo'] ?? null;
-    if (!astronomyContentNonEmptyString($slug) || !isset($articles[$slug])) {
-        return [astronomyContentError($field . '.articulo', 'El artículo referenciado no existe.')];
-    }
-    if (($articles[$slug]['valid'] ?? false) !== true) {
-        return [astronomyContentError($field . '.articulo', 'El artículo referenciado tiene errores.')];
-    }
-    $anchor = $value['ancla'] ?? null;
-    if ($anchor !== null && (!astronomyContentNonEmptyString($anchor) || !in_array($anchor, $articles[$slug]['anchors'], true))) {
-        return [astronomyContentError($field . '.ancla', 'El ancla referenciada no existe en el artículo.')];
-    }
-    return [];
-}
-
 function astronomyContentValidateArticle(string $slug, $raw, string $filename): array
 {
     $errors = [];
@@ -474,6 +455,7 @@ function astronomyContentValidateTrivia($raw, string $slug, int $index): array
         $errors[] = astronomyContentError('trivias.' . $index, 'La trivia debe ser un array.');
         $raw = [];
     }
+    unset($raw['referencia']);
     if (!astronomyContentNonEmptyString($raw['id'] ?? null)) {
         $errors[] = astronomyContentError('trivias.' . $index . '.id', 'El identificador es obligatorio.');
     }
@@ -529,6 +511,7 @@ function astronomyContentValidateFact($raw, string $slug, int $index): array
         $errors[] = astronomyContentError('sabias_que.' . $index, 'La entrada debe ser un array.');
         $raw = [];
     }
+    unset($raw['referencia']);
     foreach (['id', 'titulo', 'respuesta'] as $field) {
         if (!astronomyContentNonEmptyString($raw[$field] ?? null)) {
             $errors[] = astronomyContentError('sabias_que.' . $index . '.' . $field, 'El campo es obligatorio.');
@@ -595,8 +578,6 @@ function astronomyLoadContentCatalog(?string $directory = null): array
                 $trivia['errors'][] = astronomyContentError('trivias.' . $index . '.id', 'El identificador está repetido dentro del artículo.');
             }
             $triviaIds[$trivia['id']] = true;
-            $triviaSource = is_array($triviaRaw) ? $triviaRaw : [];
-            $trivia['errors'] = array_merge($trivia['errors'], astronomyContentValidateReference($triviaSource['referencia'] ?? null, 'trivias.' . $index . '.referencia', $catalog['articles']));
             $trivia['valid'] = $trivia['errors'] === [];
             $article['trivias'][$trivia['id']] = $trivia;
             $catalog['trivias'][] = $trivia;
@@ -609,8 +590,6 @@ function astronomyLoadContentCatalog(?string $directory = null): array
                 $fact['errors'][] = astronomyContentError('sabias_que.' . $index . '.id', 'El identificador está repetido dentro del artículo.');
             }
             $factIds[$fact['id']] = true;
-            $factSource = is_array($factRaw) ? $factRaw : [];
-            $fact['errors'] = array_merge($fact['errors'], astronomyContentValidateReference($factSource['referencia'] ?? null, 'sabias_que.' . $index . '.referencia', $catalog['articles']));
             $fact['valid'] = $fact['errors'] === [];
             $article['facts'][$fact['id']] = $fact;
             $catalog['facts'][] = $fact;
@@ -691,14 +670,6 @@ function astronomyContentArticleUrl(string $slug, string $anchor = ''): string
         'contenido.php?slug=' . rawurlencode($slug)
         . ($anchor !== '' ? '#' . rawurlencode($anchor) : '')
     );
-}
-
-function astronomyContentReferenceUrl(array $entry): string
-{
-    $reference = is_array($entry['raw']['referencia'] ?? null) ? $entry['raw']['referencia'] : [];
-    $slug = (string) ($reference['articulo'] ?? $entry['source_slug'] ?? '');
-    $anchor = (string) ($reference['ancla'] ?? '');
-    return astronomyContentArticleUrl($slug, $anchor);
 }
 
 function renderAstronomyContentDiagnostic(array $diagnostic, string $heading = 'Contenido con errores'): void
@@ -785,7 +756,6 @@ function renderAstronomyHomeContentCards(array $catalog): void
                     <?= astronomyContentProtectedImageHtml($fact['image'], '') ?>
                     <h2><?= htmlspecialchars((string) $fact['raw']['titulo']) ?></h2>
                     <p><?= htmlspecialchars((string) $fact['raw']['respuesta']) ?></p>
-                    <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyContentReferenceUrl($fact), ENT_QUOTES, 'UTF-8') ?>">Leer más <span aria-hidden="true">→</span></a>
                 <?php endif; ?>
             </article>
         <?php endif; ?>
@@ -939,9 +909,5 @@ function astronomyContentRenderMarkdown(string $markdown): string
 
 function astronomyContentArticleBodyMarkdown(string $markdown): string
 {
-    $withoutTitle = preg_replace('/^\s*#\s+.*?(?:\R+|$)/u', '', $markdown, 1) ?? $markdown;
-    if (preg_match('/^##\s+/mu', $withoutTitle, $match, PREG_OFFSET_CAPTURE) === 1) {
-        return substr($withoutTitle, $match[0][1]);
-    }
-    return $withoutTitle;
+    return preg_replace('/\A(?:\x{FEFF})?[ \t]*#[ \t]+[^\r\n]*(?:\R|$)/u', '', $markdown, 1) ?? $markdown;
 }

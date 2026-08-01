@@ -131,8 +131,6 @@ Con el paso de los días comienza a hacerse visible una pequeña parte iluminada
 
 Semanas después llegamos a la Luna llena, momento en que vemos prácticamente toda la cara iluminada.
 
-[[esquema tipo="fases-lunares"]]
-
 ## Luna llena {#luna-llena}
 
 La Luna llena sale aproximadamente cuando el Sol se pone y permanece visible durante toda la noche.
@@ -144,8 +142,6 @@ Por eso suele ser la fase más fácil de observar.
 Aunque la Luna gira sobre su eje, tarda prácticamente el mismo tiempo en completar una rotación que en dar una vuelta alrededor de la Tierra.
 
 Gracias a esa sincronización vemos siempre casi el mismo hemisferio.
-
-[[trivia id="tr-01"]]
 MD,
 
 ];

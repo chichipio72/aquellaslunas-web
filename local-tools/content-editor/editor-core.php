@@ -33,10 +33,23 @@ function contentEditorLoadRaw(string $slug, ?string $directory = null): array
     if (!is_file($path) || !is_readable($path)) {
         throw new RuntimeException('El archivo no existe o no puede leerse.');
     }
+    clearstatcache(true, $path);
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($path, true);
+    }
+    $sourcePath = $path;
+    $temporarySource = tempnam(sys_get_temp_dir(), 'aquellas-lunas-content-read-');
+    if ($temporarySource !== false && @copy($path, $temporarySource)) {
+        $sourcePath = $temporarySource;
+    }
     try {
-        $raw = (static fn(string $filename) => require $filename)($path);
+        $raw = (static fn(string $filename) => require $filename)($sourcePath);
     } catch (Throwable $exception) {
         throw new RuntimeException('El archivo produjo un error al cargarse: ' . $exception->getMessage(), 0, $exception);
+    } finally {
+        if ($sourcePath !== $path) {
+            @unlink($sourcePath);
+        }
     }
     if (!is_array($raw)) {
         throw new RuntimeException('El archivo no devuelve un array PHP.');
@@ -153,10 +166,6 @@ function contentEditorNormalizePost(array $post): array
             'pregunta' => trim((string) ($trivia['pregunta'] ?? '')),
             'imagen' => contentEditorNullableText($trivia['imagen'] ?? null),
             'opciones' => $options,
-            'referencia' => [
-                'articulo' => trim((string) ($trivia['referencia_articulo'] ?? '')),
-                'ancla' => contentEditorNullableText($trivia['referencia_ancla'] ?? null),
-            ],
         ];
     }
 
@@ -170,10 +179,6 @@ function contentEditorNormalizePost(array $post): array
             'titulo' => trim((string) ($fact['titulo'] ?? '')),
             'respuesta' => trim((string) ($fact['respuesta'] ?? '')),
             'imagen' => contentEditorNullableText($fact['imagen'] ?? null),
-            'referencia' => [
-                'articulo' => trim((string) ($fact['referencia_articulo'] ?? '')),
-                'ancla' => contentEditorNullableText($fact['referencia_ancla'] ?? null),
-            ],
         ];
     }
     return $raw;
@@ -206,6 +211,14 @@ function contentEditorExportValue($value, int $level = 1): string
 
 function contentEditorSerialize(array $raw): string
 {
+    foreach (['trivias', 'sabias_que'] as $collection) {
+        foreach (is_array($raw[$collection] ?? null) ? $raw[$collection] : [] as $index => $entry) {
+            if (is_array($entry)) {
+                unset($entry['referencia']);
+                $raw[$collection][$index] = $entry;
+            }
+        }
+    }
     $markdown = rtrim((string) ($raw['articulo'] ?? ''));
     if (preg_match('/^MD;?$/m', $markdown) === 1) {
         throw new InvalidArgumentException('El artículo contiene una línea reservada “MD” que impide usar el heredoc.');

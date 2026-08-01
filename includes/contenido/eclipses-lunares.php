@@ -27,10 +27,8 @@ return [
     ],
 
     'relaciones' => [
-        'eclipse_lunar',
-        'luna_llena',
-        'umbra',
-        'penumbra',
+        'eclipse',
+        'lunar_eclipse',
     ],
 
     'sabias_que' => [
@@ -39,7 +37,7 @@ return [
             'visible' => true,
             'titulo' => '¿Sabías por qué la Luna puede verse rojiza durante un eclipse total?',
             'respuesta' => 'La atmósfera terrestre desvía hacia la sombra parte de la luz roja del Sol. Esa luz alcanza la superficie lunar y puede darle tonos cobrizos, anaranjados o rojizos.',
-            'imagen' => '931e5383005c296189725bab65bc618c624837cf38b9436589787c1d5b6ba01a.jpg',
+            'imagen' => '9f934b4a0ef9506d2c5cddb5880dd394518a0d7160aee97b4bfb21dc8179d7ac.jpg',
             'referencia' => [
                 'articulo' => 'eclipses-lunares',
                 'ancla' => 'color-rojizo',
@@ -112,6 +110,28 @@ return [
                 'ancla' => 'umbra-y-penumbra',
             ],
         ],
+        [
+            'id' => 'tr-03',
+            'visible' => true,
+            'pregunta' => '¿En qué momento se puede ver un eclipse de Luna?',
+            'imagen' => '931e5383005c296189725bab65bc618c624837cf38b9436589787c1d5b6ba01a.jpg',
+            'opciones' => [
+                [
+                    'texto' => 'Solo de día',
+                ],
+                [
+                    'texto' => 'Solo de noche',
+                    'explicacion' => 'En el eclipse de Luna la Tierra se interpone entre la Luna y el Sol, por lo tanto desde el punto de vista de la Tierra la Luna está en el lado puesto al Sol, o sea de noche.',
+                ],
+                [
+                    'texto' => 'Tanto de día como de noche',
+                ],
+            ],
+            'referencia' => [
+                'articulo' => 'eclipses-lunares',
+                'ancla' => NULL,
+            ],
+        ],
     ],
 
     'articulo' => <<<'MD'
@@ -121,13 +141,9 @@ Un eclipse lunar se produce cuando la Luna atraviesa la sombra de la Tierra. A d
 
 ## Cómo se produce {#como-se-produce}
 
-[[bloque-imagen src="9f934b4a0ef9506d2c5cddb5880dd394518a0d7160aee97b4bfb21dc8179d7ac.jpg" alt="Eclipse lunar" posicion="derecha"]]
-
 Durante la Luna llena, la Tierra se encuentra aproximadamente entre el Sol y la Luna.
 
 Si los tres cuerpos quedan suficientemente alineados, la sombra terrestre alcanza la superficie lunar y comienza el eclipse.
-
-[[/bloque-imagen]]
 
 ## Umbra y penumbra {#umbra-y-penumbra}
 
@@ -146,6 +162,7 @@ La atmósfera terrestre filtra y desvía parte de la luz solar hacia el interior
 El color final puede variar entre gris oscuro, cobre, naranja o rojo profundo.
 
 ## ¿Por qué no ocurren todos los meses? {#por-que-no-ocurren-cada-mes}
+[[bloque-imagen src="9f934b4a0ef9506d2c5cddb5880dd394518a0d7160aee97b4bfb21dc8179d7ac.jpg" alt="Eclipse total de Luna" posicion="derecha"]]
 
 La órbita lunar está inclinada unos grados respecto del plano en el que la Tierra gira alrededor del Sol.
 
@@ -161,7 +178,7 @@ Un eclipse lunar puede ser:
 - **Parcial:** una parte de la Luna entra en la umbra.
 - **Total:** toda la Luna queda dentro de la umbra.
 
-[[trivia id="tr-01"]]
+[[/bloque-imagen]]
 MD,
 
 ];

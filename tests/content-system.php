@@ -27,6 +27,10 @@ $trivia = astronomyContentRandomTrivia($catalog);
 $fact = astronomyContentRandomFact($catalog);
 contentSystemAssert(is_array($trivia) && ($trivia['valid'] ?? false), 'No se obtuvo una trivia válida.');
 contentSystemAssert(is_array($fact) && ($fact['valid'] ?? false), 'No se obtuvo un “Sabías que” válido.');
+contentSystemAssert(
+    !array_key_exists('referencia', $trivia['raw']) && !array_key_exists('referencia', $fact['raw']),
+    'El loader no ignoró las referencias heredadas de trivia y “Sabías que…”.'
+);
 contentSystemAssert(count($trivia['raw']['opciones'] ?? []) === 2, 'La selección aleatoria perdió opciones de trivia.');
 contentSystemAssert(
     str_contains(astronomyContentRenderMarkdown($catalog['articles']['valid-content']['raw']['articulo']), 'id="seccion"'),
@@ -115,8 +119,13 @@ contentSystemAssert(
     'Un separador no interrumpió el flujo antes de la sección siguiente.'
 );
 contentSystemAssert(
-    trim(astronomyContentArticleBodyMarkdown("# Título\n\nIntroducción\n\n## Desarrollo\n\nTexto")) === "## Desarrollo\n\nTexto",
-    'La vista individual no separó el título principal del cuerpo Markdown.'
+    trim(astronomyContentArticleBodyMarkdown("# Título\n\nIntroducción\n\n## Desarrollo\n\nTexto")) === "Introducción\n\n## Desarrollo\n\nTexto",
+    'La vista individual eliminó el primer párrafo junto con el H1 de compatibilidad.'
+);
+$markdownWithoutH1 = "Introducción sin H1.\n\n## Desarrollo\n\nTexto";
+contentSystemAssert(
+    astronomyContentArticleBodyMarkdown($markdownWithoutH1) === $markdownWithoutH1,
+    'La preparación alteró un artículo que no comienza con H1.'
 );
 contentSystemAssert(astronomyContentImagePosition(15) === 15.0, 'Se perdió una posición focal válida.');
 contentSystemAssert(astronomyContentImagePosition(120) === 50.0, 'Una posición focal fuera de rango no volvió al centro.');
@@ -336,7 +345,7 @@ $homeCards = (string) ob_get_clean();
 contentSystemAssert(str_contains($homeCards, 'data-content-trivia'), 'La portada no renderizó la trivia interactiva.');
 contentSystemAssert(substr_count($homeCards, 'data-correct="true"') === 1, 'La trivia no identificó exactamente una respuesta correcta después de mezclar.');
 contentSystemAssert(!str_contains($homeCards, 'Conocer la respuesta'), 'Persistió el enlace anterior de la trivia.');
-contentSystemAssert(str_contains($homeCards, 'class="home-v2-card__link"'), '“Sabías que…” no reutilizó el patrón visual de enlace.');
+contentSystemAssert(!str_contains($homeCards, 'Leer más'), '“Sabías que…” conservó un enlace sin destino después de retirar referencias.');
 
 putenv('APP_ENV=production');
 putenv('CONTENT_ENABLED_IN_PRODUCTION=false');

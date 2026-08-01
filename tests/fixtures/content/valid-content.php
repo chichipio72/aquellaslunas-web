@@ -13,7 +13,7 @@ return [
         'titulo' => '¿Sabías que esta entrada es válida?',
         'respuesta' => 'Sí, porque cumple el contrato completo.',
         'imagen' => null,
-        'referencia' => ['articulo' => 'valid-content', 'ancla' => 'seccion'],
+        'referencia' => ['articulo' => 'articulo-heredado-inexistente', 'ancla' => 'ancla-inexistente'],
     ]],
     'trivias' => [[
         'id' => 'tr-01',
@@ -24,7 +24,7 @@ return [
             ['texto' => 'Incorrecta'],
             ['texto' => 'Correcta', 'explicacion' => 'Es la respuesta válida.'],
         ],
-        'referencia' => ['articulo' => 'valid-content', 'ancla' => 'seccion'],
+        'referencia' => ['articulo' => 'articulo-heredado-inexistente', 'ancla' => 'ancla-inexistente'],
     ]],
     'articulo' => <<<'MD'
 # Contenido válido

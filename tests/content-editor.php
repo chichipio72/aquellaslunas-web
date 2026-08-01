@@ -89,7 +89,7 @@ $raw['trivias'] = [[
         ['texto' => 'Incorrecta'],
         ['texto' => 'Correcta', 'explicacion' => 'Esta es la explicación.'],
     ],
-    'referencia' => ['articulo' => 'articulo-prueba', 'ancla' => 'seccion'],
+    'referencia' => ['articulo' => 'heredada', 'ancla' => 'ancla-antigua'],
 ]];
 $raw['sabias_que'] = [[
     'id' => 'sq-01',
@@ -97,7 +97,7 @@ $raw['sabias_que'] = [[
     'titulo' => 'Un dato',
     'respuesta' => 'Una respuesta.',
     'imagen' => null,
-    'referencia' => ['articulo' => 'articulo-prueba', 'ancla' => 'seccion'],
+    'referencia' => ['articulo' => 'heredada', 'ancla' => 'ancla-antigua'],
 ]];
 
 $invalidSlug = contentEditorValidateCandidate('Slug inválido', $raw, $contentDirectory, $imageDirectory);
@@ -110,6 +110,7 @@ contentEditorAssert(is_file($path), 'No apareció el archivo creado.');
 $source = file_get_contents($path);
 contentEditorAssert(str_contains($source, "'articulo' => <<<'MD'"), 'El artículo no se serializó con heredoc.');
 contentEditorAssert(!str_contains($source, "'slug' =>"), 'El serializador escribió un campo slug.');
+contentEditorAssert(!str_contains($source, "'referencia' =>"), 'El serializador conservó referencias heredadas de trivias o “Sabías que…”.');
 $reloadedRaw = (static fn(string $file) => require $file)($path);
 contentEditorAssert($reloadedRaw['titulo'] === 'Artículo de prueba', 'El PHP generado no pudo recargarse.');
 contentEditorAssert($reloadedRaw['imagen'] === $validImage, 'No persistió únicamente el nombre de la imagen principal.');
@@ -121,8 +122,6 @@ contentEditorAssert($catalog['facts'][0]['valid'], 'El “Sabías que…” gene
 
 $canonicalRaw = $raw;
 $canonicalRaw['imagen'] = $canonicalImage;
-$canonicalRaw['trivias'][0]['referencia']['articulo'] = 'imagen-real';
-$canonicalRaw['sabias_que'][0]['referencia']['articulo'] = 'imagen-real';
 $canonicalSaved = contentEditorSave('imagen-real', $canonicalRaw, true, $contentDirectory, $backupDirectory);
 contentEditorAssert($canonicalSaved['saved'], 'No se guardó una selección tomada de la galería canónica.');
 contentEditorAssert(
