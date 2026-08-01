@@ -7,7 +7,7 @@ const ASTRONOMY_CONTENT_DEBUG_CSRF_KEY = 'astronomy_content_debug_csrf';
 
 function astronomyContentDebugAvailable(): bool
 {
-    return isLocalEnvironment() && isContentEnabled();
+    return canUseSiteDebugTools() && isContentEnabled();
 }
 
 function astronomyContentDebugSession(): bool
@@ -16,7 +16,7 @@ function astronomyContentDebugSession(): bool
         return false;
     }
     if (session_status() === PHP_SESSION_ACTIVE) {
-        return true;
+        return session_name() === 'aquellas_lunas_local';
     }
     session_name('aquellas_lunas_local');
     $savePath = trim((string) session_save_path());

@@ -13,7 +13,9 @@ require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/content-system.php';
 
 sendDynamicNoCacheHeaders();
-if (!isContentEnabled()) {
+$adminPreview = astronomyContentAdminPreviewEnabled();
+$contentEnabled = isContentEnabled();
+if (!$contentEnabled && !$adminPreview) {
     http_response_code(404);
     exit;
 }
@@ -24,7 +26,7 @@ $article = preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1
     ? ($catalog['articles'][$slug] ?? null)
     : null;
 $debug = astronomyContentDebugEnabled();
-if ($article === null || (!$debug && (!$article['valid'] || !$article['visible']))) {
+if ($article === null || (!$debug && (!$article['valid'] || (!$article['visible'] && !$adminPreview)))) {
     http_response_code(404);
     $article = null;
 }
@@ -65,8 +67,12 @@ $pageSeo['robots'] = 'noindex, nofollow';
                     <h1><?= htmlspecialchars((string) $article['raw']['titulo']) ?></h1>
                     <p><?= htmlspecialchars((string) $article['raw']['resumen']) ?></p>
                 </header>
-                <?php if (isLocalEnvironment() && astronomyContentSlugFromFilename($article['slug'] . '.php') === $article['slug']): ?>
-                    <div class="content-local-actions"><a class="content-local-edit-link" href="<?= htmlspecialchars(astronomyInternalUrl('local-tools/content-editor/index.php?action=edit&slug=' . rawurlencode($article['slug'])), ENT_QUOTES, 'UTF-8') ?>">Editar este artículo <span aria-hidden="true">→</span></a></div>
+                <?php if ($adminPreview): ?>
+                    <div class="content-local-actions">
+                        <?php if (!$contentEnabled): ?><p class="content-local-note">Sección pública deshabilitada</p><?php endif; ?>
+                        <?php if (!$article['visible']): ?><p class="content-local-note">Contenido oculto</p><?php endif; ?>
+                        <a class="content-local-edit-link" href="<?= htmlspecialchars('/admin/contenidos/?action=edit&slug=' . rawurlencode($article['slug']), ENT_QUOTES, 'UTF-8') ?>">Editar artículo <span aria-hidden="true">→</span></a>
+                    </div>
                 <?php endif; ?>
                 <?php if (($article['image']['url'] ?? null) !== null): ?>
                     <figure class="article-hero"><?= astronomyContentProtectedImageHtml(

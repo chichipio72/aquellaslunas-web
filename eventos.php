@@ -127,7 +127,7 @@ foreach ($items as $event) {
     $groups[$key][] = $event;
 }
 $pageSeo = aquellasLunasSeoPage('Eventos lunares | Aquellas Lunas', 'Eventos lunares por fecha, ubicación y tipo.', '/eventos.php', 'article');
-if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
+if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));
 }

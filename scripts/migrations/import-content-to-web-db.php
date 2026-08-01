@@ -3,8 +3,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/content-system.php';
-require_once __DIR__ . '/../includes/web-database.php';
+require_once __DIR__ . '/../../includes/content-system.php';
+require_once __DIR__ . '/../../includes/web-database.php';
 
 const IMPORT_EXIT_OK = 0;
 const IMPORT_EXIT_FAILURE = 1;
@@ -15,11 +15,11 @@ if (PHP_SAPI !== 'cli') {
 }
 
 /**
- * @return array{dry_run: bool, help: bool}
+ * @return array{dry_run: bool, help: bool, content_directory: ?string}
  */
 function parseOptions(array $argv): array
 {
-    $options = ['dry_run' => false, 'help' => false];
+    $options = ['dry_run' => false, 'help' => false, 'content_directory' => null];
     foreach (array_slice($argv, 1) as $argument) {
         if ($argument === '--dry-run') {
             $options['dry_run'] = true;
@@ -27,6 +27,14 @@ function parseOptions(array $argv): array
         }
         if ($argument === '--help' || $argument === '-h') {
             $options['help'] = true;
+            continue;
+        }
+        if (str_starts_with($argument, '--content-dir=')) {
+            $directory = trim((string) substr($argument, strlen('--content-dir=')));
+            if ($directory === '') {
+                throw new InvalidArgumentException('La opcion --content-dir requiere una ruta no vacia.');
+            }
+            $options['content_directory'] = $directory;
             continue;
         }
         throw new InvalidArgumentException('Argumento no reconocido: ' . $argument);
@@ -37,8 +45,9 @@ function parseOptions(array $argv): array
 function printHelp(): void
 {
     echo "Uso:\n";
-    echo "  php scripts/import-content-to-web-db.php [--dry-run]\n\n";
+    echo "  php scripts/migrations/import-content-to-web-db.php --content-dir=/ruta/al/respaldo [--dry-run]\n\n";
     echo "Opciones:\n";
+    echo "  --content-dir=RUTA  Directorio de respaldo con archivos PHP legacy a importar.\n";
     echo "  --dry-run   Valida y muestra lo que importaria sin escribir en la base.\n";
     echo "  -h, --help  Muestra esta ayuda.\n";
 }
@@ -309,7 +318,14 @@ function main(array $argv): int
     }
 
     $dryRun = $options['dry_run'];
-    $contentDirectory = ASTRONOMY_CONTENT_DIRECTORY;
+    $contentDirectory = $options['content_directory'];
+
+    if (!is_string($contentDirectory) || trim($contentDirectory) === '') {
+        fwrite(STDERR, "Debes indicar --content-dir con el directorio legacy a importar.\n\n");
+        printHelp();
+        return IMPORT_EXIT_FAILURE;
+    }
+    $contentDirectory = rtrim($contentDirectory, '/');
 
     if (!is_dir($contentDirectory)) {
         fwrite(STDERR, 'No existe el directorio de contenidos: ' . $contentDirectory . "\n");

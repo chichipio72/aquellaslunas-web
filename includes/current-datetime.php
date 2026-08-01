@@ -4,11 +4,17 @@ require_once __DIR__ . '/api-client.php';
 
 const ASTRONOMY_SIMULATED_TIME_SESSION_KEY = 'astronomy_simulated_local_time';
 const ASTRONOMY_SIMULATED_TIME_COOKIE = 'astronomy_simulated_local_time';
+const ASTRONOMY_SIMULATED_TIME_CSRF_KEY = 'astronomy_simulated_time_csrf';
 
 function astronomyLocalTimeSimulationEnabled(): bool
 {
-    if (!isLocalEnvironment()) {
+    if (!canUseSiteDebugTools()) {
         return false;
+    }
+    // En producción la sesión admin es el interruptor seguro. La bandera se
+    // conserva como interruptor técnico del entorno de desarrollo local.
+    if (isProductionEnvironment()) {
+        return true;
     }
     $environmentValue = getenv('LOCAL_TIME_SIMULATION_ENABLED');
     if (is_string($environmentValue) && trim($environmentValue) !== '') {
@@ -27,7 +33,7 @@ function astronomyTimeSimulationSession(): bool
         return false;
     }
     if (session_status() === PHP_SESSION_ACTIVE) {
-        return true;
+        return session_name() === 'aquellas_lunas_local';
     }
     session_name('aquellas_lunas_local');
     $configuredSavePath = trim((string) session_save_path());
@@ -37,10 +43,29 @@ function astronomyTimeSimulationSession(): bool
     session_set_cookie_params([
         'httponly' => true,
         'samesite' => 'Lax',
-        'secure' => false,
+        'secure' => isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off',
         'path' => '/',
     ]);
     return session_start();
+}
+
+function astronomyTimeSimulationCsrfToken(): string
+{
+    if (!astronomyTimeSimulationSession()) {
+        return '';
+    }
+    $token = $_SESSION[ASTRONOMY_SIMULATED_TIME_CSRF_KEY] ?? null;
+    if (!is_string($token) || preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+        $token = bin2hex(random_bytes(32));
+        $_SESSION[ASTRONOMY_SIMULATED_TIME_CSRF_KEY] = $token;
+    }
+    return $token;
+}
+
+function astronomyTimeSimulationCsrfIsValid(mixed $token): bool
+{
+    $stored = $_SESSION[ASTRONOMY_SIMULATED_TIME_CSRF_KEY] ?? null;
+    return is_string($token) && is_string($stored) && $stored !== '' && hash_equals($stored, $token);
 }
 
 function astronomyValidLocalWallTime(string $date, string $time): ?string
@@ -68,24 +93,19 @@ function astronomyTimeSimulationRedirect(): never
     exit;
 }
 
-function astronomyStoreSimulatedLocalWallTimeCookie(?string $value): void
+function astronomyRemoveLegacySimulatedTimeCookie(): void
 {
-    if (!astronomyLocalTimeSimulationEnabled()) {
+    if (!isset($_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE])) {
         return;
     }
-    $options = [
-        'expires' => $value === null ? time() - 3600 : time() + 60 * 60 * 24 * 30,
+    setcookie(ASTRONOMY_SIMULATED_TIME_COOKIE, '', [
+        'expires' => time() - 3600,
         'path' => '/',
-        'secure' => false,
+        'secure' => isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off',
         'httponly' => true,
         'samesite' => 'Lax',
-    ];
-    setcookie(ASTRONOMY_SIMULATED_TIME_COOKIE, $value ?? '', $options);
-    if ($value === null) {
-        unset($_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE]);
-    } else {
-        $_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE] = $value;
-    }
+    ]);
+    unset($_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE]);
 }
 
 function astronomyBootstrapTimeSimulation(): void
@@ -94,7 +114,11 @@ function astronomyBootstrapTimeSimulation(): void
         return;
     }
     $sessionStarted = astronomyTimeSimulationSession();
+    astronomyRemoveLegacySimulatedTimeCookie();
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        return;
+    }
+    if (!$sessionStarted || !astronomyTimeSimulationCsrfIsValid($_POST['site_time_token'] ?? null)) {
         return;
     }
     if (($_POST['site_time_reset'] ?? '') === '1') {
@@ -102,7 +126,6 @@ function astronomyBootstrapTimeSimulation(): void
             unset($_SESSION[ASTRONOMY_SIMULATED_TIME_SESSION_KEY]);
             session_write_close();
         }
-        astronomyStoreSimulatedLocalWallTimeCookie(null);
         astronomyTimeSimulationRedirect();
     }
     if (isset($_POST['site_time_date'], $_POST['site_time_clock'])) {
@@ -117,7 +140,6 @@ function astronomyBootstrapTimeSimulation(): void
             if ($sessionStarted) {
                 $_SESSION[ASTRONOMY_SIMULATED_TIME_SESSION_KEY] = $value;
             }
-            astronomyStoreSimulatedLocalWallTimeCookie($value);
         }
         if ($sessionStarted) {
             session_write_close();
@@ -132,13 +154,6 @@ function astronomySimulatedLocalWallTime(): ?string
 {
     if (!astronomyLocalTimeSimulationEnabled()) {
         return null;
-    }
-    $cookieValue = $_COOKIE[ASTRONOMY_SIMULATED_TIME_COOKIE] ?? null;
-    if (is_string($cookieValue) && strlen($cookieValue) === 16) {
-        $validCookie = astronomyValidLocalWallTime(substr($cookieValue, 0, 10), substr($cookieValue, 11, 5));
-        if ($validCookie === $cookieValue) {
-            return $cookieValue;
-        }
     }
     if (!astronomyTimeSimulationSession()) {
         return null;

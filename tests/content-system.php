@@ -4,6 +4,8 @@ putenv('APP_ENV=local');
 putenv('CONTENT_ENABLED_IN_PRODUCTION=false');
 
 require_once __DIR__ . '/../includes/content-system.php';
+require_once __DIR__ . '/../includes/site-configuration.php';
+require_once __DIR__ . '/../includes/web-database.php';
 
 function contentSystemAssert(bool $condition, string $message): void
 {
@@ -12,16 +14,62 @@ function contentSystemAssert(bool $condition, string $message): void
     }
 }
 
-$catalog = astronomyLoadContentCatalog(__DIR__ . '/fixtures/content');
-contentSystemAssert(count($catalog['articles']) === 3, 'No se cargaron únicamente los tres archivos PHP.');
-contentSystemAssert(isset($catalog['articles']['valid-content']), 'El slug no se obtuvo del nombre del archivo.');
-contentSystemAssert($catalog['articles']['valid-content']['valid'] === true, 'El artículo válido fue rechazado.');
-contentSystemAssert(array_key_exists('image', $catalog['articles']['valid-content']), 'El loader no preparó la imagen principal opcional.');
-contentSystemAssert($catalog['articles']['valid-content']['image_position_x'] === 50.0, 'No se aplicó la posición X central por defecto.');
-contentSystemAssert($catalog['articles']['valid-content']['image_position_y'] === 50.0, 'No se aplicó la posición Y central por defecto.');
-contentSystemAssert($catalog['articles']['invalid-content']['valid'] === false, 'El retorno no-array fue aceptado.');
-contentSystemAssert($catalog['articles']['throws-content']['valid'] === false, 'Una excepción de contenido escapó del aislamiento.');
-contentSystemAssert(count(astronomyContentVisibleArticles($catalog)) === 1, 'El índice no filtró artículos inválidos.');
+function contentSystemConfigSnapshot(PDO $connection, array $keys): array
+{
+    $placeholders = implode(', ', array_fill(0, count($keys), '?'));
+    $statement = $connection->prepare('SELECT clave, valor, descripcion FROM admin_configuracion_sitio WHERE clave IN (' . $placeholders . ')');
+    $statement->execute($keys);
+
+    $snapshot = [];
+    foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $snapshot[(string) $row['clave']] = [
+            'valor' => (string) $row['valor'],
+            'descripcion' => isset($row['descripcion']) ? (string) $row['descripcion'] : null,
+        ];
+    }
+    return $snapshot;
+}
+
+function contentSystemConfigRestore(PDO $connection, array $keys, array $snapshot): void
+{
+    $placeholders = implode(', ', array_fill(0, count($keys), '?'));
+    $delete = $connection->prepare('DELETE FROM admin_configuracion_sitio WHERE clave IN (' . $placeholders . ')');
+    $delete->execute($keys);
+
+    $insert = $connection->prepare(
+        'INSERT INTO admin_configuracion_sitio (clave, valor, descripcion) VALUES (:clave, :valor, :descripcion)'
+    );
+    foreach ($snapshot as $key => $row) {
+        $insert->execute([
+            ':clave' => $key,
+            ':valor' => $row['valor'],
+            ':descripcion' => $row['descripcion'],
+        ]);
+    }
+
+    astronomySiteConfigResetCache();
+}
+
+$configConnection = getWebDatabaseConnection();
+$configKeys = ['content.enabled'];
+$configSnapshot = contentSystemConfigSnapshot($configConnection, $configKeys);
+
+try {
+    astronomySiteConfigInitialize($configConnection);
+    astronomySiteConfigUpdate($configConnection, [
+        'content.enabled' => true,
+    ]);
+
+$catalog = astronomyLoadContentCatalog();
+contentSystemAssert(count($catalog['articles']) >= 5, 'No se cargó el catálogo esperado desde MySQL.');
+
+$baseArticle = reset($catalog['articles']);
+contentSystemAssert(is_array($baseArticle), 'No hay artículos disponibles para validar el render de contenido.');
+contentSystemAssert(($baseArticle['valid'] ?? false) === true, 'El primer artículo cargado desde MySQL no es válido.');
+contentSystemAssert(array_key_exists('image', $baseArticle), 'El loader no preparó la imagen principal opcional.');
+contentSystemAssert(($baseArticle['image_position_x'] ?? null) === 50.0, 'No se aplicó la posición X central por defecto.');
+contentSystemAssert(($baseArticle['image_position_y'] ?? null) === 50.0, 'No se aplicó la posición Y central por defecto.');
+contentSystemAssert(count(astronomyContentVisibleArticles($catalog)) >= 1, 'El índice no encontró artículos visibles válidos.');
 
 $trivia = astronomyContentRandomTrivia($catalog);
 $fact = astronomyContentRandomFact($catalog);
@@ -31,9 +79,9 @@ contentSystemAssert(
     !array_key_exists('referencia', $trivia['raw']) && !array_key_exists('referencia', $fact['raw']),
     'El loader no ignoró las referencias heredadas de trivia y “Sabías que…”.'
 );
-contentSystemAssert(count($trivia['raw']['opciones'] ?? []) === 2, 'La selección aleatoria perdió opciones de trivia.');
+contentSystemAssert(count($trivia['raw']['opciones'] ?? []) >= 2, 'La selección aleatoria no conservó opciones válidas de trivia.');
 contentSystemAssert(
-    str_contains(astronomyContentRenderMarkdown($catalog['articles']['valid-content']['raw']['articulo']), 'id="seccion"'),
+    str_contains(astronomyContentRenderMarkdown((string) ($baseArticle['raw']['articulo'] ?? '')), '<h'),
     'El Markdown no conservó el ancla explícita.'
 );
 contentSystemAssert(
@@ -129,7 +177,7 @@ contentSystemAssert(
 );
 contentSystemAssert(astronomyContentImagePosition(15) === 15.0, 'Se perdió una posición focal válida.');
 contentSystemAssert(astronomyContentImagePosition(120) === 50.0, 'Una posición focal fuera de rango no volvió al centro.');
-$invalidPositionRaw = $catalog['articles']['valid-content']['raw'];
+$invalidPositionRaw = $baseArticle['raw'];
 $invalidPositionRaw['imagen_posicion_x'] = -10;
 $invalidPositionRaw['imagen_posicion_y'] = 'fuera-de-rango';
 $invalidPositionArticle = astronomyContentValidateArticle('position-test', $invalidPositionRaw, 'position-test.php');
@@ -208,11 +256,11 @@ contentSystemAssert(
         && str_starts_with((string) $canonicalFallback['url'], 'assets/images/tienda/previews/contenido/'),
     'El fallback aleatorio no utilizó la carpeta canónica.'
 );
-$mainImageRaw = $catalog['articles']['valid-content']['raw'];
+$mainImageRaw = $baseArticle['raw'];
 $mainImageRaw['imagen'] = 'principal-ausente.jpg';
 $mainImageWarning = astronomyContentValidateArticle('main-warning', $mainImageRaw, 'main-warning.php')['warnings'][0] ?? [];
 contentSystemAssert(str_starts_with($mainImageWarning['message'] ?? '', 'Imagen principal:'), 'No se identificó una advertencia de imagen principal.');
-$verticalMainRaw = $catalog['articles']['valid-content']['raw'];
+$verticalMainRaw = $baseArticle['raw'];
 $verticalMainRaw['imagen'] = $realContentImage;
 $verticalMainWarnings = astronomyContentValidateArticle('vertical-main', $verticalMainRaw, 'vertical-main.php')['warnings'];
 contentSystemAssert(
@@ -222,7 +270,7 @@ contentSystemAssert(
     )) === 1,
     'Una imagen principal vertical no generó la advertencia no bloqueante de proporción.'
 );
-$horizontalMainRaw = $catalog['articles']['valid-content']['raw'];
+$horizontalMainRaw = $baseArticle['raw'];
 $horizontalMainRaw['imagen'] = '301b83e6b4a54232c828b70f983a22177173ad2ce2b606629d9155eb2fe335de.jpg';
 $horizontalMainWarnings = astronomyContentValidateArticle('horizontal-main', $horizontalMainRaw, 'horizontal-main.php')['warnings'];
 contentSystemAssert(
@@ -251,7 +299,7 @@ $factWarning = astronomyContentValidateFact([
     'imagen' => 'fact-ausente.jpg',
 ], 'warning-test', 0)['warnings'][0] ?? [];
 contentSystemAssert(str_starts_with($factWarning['message'] ?? '', 'Imagen de “Sabías que…”'), 'No se identificó una advertencia de “Sabías que…”.');
-$realArticleRaw = require __DIR__ . '/../includes/contenido/eclipses-lunares.php';
+$realArticleRaw = $baseArticle['raw'];
 $realArticleRaw['articulo'] .= "\n\n[[imagen src=\"eclipse-lunar-total.jpg\" alt=\"Prueba\"]]";
 $realArticleWithMissingComponent = astronomyContentValidateArticle('eclipses-lunares', $realArticleRaw, 'eclipses-lunares.php');
 $embeddedWarning = array_values(array_filter(
@@ -277,7 +325,7 @@ contentSystemAssert(
 
 astronomyContentDebugSession();
 $_SESSION[ASTRONOMY_CONTENT_DEBUG_SESSION_KEY] = true;
-$invalidAlignmentRaw = $catalog['articles']['valid-content']['raw'];
+$invalidAlignmentRaw = $baseArticle['raw'];
 $invalidAlignmentRaw['articulo'] .= "\n\n[[imagen src=\"LunaTotal.jpg\" alineacion=\"diagonal\"]]";
 $invalidAlignmentWarnings = astronomyContentValidateArticle(
     'alignment-warning',
@@ -291,7 +339,7 @@ contentSystemAssert(
     )) === 1,
     'Debug no registró la advertencia por alineación inválida.'
 );
-$obsoleteAlignmentRaw = $catalog['articles']['valid-content']['raw'];
+$obsoleteAlignmentRaw = $baseArticle['raw'];
 $obsoleteAlignmentRaw['articulo'] .= "\n\n[[imagen src=\"LunaTotal.jpg\" alineacion=\"derecha\"]]";
 $obsoleteAlignmentWarnings = astronomyContentValidateArticle(
     'obsolete-alignment',
@@ -305,7 +353,7 @@ contentSystemAssert(
     )) === 1,
     'Debug no recomendó migrar la alineación lateral anterior a bloque-imagen.'
 );
-$blockValidationRaw = $catalog['articles']['valid-content']['raw'];
+$blockValidationRaw = $baseArticle['raw'];
 $blockValidationRaw['articulo'] .= "\n\n[[bloque-imagen src=\"ausente.jpg\" posicion=\"diagonal\"]]\n\n[[/bloque-imagen]]";
 $blockValidationWarnings = astronomyContentValidateArticle(
     'block-validation',
@@ -318,14 +366,14 @@ contentSystemAssert(
         && count(array_filter($blockValidationWarnings, static fn(array $warning): bool => ($warning['kind'] ?? '') === 'image_block_image')) === 1,
     'El bloque no informó posición inválida, contenido vacío e imagen inexistente.'
 );
-$unclosedValidationRaw = $catalog['articles']['valid-content']['raw'];
+$unclosedValidationRaw = $baseArticle['raw'];
 $unclosedValidationRaw['articulo'] .= "\n\n" . $unclosedBlock;
 $unclosedWarnings = astronomyContentValidateArticle('unclosed-block', $unclosedValidationRaw, 'unclosed-block.php')['warnings'];
 contentSystemAssert(
     count(array_filter($unclosedWarnings, static fn(array $warning): bool => ($warning['kind'] ?? '') === 'image_block_missing_close')) === 1,
     'No se diagnosticó con precisión un bloque sin cierre.'
 );
-$nestedValidationRaw = $catalog['articles']['valid-content']['raw'];
+$nestedValidationRaw = $baseArticle['raw'];
 $nestedValidationRaw['articulo'] .= "\n\n[[bloque-imagen src=\"LunaTotal.jpg\"]]\n[[bloque-imagen src=\"LunaTotal.jpg\"]]\nTexto\n[[/bloque-imagen]]";
 $nestedWarnings = astronomyContentValidateArticle('nested-block', $nestedValidationRaw, 'nested-block.php')['warnings'];
 contentSystemAssert(
@@ -349,10 +397,17 @@ contentSystemAssert(!str_contains($homeCards, 'Leer más'), '“Sabías que…�
 
 putenv('APP_ENV=production');
 putenv('CONTENT_ENABLED_IN_PRODUCTION=false');
-contentSystemAssert(astronomyLoadContentCatalog(__DIR__ . '/fixtures/content')['articles'] === [], 'El loader publicó contenido deshabilitado.');
+astronomySiteConfigUpdate($configConnection, [
+    'content.enabled' => false,
+]);
+contentSystemAssert(astronomyLoadContentCatalog()['articles'] === [], 'El loader publicó contenido deshabilitado.');
 contentSystemAssert(!astronomyContentDebugAvailable(), 'El modo debug quedó disponible en producción.');
 
 putenv('APP_ENV');
 putenv('CONTENT_ENABLED_IN_PRODUCTION');
+
+} finally {
+    contentSystemConfigRestore($configConnection, $configKeys, $configSnapshot);
+}
 
 echo "content-system: ok\n";

@@ -1,18 +1,18 @@
 <?php
 
-require_once __DIR__ . '/../../includes/api-config.php';
-if (!isLocalEnvironment()) {
-    http_response_code(404);
-    echo '404 Not Found';
-    exit;
+if (!defined('STORE_ADMIN_LOGIN_PATH')) {
+    define('STORE_ADMIN_LOGIN_PATH', '../login.php');
 }
 
-header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
+require_once __DIR__ . '/../../includes/store-admin-auth.php';
+require_once __DIR__ . '/../../includes/store-admin-navigation.php';
+require_once __DIR__ . '/../../includes/asset-url.php';
+
+sendStoreAdminHeaders();
+startStoreAdminSession();
+requireStoreAdminAuthentication();
 
 require_once __DIR__ . '/editor-core.php';
-require_once __DIR__ . '/../../includes/asset-url.php';
 
 function editorHtml($value): string
 {
@@ -143,72 +143,97 @@ function renderEditorFact(array $fact, int $index, array $errors, array $gallery
 
 $action = (string) ($_GET['action'] ?? 'list');
 $slug = trim((string) ($_GET['slug'] ?? ''));
-$requestedTab = (string) ($_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['active_tab'] ?? 'content') : ($_GET['tab'] ?? 'content'));
+$requestedTab = (string) ($_GET['tab'] ?? 'content');
 $activeTab = in_array($requestedTab, ['content', 'facts', 'trivias'], true) ? $requestedTab : 'content';
-$isNew = $action === 'new';
 $errors = [];
 $warnings = [];
-$notice = isset($_GET['saved']) ? 'Los cambios fueron guardados correctamente.' : '';
+$notice = '';
+$message = '';
 $raw = contentEditorEmptyArticle();
+$articleMetadata = null;
 
-if ($action === 'edit' && $slug !== '') {
-    try {
-        $raw = contentEditorLoadRaw($slug);
-    } catch (Throwable $exception) {
-        $errors[] = astronomyContentError('archivo', $exception->getMessage());
+$dbArticles = [];
+$dbArticleDiagnostics = [];
+$dbGlobalWarnings = [];
+$dbConnection = null;
+
+try {
+    $dbConnection = getWebDatabaseConnection();
+    $dbArticles = contentEditorDbListArticles($dbConnection);
+    $dbGlobalWarnings = contentEditorDbGlobalWarnings($dbConnection);
+    foreach ($dbArticles as $dbArticle) {
+        $loaded = contentEditorDbLoadArticleRaw($dbConnection, $dbArticle['slug']);
+        if ($loaded === null) {
+            $dbArticleDiagnostics[$dbArticle['slug']] = [
+                astronomyContentError('mysql', 'No se pudo cargar el artículo desde MySQL.'),
+            ];
+            continue;
+        }
+        $dbArticleDiagnostics[$dbArticle['slug']] = $loaded['warnings'];
     }
+} catch (Throwable $exception) {
+    $errors[] = astronomyContentError(
+        'mysql',
+        'No se pudo cargar el listado desde MySQL. Verificá la conexión. Detalle: '
+        . $exception->getMessage()
+    );
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $requestContentLength = filter_var($_SERVER['CONTENT_LENGTH'] ?? 0, FILTER_VALIDATE_INT);
-    $requestContentLength = $requestContentLength !== false ? $requestContentLength : 0;
-    if ($_POST === [] && $requestContentLength > 0) {
-        $errors[] = astronomyContentError(
-            'archivo',
-            'El envío llegó vacío o incompleto. Puede deberse a límites de tamaño/cantidad de campos del servidor (por ejemplo post_max_size o max_input_vars). Recargá la página y volvé a guardar.'
-        );
-    } else {
-        $isNew = ($_POST['mode'] ?? '') === 'new';
-        $slug = $isNew ? trim((string) ($_POST['slug'] ?? '')) : trim((string) ($_POST['original_slug'] ?? ''));
-        $raw = contentEditorNormalizePost($_POST);
-        if (($_POST['content_editor_form_complete'] ?? null) !== '1') {
-            $errors[] = astronomyContentError(
-                'archivo',
-                'El formulario llegó incompleto y no se guardó para evitar pérdida de datos. Revisá límites del servidor (max_input_vars/post_max_size) e intentá nuevamente.'
-            );
-        } elseif (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
-            $errors[] = astronomyContentError('archivo', 'La sesión del formulario venció. Recargá la página e intentá nuevamente.');
-        } else {
-            $result = contentEditorSave($slug, $raw, $isNew);
-            $errors = $result['errors'];
-            if ($result['saved']) {
-                header(
-                    'Location: index.php?action=edit&slug=' . rawurlencode($slug)
-                    . '&saved=1&tab=' . rawurlencode($activeTab),
-                    true,
-                    303
-                );
-                exit;
-            }
-            $warnings = contentEditorValidateCandidate($slug, $raw)['warnings'];
-        }
+    $mode = (string) ($_POST['mode'] ?? 'edit');
+    if (in_array($mode, ['new', 'edit'], true)) {
+        $action = $mode === 'new' ? 'new' : 'edit';
     }
-    $action = $isNew ? 'new' : 'edit';
+    $slug = trim((string) ($_POST['slug'] ?? $slug));
+    $raw = contentEditorNormalizePost($_POST);
+    $activeTab = in_array((string) ($_POST['active_tab'] ?? ''), ['content', 'facts', 'trivias'], true)
+        ? (string) $_POST['active_tab']
+        : $activeTab;
+
+    if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+        $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
+    } elseif ($dbConnection === null) {
+        $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para guardar el artículo.');
+    } else {
+        $isNew = $action === 'new';
+        $originalSlug = trim((string) ($_POST['original_slug'] ?? ''));
+        $save = contentEditorDbSaveArticle($dbConnection, $originalSlug, $slug, $raw, $isNew);
+        if ($save['saved']) {
+            $targetSlug = trim((string) $save['slug']);
+            header('Location: index.php?action=edit&slug=' . rawurlencode($targetSlug) . '&saved=1', true, 303);
+            exit;
+        }
+        $errors = array_merge($errors, $save['errors']);
+    }
 }
 
-$editing = $action === 'new' || $action === 'edit';
-$catalog = astronomyLoadContentCatalog();
-$editorImageGallery = contentEditorImageGallery();
-if (
-    $editing
-    && $_SERVER['REQUEST_METHOD'] !== 'POST'
-    && $action === 'edit'
-    && isset($catalog['articles'][$slug])
-    && $errors === []
-) {
-    $errors = contentEditorCatalogArticleIssues($catalog, $slug, 'errors');
-    $warnings = contentEditorCatalogArticleIssues($catalog, $slug, 'warnings');
+if ($action === 'edit' && $slug !== '' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($dbConnection === null) {
+        $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para abrir el artículo solicitado.');
+    } else {
+        $loaded = contentEditorDbLoadArticleRaw($dbConnection, $slug);
+        if ($loaded === null) {
+            $errors[] = astronomyContentError('articulo', 'No existe un artículo con ese slug en MySQL.');
+        } else {
+            $raw = $loaded['raw'];
+            $articleMetadata = $loaded['metadata'];
+            $warnings = array_merge($warnings, $loaded['warnings']);
+        }
+    }
 }
+
+if ($action === 'new' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $slug = '';
+    $raw = contentEditorEmptyArticle();
+}
+
+if (($_GET['saved'] ?? '') === '1') {
+    $message = 'Cambios guardados correctamente en MySQL.';
+}
+
+$editing = ($action === 'edit' && $slug !== '') || $action === 'new';
+$isNewArticle = $action === 'new';
+$editorImageGallery = contentEditorImageGallery();
 $saveFailed = $_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [];
 $tabErrorCounts = editorTabErrorCounts($errors);
 ?>
@@ -217,38 +242,36 @@ $tabErrorCounts = editorTabErrorCounts($errors);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex,nofollow">
-    <title>Editor local de contenidos | Aquellas Lunas</title>
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Contenidos · Área privada</title>
     <link rel="stylesheet" href="../../<?= editorHtml(versionedAssetUrl('assets/css/styles.css')) ?>">
-    <link rel="stylesheet" href="../../<?= editorHtml(versionedAssetUrl('local-tools/content-editor/editor.css')) ?>">
-    <script src="../../<?= editorHtml(versionedAssetUrl('local-tools/content-editor/editor.js')) ?>" defer></script>
+    <link rel="stylesheet" href="../../<?= editorHtml(versionedAssetUrl('admin/contenidos/editor.css')) ?>">
 </head>
-<body>
-<header class="editor-header">
-    <div class="container editor-header__inner">
-        <a class="editor-brand" href="index.php">Aquellas Lunas <small>Editor local</small></a>
-        <a class="editor-link" href="../../index.php">Volver al sitio <span aria-hidden="true">→</span></a>
-    </div>
-</header>
+<body class="store-admin">
+<?php renderStoreAdminNavigation('contents', 'Contenidos'); ?>
 <main class="container editor-container">
+<?php if ($notice !== ''): ?><p class="editor-notice" role="status"><?= editorHtml($notice) ?></p><?php endif; ?>
+<?php if ($message !== ''): ?><section class="editor-notice" role="status"><strong><?= editorHtml($message) ?></strong></section><?php endif; ?>
+<?php if ($errors !== []): ?><section class="editor-errors" role="alert"><h2>Error de lectura MySQL</h2><ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'mysql') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
+<?php if ($dbGlobalWarnings !== []): ?><section class="editor-warnings" role="status"><h2>Advertencias globales de MySQL</h2><ul><?php foreach ($dbGlobalWarnings as $warning): ?><li><code><?= editorHtml($warning['field'] ?? 'mysql') ?></code>: <?= editorHtml($warning['message'] ?? 'Advertencia') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
 <?php if (!$editing): ?>
     <div class="editor-heading">
-        <div><p class="eyebrow">HERRAMIENTA LOCAL</p><h1>Contenidos</h1></div>
+        <div><p class="eyebrow">GESTIÓN EDITORIAL</p><h2>Contenidos desde MySQL</h2></div>
         <a class="editor-button editor-button--primary" href="index.php?action=new">Nuevo artículo</a>
     </div>
-    <?php if ($notice !== ''): ?><p class="editor-notice" role="status"><?= editorHtml($notice) ?></p><?php endif; ?>
+    <?php if ($errors !== []): ?>
+        <p class="editor-title-note">No se muestra el listado porque la consulta a MySQL falló.</p>
+    <?php else: ?>
     <div class="editor-table-wrap">
         <table class="editor-table">
-            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th></th></tr></thead>
+            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th>Actualizado</th><th></th></tr></thead>
             <tbody>
-            <?php foreach ($catalog['articles'] as $article): ?>
+            <?php foreach ($dbArticles as $article): ?>
                 <?php
-                $articleStatus = contentEditorArticleStatus($catalog, $article['slug']);
-                $articleErrors = $articleStatus['errors'];
-                $articleWarnings = $articleStatus['warnings'];
-                $state = $articleStatus['state'];
-                $canReadArticle = contentEditorArticleIsReadable($article);
-                $articleTitle = (string) ($article['raw']['titulo'] ?? 'No disponible');
+                $articleWarnings = $dbArticleDiagnostics[$article['slug']] ?? [];
+                $state = $articleWarnings === [] ? 'valid' : 'warning';
+                $canReadArticle = true;
+                $articleTitle = (string) ($article['titulo'] ?? 'No disponible');
                 $articleReadUrl = '../../' . ltrim(astronomyContentArticleUrl((string) $article['slug']), '/');
                 ?>
                 <tr>
@@ -262,35 +285,30 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                         <?php endif; ?>
                     </td>
                     <td><?= $article['visible'] ? 'Visible' : 'Oculto' ?></td>
-                    <td><span class="editor-status editor-status--<?= $state ?>"><?php if ($state === 'invalid'): ?>Con errores · <?= count($articleErrors) ?><?php elseif ($state === 'warning'): ?>Con advertencias · <?= count($articleWarnings) ?> advertencia<?= count($articleWarnings) === 1 ? '' : 's' ?><?php else: ?>Válido<?php endif; ?></span></td>
-                    <td><?= count(is_array($article['raw']['trivias'] ?? null) ? $article['raw']['trivias'] : []) ?></td>
-                    <td><?= count(is_array($article['raw']['sabias_que'] ?? null) ? $article['raw']['sabias_que'] : []) ?></td>
-                    <td><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Editar</a></td>
+                    <td><span class="editor-status editor-status--<?= $state ?>"><?php if ($state === 'warning'): ?>Con advertencias · <?= count($articleWarnings) ?> advertencia<?= count($articleWarnings) === 1 ? '' : 's' ?><?php else: ?>Válido<?php endif; ?></span></td>
+                    <td><?= (int) $article['trivias_count'] ?></td>
+                    <td><?= (int) $article['sabias_que_count'] ?></td>
+                    <td><?= editorHtml((string) $article['actualizado_en']) ?></td>
+                    <td><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Ver</a></td>
                 </tr>
-                <?php if ($articleErrors !== []): ?><tr class="editor-diagnostic-row"><td colspan="7"><ul><?php foreach ($articleErrors as $error): ?><li><code><?= editorHtml($error['field']) ?></code>: <?= editorHtml($error['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
+                <?php if ($articleWarnings !== []): ?><tr class="editor-diagnostic-row"><td colspan="8"><ul><?php foreach ($articleWarnings as $warning): ?><li><code><?= editorHtml($warning['field']) ?></code>: <?= editorHtml($warning['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
 <?php else: ?>
     <div class="editor-heading">
-        <div><p class="eyebrow"><?= $isNew ? 'NUEVO CONTENIDO' : 'EDICIÓN LOCAL' ?></p><h1><?= $isNew ? 'Nuevo artículo' : editorHtml($raw['titulo'] ?? $slug) ?></h1></div>
+        <div><p class="eyebrow">EDICIÓN MYSQL</p><h2><?= $isNewArticle ? 'Nuevo artículo' : editorHtml($raw['titulo'] ?? $slug) ?></h2><?php if (is_array($articleMetadata) && isset($articleMetadata['actualizado_en'])): ?><p class="editor-title-note">Actualizado en MySQL: <?= editorHtml((string) $articleMetadata['actualizado_en']) ?></p><?php endif; ?></div>
         <a class="editor-link" href="index.php">Volver al listado</a>
     </div>
-    <?php if ($notice !== ''): ?><p class="editor-notice" role="status"><?= editorHtml($notice) ?></p><?php endif; ?>
-    <?php if ($errors !== []): ?>
-        <section class="editor-errors<?= $saveFailed ? ' editor-save-failure' : '' ?>" role="alert">
-            <h2><?= $saveFailed ? 'No se guardaron los cambios.' : 'El contenido presenta errores' ?></h2>
-            <?php if ($saveFailed): ?><p>Corregí los errores indicados antes de volver a intentar. Se encontraron <strong><?= count($errors) ?> error<?= count($errors) === 1 ? '' : 'es' ?></strong>.</p><?php endif; ?>
-            <ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'contenido') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul>
-        </section>
-    <?php endif; ?>
     <?php if ($warnings !== []): ?><section class="editor-warnings" role="status"><h2>Advertencias del contenido</h2><ul><?php foreach ($warnings as $warning): ?><li><code><?= editorHtml($warning['field'] ?? 'contenido') ?></code>: <?= editorHtml($warning['message'] ?? 'Advertencia') ?><?php if (($warning['kind'] ?? null) === 'embedded_image' && isset($warning['line'])): ?> <button class="editor-warning-action" type="button" data-goto-markdown-line="<?= (int) $warning['line'] ?>">Ir al componente</button><?php endif; ?></li><?php endforeach; ?></ul></section><?php endif; ?>
     <form class="editor-form" method="post" data-content-editor novalidate>
         <input type="hidden" name="csrf_token" value="<?= editorHtml(contentEditorCsrfToken()) ?>">
-        <input type="hidden" name="mode" value="<?= $isNew ? 'new' : 'edit' ?>">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="mode" value="<?= $isNewArticle ? 'new' : 'edit' ?>">
+        <input type="hidden" name="original_slug" value="<?= editorHtml($isNewArticle ? '' : $slug) ?>">
         <input type="hidden" name="active_tab" value="<?= editorHtml($activeTab) ?>" data-active-tab>
-        <?php if (!$isNew): ?><input type="hidden" name="original_slug" value="<?= editorHtml($slug) ?>"><?php endif; ?>
         <div class="editor-tabs" role="tablist" aria-label="Secciones del artículo">
             <?php foreach (['content' => 'Contenido', 'facts' => 'Sabías que', 'trivias' => 'Trivias'] as $tabKey => $tabLabel): ?>
                 <?php $tabIsActive = $activeTab === $tabKey; ?>
@@ -301,8 +319,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
         <section class="editor-panel">
             <h2>Artículo</h2>
             <div class="editor-meta-row">
-                <?php if ($isNew): ?><label>Nombre de archivo y slug<input name="slug" value="<?= editorHtml($slug) ?>" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="mi-articulo" required><?php editorFieldErrors($errors, 'slug'); ?></label>
-                <?php else: ?><label>Slug<input value="<?= editorHtml($slug) ?>" readonly></label><?php endif; ?>
+                <label>Slug<input name="slug" value="<?= editorHtml($slug) ?>" required></label>
                 <label>Versión<input type="number" name="version" value="<?= editorHtml($raw['version'] ?? 1) ?>" min="1" required><?php editorFieldErrors($errors, 'version'); ?></label>
                 <label class="editor-check"><input type="checkbox" name="visible"<?= ($raw['visible'] ?? false) ? ' checked' : '' ?>> Visible</label>
             </div>
@@ -439,8 +456,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                 <div class="editor-collection__detail" data-trivia-list><?php foreach (array_values(is_array($raw['trivias'] ?? null) ? $raw['trivias'] : []) as $index => $trivia) renderEditorTrivia($trivia, $index, $errors, $editorImageGallery); ?></div>
             </section>
         </div>
-        <input type="hidden" name="content_editor_form_complete" value="1">
-        <div class="editor-actions"><button class="editor-button editor-button--primary" type="submit">Guardar artículo</button><a class="editor-button editor-button--quiet" href="index.php">Cancelar</a></div>
+        <div class="editor-actions"><a class="editor-button editor-button--quiet" href="index.php">Volver al listado</a><button class="editor-button editor-button--primary" type="submit">Guardar artículo</button></div>
     </form>
     <dialog class="editor-image-dialog" data-image-dialog aria-labelledby="editor-image-dialog-title">
         <div class="editor-image-dialog__heading">
@@ -472,5 +488,6 @@ $tabErrorCounts = editorTabErrorCounts($errors);
     </dialog>
 <?php endif; ?>
 </main>
+<script src="../../<?= editorHtml(versionedAssetUrl('admin/contenidos/editor.js')) ?>" defer></script>
 </body>
 </html>

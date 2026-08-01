@@ -32,11 +32,12 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
                 <span class="brand-tagline">Una Luna diferente cada noche</span>
             </a>
             <?php if ($simulationEnabled || $contentDebugAvailable): ?>
-            <div class="header-local-tools" data-swipe-navigation-ignore>
+            <div class="header-debug-tools" data-swipe-navigation-ignore>
                 <?php if ($simulationEnabled): ?>
                 <details class="header-time-simulation">
                 <summary><?= $simulationActive ? 'Tiempo simulado' : 'Modo de prueba' ?></summary>
                 <form method="post" action="<?= htmlspecialchars((string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="site_time_token" value="<?= htmlspecialchars(astronomyTimeSimulationCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                     <label><span class="visually-hidden">Fecha simulada</span><input type="date" name="site_time_date" value="<?= htmlspecialchars($localDate->format('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" required></label>
                     <label><span class="visually-hidden">Hora simulada</span><input type="time" name="site_time_clock" value="<?= htmlspecialchars($localDate->format('H:i'), ENT_QUOTES, 'UTF-8') ?>" required></label>
                     <button type="submit">Aplicar</button>
@@ -50,6 +51,7 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
                 </form>
                 <?php if ($simulationActive): ?>
                     <form id="site-time-reset-form" class="header-time-simulation__reset-form" method="post" action="<?= htmlspecialchars((string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/'), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="site_time_token" value="<?= htmlspecialchars(astronomyTimeSimulationCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                         <input type="hidden" name="site_time_reset" value="1">
                     </form>
                 <?php endif; ?>

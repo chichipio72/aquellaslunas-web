@@ -185,7 +185,7 @@ Los derivados de tienda usan 800 px, calidad 72 y una marca semitransparente rep
 
 `galeria.php` presenta las fotos disponibles que ya tienen `archivo_preview_tienda`, ordenadas por creación descendente. La cuadrícula y el modal usan siempre esa versión comercial; no exponen la variante de contenido, originales ni rutas internas.
 
-El portal privado vive bajo `admin/` y no aparece en la navegación pública. `admin/index.php` es el panel general y enlaza la Galería y tienda y el Laboratorio Astronómico mediante una navegación administrativa compartida. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, reutiliza la sesión `aquellas_lunas_admin` y usa CSRF en todos los cambios. El laboratorio consulta de forma privada la tabla MySQL `datos_astronomicos` y ofrece los modos Serie diaria y Extremos locales mediante Apache ECharts. La arquitectura administrativa, el contrato JSON, el catálogo de variables y las reglas de extensión se describen en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
+El portal privado vive bajo `admin/` y no aparece en la navegación pública. `admin/index.php` es el panel general y enlaza Galería y tienda, Laboratorio Astronómico y Contenidos editoriales (`/admin/contenidos/`) mediante navegación administrativa compartida. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, reutiliza la sesión `aquellas_lunas_admin` y usa CSRF en todos los cambios. El laboratorio consulta de forma privada `datos_astronomicos`. El editor de contenidos lee y escribe en MySQL con transacciones sobre tablas editoriales de contenido. La arquitectura administrativa, el contrato JSON, el catálogo de variables, la base de contenidos y los pendientes se describen en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
 
 La galería permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
 
@@ -222,38 +222,34 @@ Los nombres públicos usados actualmente son `moon instant`, `daily`, `home phas
 
 El diagnóstico debe permanecer desactivado en producción salvo durante una revisión puntual.
 
-El panel del swipe requiere simultáneamente `ASTRONOMY_SHOW_TIMINGS=true` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa fuente Touch/Pointer, movimientos, coordenadas, deltas, `touch-action`, exclusiones, resultado y destino. En ese modo un gesto aceptado no navega automáticamente; el botón **Ir al destino detectado** usa la URL exacta conservada. Con cualquiera de las dos opciones en falso el panel no se renderiza y la navegación es inmediata, sin afectar timings, reloj simulado ni aviso inicial.
+El panel del swipe requiere `canUseSiteDebugTools()` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa fuente Touch/Pointer, movimientos, coordenadas, deltas, `touch-action`, exclusiones, resultado y destino. Sin autorización el panel no se renderiza.
 
 ## Reloj simulado local
 
-`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control de desarrollo del encabezado
-únicamente cuando `APP_ENV=local`. El helper `includes/current-datetime.php`
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control en local. En producción se
+habilita únicamente para una sesión admin válida. El helper `includes/current-datetime.php`
 centraliza el instante mediante `get_current_datetime()` y persiste en sesión una
 fecha y hora local. La portada, consultas astronómicas, filtros de eventos pasados,
 fechas predeterminadas y marcadores usan ese valor; **Usar hora real** lo elimina.
 
-El valor se interpreta nuevamente en la zona de la ubicación activa, por lo que un cambio de ubicación conserva la fecha y hora local elegidas. Producción debe omitir la opción o configurarla en `false`: en ese estado no se renderiza ni acepta el modo de prueba, incluso si llega `debug_now` o existe una cookie anterior.
+El valor se interpreta nuevamente en la zona de la ubicación activa y se conserva en la sesión separada `aquellas_lunas_local`. Una cookie de fecha inventada por el cliente no se acepta.
 
 ## Laboratorio visual local
 
 `pruebas-visuales.php` permite evaluar componentes experimentales dentro del diseño
-real del sitio y sólo responde cuando `isLocalEnvironment()` es verdadero. La primera
+real del sitio y sólo responde cuando `canUseSiteDebugTools()` es verdadero. La primera
 prueba compara tres composiciones con publicaciones públicas insertadas mediante el
 embed oficial de Instagram. Las URLs se editan en el arreglo `$instagramPosts`, cerca
 del inicio de esa página; el renderer acepta la URL sencilla con la ruta de la cuenta
 y la normaliza al permalink canónico requerido por el embed.
 
-En entorno local, **Galería** y **Pruebas visuales** aparecen en el menú centralizado,
-independientemente de timings. En producción ambas entradas permanecen ocultas; la
-Galería conserva su acceso y comportamiento previos, mientras que la página
-experimental responde 404.
+**Galería** depende de `menu.gallery.enabled`. **Pruebas visuales** aparece en local
+o para un administrador autenticado y responde 404 para los demás.
 
 La detección general está en `includes/api-config.php`: `appEnvironment()`,
-`isLocalEnvironment()` e `isProductionEnvironment()`. Solo `APP_ENV=local` activa
-funciones locales; todo otro valor es producción. `isContentEnabled()` deja preparada
-la futura sección editorial: siempre habilitada en local y, en producción, sólo con
-`CONTENT_ENABLED_IN_PRODUCTION=true`. Ninguna bandera funcional debe reutilizarse
-como indicador del entorno.
+`isLocalEnvironment()`, `isProductionEnvironment()` y `canUseSiteDebugTools()`.
+`APP_ENV` distingue el entorno técnico; la publicación editorial depende de
+`admin_configuracion_sitio`.
 
 ## Compatibilidad con PHP del hosting
 

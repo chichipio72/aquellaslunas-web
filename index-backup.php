@@ -283,7 +283,7 @@ $nearestEventShowsTime = ($nearestEventPresentation['show_time'] ?? false) === t
 $hasApiError = $apiErrorMessage !== null || $phasesErrorMessage !== null || $upcomingErrorMessage !== null;
 $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'El cielo de hoy, la Luna aparente y los próximos eventos para tu ubicación.', '/');
 $pageSeo['robots'] = 'noindex, nofollow';
-if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
+if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));
 }

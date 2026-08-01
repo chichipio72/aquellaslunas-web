@@ -13,23 +13,7 @@ function sendDynamicNoCacheHeaders(): void
 
 function astronomyTimingsEnabled(?string $productionConfigPath = null): bool
 {
-    $environmentValue = getenv('ASTRONOMY_SHOW_TIMINGS');
-    if (is_string($environmentValue) && trim($environmentValue) !== '') {
-        return filter_var($environmentValue, FILTER_VALIDATE_BOOLEAN);
-    }
-
-    $configPath = $productionConfigPath ?? ASTRONOMY_PRODUCTION_CONFIG_PATH;
-    if (!is_file($configPath) || !is_readable($configPath)) {
-        return false;
-    }
-    try {
-        $productionConfig = require $configPath;
-    } catch (Throwable $exception) {
-        error_log('Aquellas Lunas timings configuration error: ' . $exception->getMessage());
-        return false;
-    }
-    return is_array($productionConfig)
-        && filter_var($productionConfig['astronomy_show_timings'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    return canUseSiteDebugTools();
 }
 
 function astronomyApiRequest(string $url, string $label, int $timeout = 12): array

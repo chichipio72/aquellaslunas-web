@@ -41,19 +41,19 @@ La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-prof
 
 `MOBILE_SWIPE_NAVIGATION_ENABLED` habilita el recorrido táctil móvil entre Inicio, Esta noche, Sol y Luna, Planificador y Eventos. `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` controla por separado el aviso inicial guardado en `localStorage`. Ambas usan `true` de forma predeterminada. `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED` controla únicamente el panel visual y usa `false`: incluso en modo timings, el swipe navega automáticamente mientras esa opción siga apagada.
 
-`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control «Modo de prueba» únicamente
-si además `APP_ENV=local`. La fecha y hora se guardan en una sesión PHP y se
+`LOCAL_TIME_SIMULATION_ENABLED=true` habilita el control «Modo de prueba» en local.
+En producción sólo lo habilita una sesión admin válida. La fecha y hora se guardan en una sesión PHP y se
 interpretan como hora local de la ubicación activa; al cambiar de zona horaria se
 conserva la hora de pared elegida. Con la opción ausente o en `false`, el servidor no
 inicia esta sesión, no renderiza el control e ignora `debug_now`.
-`CONTENT_ENABLED_IN_PRODUCTION=false` queda preparado para la futura sección de
-contenido; `isContentEnabled()` devuelve siempre `true` en local.
+La publicación de contenido se controla mediante `admin_configuracion_sitio` y es
+independiente de `APP_ENV`.
 
-La sección **Contenidos** usa archivos PHP bajo `includes/contenido/`. En la cabecera
-local aparece **Ver errores de contenido**: activa por sesión un diagnóstico que
-mantiene visibles los problemas de archivos, metadatos, Markdown, referencias,
-trivias, entradas “Sabías que…” e imágenes. El control no existe en producción y no
-requiere variables adicionales.
+La sección **Contenidos** lee desde MySQL mediante `includes/content-system.php`.
+En la cabecera local aparece **Ver errores de contenido**: activa por sesión un
+diagnóstico que mantiene visibles los problemas de metadatos, Markdown,
+referencias, trivias, entradas “Sabías que…” e imágenes. El control no existe en
+producción y no requiere variables adicionales.
 
 Los recursos reutilizables de artículos, trivias y “Sabías que…” se colocan en
 `assets/images/tienda/previews/contenido/`. Si una referencia editorial no coincide con un
@@ -534,8 +534,7 @@ return [
 CSS, JavaScript y miniaturas lunares locales usan `includes/asset-url.php` para agregar una versión basada en `filemtime()`. No se deshabilita la caché de estáticos: al modificar un archivo cambia su URL y el navegador solicita la versión nueva.
 
 Producción no usa `.env` ni Docker. Puede omitir `APP_ENV`: el valor seguro
-predeterminado es `production`. El simulador no inicia sesión, no renderiza controles
-y no acepta `debug_now` salvo que coincidan `APP_ENV=local` y
-`LOCAL_TIME_SIMULATION_ENABLED=true`.
+predeterminado es `production`. El simulador sólo inicia la sesión pública separada,
+renderiza controles y acepta `debug_now` cuando existe una sesión admin válida.
 
 Analytics no distingue entornos y también se carga en producción con el mismo ID. En el hosting, las páginas viven bajo `/astro/`; assets y endpoints del mismo origen deben resolver bajo ese prefijo.

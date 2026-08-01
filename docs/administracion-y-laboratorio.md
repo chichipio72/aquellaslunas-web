@@ -19,10 +19,11 @@ laboratorio es una herramienta de consulta: lee la tabla MySQL
 | `/admin/logout.php` | Cierre de sesión por `POST` con CSRF. |
 | `/admin/fotos.php` | Administración de la galería y tienda. |
 | `/admin/laboratorio-astronomico.php` | Interfaz del Laboratorio Astronómico. |
+| `/admin/contenidos/` y `/admin/contenidos/index.php` | Editor administrativo de artículos, trivias y bloques “Sabías que...”. |
 | `/admin/api/datos-astronomicos.php` | Endpoint JSON privado del laboratorio. |
 
 `admin/index.php` no redirige a una herramienta concreta: presenta tarjetas para
-Galería y tienda y Laboratorio Astronómico. Una nueva herramienta debe agregarse al
+Galería y tienda, Laboratorio Astronómico y Contenidos editoriales. Una nueva herramienta debe agregarse al
 panel y a la navegación común sólo si corresponde que sea accesible desde todo el
 administrador.
 
@@ -62,10 +63,16 @@ herramienta.
 ### Navegación y componentes compartidos
 
 `includes/store-admin-navigation.php` genera el encabezado común mediante
-`renderStoreAdminNavigation($activeSection, $title)`. Incluye Inicio, Galería,
-Laboratorio y el formulario seguro para cerrar sesión; aplica `aria-current="page"`
-y la clase activa correspondiente. El componente es adaptable a pantallas angostas
-y evita duplicar el HTML y el token CSRF.
+`renderStoreAdminNavigation($activeSection, $title)`. Incluye Inicio, Contenidos,
+Galería, Laboratorio y el formulario seguro para cerrar sesión; aplica
+`aria-current="page"` y la clase activa correspondiente.
+
+La navegación resuelve enlaces válidos en todo `/admin` a partir de la ruta actual
+del script, en lugar de depender de concatenaciones manuales de prefijos relativos.
+La ruta canónica del editor es `/admin/contenidos/`.
+
+El componente es adaptable a pantallas angostas y evita duplicar el HTML y el token
+CSRF.
 
 Los componentes principales que debe reutilizar una herramienta administrativa son:
 
@@ -80,6 +87,164 @@ contenido, enviar las cabeceras privadas, usar la navegación común, escapar to
 salida HTML y emplear botones y controles estilizados. Un endpoint nuevo debe
 responder errores JSON genéricos, desactivar `display_errors`, registrar únicamente
 el tipo técnico necesario y no exponer rutas, DSN ni credenciales.
+
+### Módulos administrativos actuales
+
+- Fotos (`/admin/fotos.php`): gestión de disponibilidad, precio y metadatos editoriales
+  de galería/tienda.
+- Laboratorio astronómico (`/admin/laboratorio-astronomico.php`): análisis de series
+  y extremos sobre `datos_astronomicos` en modo sólo consulta.
+- Contenidos (`/admin/contenidos/`): edición estructurada de artículos editoriales en
+  MySQL con validación y persistencia transaccional.
+
+## Editor de contenidos
+
+### Fuente de datos y alcance
+
+El editor administrativo de contenidos usa MySQL como única fuente y como destino
+de escritura.
+
+La lectura y escritura del módulo se realizan sobre tablas de contenido mediante
+`getWebDatabaseConnection()`; no se escriben archivos PHP durante el guardado
+administrativo.
+
+### Flujo de guardado
+
+El guardado se ejecuta en una única transacción que cubre:
+
+- artículo base (`contenido_articulos`),
+- palabras clave (`contenido_articulos_palabras_clave`),
+- relaciones (`contenido_articulos_relaciones`),
+- trivias (`contenido_trivias`),
+- opciones de trivia (`contenido_trivia_opciones`),
+- bloques “Sabías que...” (`contenido_sabias_que`).
+
+Ante cualquier falla, la operación revierte completa (`ROLLBACK`) y no persiste un
+estado parcial.
+
+### Validaciones implementadas
+
+El editor valida, antes de escribir:
+
+- slug con formato válido y unicidad en base,
+- versión numérica válida (>= 1),
+- campos obligatorios (`titulo`, `resumen`, `articulo`),
+- listas de `palabras_clave` y `relaciones`,
+- `trivias` y `sabias_que` como colecciones listadas,
+- códigos únicos dentro de cada colección,
+- imágenes pertenecientes a la galería permitida,
+- exactamente una opción correcta por trivia,
+- coherencia entre referencias `[[trivia id="..."]]` en Markdown y trivias reales,
+- codificación UTF-8 válida,
+- consistencia de orden persistido para colecciones y opciones,
+- advertencias de registros huérfanos en tablas relacionadas.
+
+### Relaciones entre artículos, trivias y “Sabías que...”
+
+Cada artículo (`contenido_articulos`) puede tener múltiples:
+
+- trivias (`contenido_trivias`),
+- bloques “Sabías que...” (`contenido_sabias_que`),
+- palabras clave y relaciones internas por slug.
+
+Cada trivia puede tener múltiples opciones (`contenido_trivia_opciones`) y una sola
+opción correcta representada por `correcta = 1` con explicación asociada.
+
+### Importador histórico de migración
+
+La migración inicial desde archivos PHP quedó documentada en
+`scripts/migrations/import-content-to-web-db.php`.
+
+Ese script se conserva sólo como historial técnico de la carga inicial:
+
+- valida candidatos desde una carpeta de entrada explícita en tiempo de ejecución,
+- inserta en tablas MySQL de contenido,
+- soporta `--dry-run` para simulación,
+- no sobrescribe artículos existentes por slug.
+
+### Política actual de sobrescritura
+
+La política actual del importador es conservadora: no sobrescribe contenido ya
+existente en MySQL y omite el slug duplicado. La actualización de contenido existente
+se realiza desde el editor administrativo autenticado.
+
+## Base de datos de contenidos
+
+Las tablas editoriales activas son:
+
+- `contenido_articulos`: tabla raíz por slug, versión, visibilidad, título, resumen,
+  markdown e imagen principal.
+- `contenido_articulos_palabras_clave`: lista ordenada de palabras clave por artículo.
+- `contenido_articulos_relaciones`: lista ordenada de slugs relacionados por artículo.
+- `contenido_trivias`: trivias asociadas a un artículo con orden, visibilidad,
+  pregunta e imagen opcional.
+- `contenido_trivia_opciones`: opciones de cada trivia con orden, bandera de correcta
+  y explicación.
+- `contenido_sabias_que`: bloques “Sabías que...” asociados a artículo con orden,
+  visibilidad, frase y detalle.
+
+Relaciones lógicas:
+
+- `contenido_articulos` 1:N `contenido_trivias`.
+- `contenido_trivias` 1:N `contenido_trivia_opciones`.
+- `contenido_articulos` 1:N `contenido_sabias_que`.
+- `contenido_articulos` 1:N `contenido_articulos_palabras_clave`.
+- `contenido_articulos` 1:N `contenido_articulos_relaciones`.
+
+## Modo Administrador
+
+Decisión de arquitectura:
+
+Cuando un usuario tenga sesión administrativa válida, el sitio público podrá habilitar
+herramientas adicionales sólo para ese usuario, sin depender de `APP_ENV=local`.
+
+Ejemplos previstos:
+
+- enlaces “Editar artículo”,
+- accesos rápidos al editor,
+- funciones de depuración,
+- herramientas de mantenimiento,
+- información técnica no visible para visitantes normales.
+
+Esta línea reemplaza progresivamente utilidades históricas exclusivas de entorno local.
+
+## Entorno local y sesiones
+
+Durante la migración del editor se detectó un conflicto entre la sesión administrativa
+(`aquellas_lunas_admin`) y la sesión usada por la simulación temporal local
+(`aquellas_lunas_local`).
+
+Causa:
+
+- incluir componentes que cargan `includes/current-datetime.php` antes de iniciar la
+  sesión administrativa podía activar la sesión local primero.
+
+Efecto:
+
+- la autenticación administrativa no encontraba `STORE_ADMIN_SESSION_KEY` en la
+  sesión activa y trataba al usuario como no autenticado.
+
+Solución aplicada:
+
+- en módulos admin, ejecutar siempre primero
+  `startStoreAdminSession()` y `requireStoreAdminAuthentication()`;
+- cargar después componentes que puedan iniciar otras sesiones en entorno local.
+
+Regla permanente:
+
+"Ningún módulo administrativo debe incluir componentes que puedan iniciar otra sesión
+antes de ejecutar `startStoreAdminSession()` y `requireStoreAdminAuthentication()`."
+
+## Pendientes
+
+Próximas líneas de trabajo definidas:
+
+- habilitación pública progresiva de contenidos desde la capa editorial MySQL,
+- integración de configuración del sitio desde `admin_configuracion_sitio`,
+- editor administrativo para configuración del sitio,
+- importación masiva de contenido mediante texto estructurado,
+- mejoras del flujo editorial ya unificado en MySQL,
+- automatización de cargas masivas en formato estructurado.
 
 ## Laboratorio Astronómico
 
@@ -442,7 +607,7 @@ docker compose exec -T web php tests/astronomy-laboratory-extrema.php
 docker compose exec -T web bash tests/store-admin-http.sh http://localhost
 ```
 
-## Pendientes
+## Pendientes del laboratorio
 
 - Evaluar una unión visual opcional de huecos pequeños por `NULL`, con un límite
   explícito de días y sin alterar los datos ni el cálculo de extremos.

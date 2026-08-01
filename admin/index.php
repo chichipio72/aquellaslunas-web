@@ -26,6 +26,16 @@ requireStoreAdminAuthentication();
             <p>Elegí el área que querés administrar.</p>
         </div>
         <div class="store-admin-dashboard__cards">
+            <a class="card store-admin-dashboard__card" href="contenidos/">
+                <span class="store-admin-dashboard__card-label">Contenidos editoriales</span>
+                <span>Administrá artículos, trivias y bloques “Sabías que…” directamente en MySQL.</span>
+                <strong>Entrar a Contenidos</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="configuracion-sitio/">
+                <span class="store-admin-dashboard__card-label">Configuración del sitio</span>
+                <span>Activá o desactivá visibilidad de contenidos, entradas del menú principal y tarjetas de portada.</span>
+                <strong>Entrar a Configuración del sitio</strong>
+            </a>
             <a class="card store-admin-dashboard__card" href="fotos.php">
                 <span class="store-admin-dashboard__card-label">Galería y tienda</span>
                 <span>Gestioná imágenes, publicaciones, productos y descargas.</span>

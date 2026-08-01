@@ -13,7 +13,9 @@ require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/content-system.php';
 
 sendDynamicNoCacheHeaders();
-if (!isContentEnabled()) {
+$adminPreview = astronomyContentAdminPreviewEnabled();
+$contentEnabled = isContentEnabled();
+if (!$contentEnabled && !$adminPreview) {
     http_response_code(404);
     exit;
 }
@@ -52,6 +54,7 @@ $pageSeo['robots'] = 'noindex, nofollow';
             <p class="eyebrow">PARA SEGUIR DESCUBRIENDO</p>
             <h1>Contenidos</h1>
             <p>Artículos para comprender y disfrutar la Luna y el cielo.</p>
+            <?php if (!$contentEnabled && $adminPreview): ?><p class="status-info">La sección pública de contenidos está deshabilitada en la configuración del sitio.</p><?php endif; ?>
         </header>
         <section class="content-index" aria-label="Artículos">
             <?php foreach ($articles as $article): ?>

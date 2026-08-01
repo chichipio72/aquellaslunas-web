@@ -49,17 +49,17 @@ Las vistas públicas invocan el encabezado común con la marca **Aquellas Lunas*
 
 `api-config.php` también es la única fuente de detección del entorno.
 `appEnvironment()` sólo reconoce `APP_ENV=local`; cualquier ausencia o valor distinto
-es producción. Las capacidades locales consultan `isLocalEnvironment()`. Una bandera
+es producción. Las herramientas técnicas consultan `canUseSiteDebugTools()`, que
+acepta local o una sesión administrativa válida. Una bandera
 de una función particular —simulador, timings, navegación u otra— nunca debe usarse
 como indicador general del entorno.
 
 ## Infraestructura de contenidos
 
-`includes/content-system.php` recorre automáticamente el nivel superior de
-`includes/contenido/` y sólo carga archivos `.php`. El nombre del archivo es la única
-fuente del slug. Cada `require` está aislado con `Throwable`; el catálogo conserva
-errores por artículo, trivia o entrada “Sabías que…” sin propagar una falla al resto
-de la página.
+`includes/content-system.php` carga el catálogo editorial exclusivamente desde
+MySQL mediante la capa `includes/content-database.php`. El loader aplica
+validaciones de contrato y devuelve un catálogo seguro (vacío + diagnósticos) si la
+conexión falla, sin propagar excepciones a las páginas públicas.
 
 La validación cubre contrato y metadatos, Markdown, identificadores y opciones de
 trivia, imágenes locales y marcadores
@@ -91,8 +91,7 @@ entidades válidas y visibles. En debug local, los errores se sustituyen por blo
 de diagnóstico.
 
 `includes/content-debug.php` administra ese modo mediante la sesión local y un POST
-con CSRF. No usa variables de entorno y nunca puede habilitarse fuera de
-`isLocalEnvironment()`. Tanto enlaces como páginas directas y loader comprueban
+con CSRF. Requiere `canUseSiteDebugTools()`. Tanto enlaces como páginas directas y loader comprueban
 `isContentEnabled()`.
 
 ### Criterio permanente para controles interactivos
@@ -109,37 +108,22 @@ su propia condición de correcta derivada de la presencia de `explicacion`. El
 cliente bloquea selecciones posteriores, marca textualmente la respuesta correcta y
 publica resultado y explicación mediante una región `aria-live`.
 
-### Editor local de contenidos
+### Editor de contenidos
 
-`local-tools/content-editor/` ofrece listado, alta y edición del modelo estructurado
-sin editar fragmentos del PHP original. Su entrada verifica directamente
-`isLocalEnvironment()` y responde 404 fuera de local, además de permanecer excluida
-del despliegue. El núcleo se mantiene separado de la vista para probar normalización,
-serialización y persistencia.
+El único editor operativo vive en `/admin/contenidos/`, exige autenticación
+administrativa y persiste exclusivamente en MySQL. El editor local antiguo fue
+retirado; el sitio público y `/admin/` no dependen de herramientas locales.
 
-Antes de guardar, el editor serializa el candidato en un directorio temporal junto
-con el resto de los artículos y lo recarga mediante `astronomyLoadContentCatalog()`.
-Así reutiliza las validaciones públicas de estructura, Markdown, componentes,
-trivias e IDs. Sólo agrega controles propios de entrada, como la regla
-segura del slug y la protección CSRF.
-
-Los archivos se regeneran completos con un heredoc `MD` para `articulo`. En una
-edición se copia primero el original a
-`local-tools/content-editor/backups/<slug>/<slug>-YYYYmmdd-HHMMSS-<sufijo>.php`;
-después se escribe un temporal dentro de `includes/contenido/` y `rename()` realiza
-el reemplazo atómico. Inmediatamente después se limpia la caché de estado de PHP y
-se invalida OPcache para que la redirección cargue el array recién escrito, incluida
-la imagen principal y sus diagnósticos. El editor responde con `no-store` y usa
-`303 See Other` tras un POST exitoso para no restaurar formularios o advertencias
-anteriores desde la caché del navegador. No existen acciones de renombrado ni
-eliminación en esta versión.
+El editor administrativo valida y guarda el contenido persistido en tablas
+editoriales. Su núcleo se mantiene separado de la vista para probar normalización,
+carga desde MySQL y diagnósticos de consistencia.
 
 El selector visual de imágenes reutiliza exclusivamente
 `astronomyContentAvailableImages()` sobre el nivel superior de
 `assets/images/tienda/previews/contenido/`. Descarta extensiones no admitidas y
 archivos que no sean imágenes reales. Esos archivos ya son las previews
-reutilizables, por lo que no se busca otra variante. El formulario y el PHP
-generado conservan únicamente el nombre del archivo.
+reutilizables, por lo que no se busca otra variante. La base conserva únicamente el
+nombre del archivo.
 
 El campo estructurado `imagen` del artículo representa su imagen principal y es
 opcional, igual que en trivias y “Sabías que…”. Se resuelve una vez en el loader y
@@ -319,11 +303,23 @@ La confirmación bloquea pedido y pago dentro de una transacción. Exige referen
 
 ## Administración privada
 
-`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. El panel ofrece acceso a la galería/tienda y al Laboratorio Astronómico. `includes/store-admin-navigation.php` comparte entre panel, galería y laboratorio la navegación Inicio, Galería, Laboratorio y el formulario de cierre de sesión.
+`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. El panel ofrece acceso a la galería/tienda, al Laboratorio Astronómico y al editor de Contenidos (`/admin/contenidos/`). `includes/store-admin-navigation.php` comparte entre módulos la navegación Inicio, Contenidos, Galería, Laboratorio y el formulario de cierre de sesión.
 
 `includes/store-admin-auth.php` conserva la autenticación histórica: cookie de sesión `aquellas_lunas_admin`, estado `store_admin_authenticated`, cookie HttpOnly/SameSite=Lax, validación mediante `password_verify()`, regeneración del ID, CSRF y destrucción completa. `admin/login.php` dirige al panel general después de autenticar y `admin/logout.php` mantiene el cierre por POST. Todas las respuestas administrativas usan `no-store` y `X-Robots-Tag: noindex`.
 
+La ruta canónica de contenidos es `/admin/contenidos/`. La navegación calcula rutas válidas según la ubicación del script actual en `/admin` para evitar prefijos relativos frágiles.
+
 `includes/store-admin-photos.php` consulta todas las fotos mediante la conexión PDO compartida y modifica con sentencias preparadas sólo disponibilidad, precio y los campos editoriales `titulo`, `descripcion` y `palabras_clave`. Estos últimos son opcionales, se recortan, validan a 255/5000/2000 caracteres y se guardan como texto o `NULL`. No interpreta HTML ni actualiza EXIF, `metadatos_json`, monedas o previews. La asignación múltiple de precios sigue siendo transaccional; el portal no muestra hashes, originales o nombres de archivo, no borra y no toca `pedido_fotos`.
+
+El editor de Contenidos en `/admin/contenidos/` persiste en MySQL con transacciones únicas sobre `contenido_articulos`, `contenido_articulos_palabras_clave`, `contenido_articulos_relaciones`, `contenido_trivias`, `contenido_trivia_opciones` y `contenido_sabias_que`. El importador histórico `scripts/migrations/import-content-to-web-db.php` se conserva sólo como referencia de migración inicial y no forma parte del flujo operativo actual.
+
+### Modo Administrador
+
+La sesión administrativa habilitará progresivamente capacidades adicionales sobre el sitio público sólo para usuarios autenticados en admin (por ejemplo enlaces de edición, accesos rápidos, depuración y mantenimiento), sin depender de `APP_ENV=local`.
+
+### Regla de sesiones en admin
+
+Regla permanente: ningún módulo administrativo debe incluir componentes que puedan abrir otra sesión antes de ejecutar `startStoreAdminSession()` y `requireStoreAdminAuthentication()`. Esta regla evita conflictos con la sesión local de simulación temporal (`aquellas_lunas_local`).
 
 ### Laboratorio Astronómico
 

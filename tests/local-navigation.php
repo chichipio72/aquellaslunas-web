@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../includes/site-sections.php';
+require_once __DIR__ . '/../includes/site-configuration.php';
+require_once __DIR__ . '/../includes/web-database.php';
 
 function localNavigationAssert(bool $condition, string $message): void
 {
@@ -11,6 +13,15 @@ function localNavigationAssert(bool $condition, string $message): void
 
 putenv('APP_ENV=local');
 putenv('ASTRONOMY_SHOW_TIMINGS=false');
+$connection = getWebDatabaseConnection();
+astronomySiteConfigInitialize($connection);
+
+$allEnabled = [];
+foreach (array_keys(astronomySiteConfigCatalog()) as $key) {
+    $allEnabled[$key] = true;
+}
+astronomySiteConfigUpdate($connection, $allEnabled);
+
 $localSections = astronomySiteSections();
 localNavigationAssert(($localSections['gallery']['menu_enabled'] ?? false) === true, 'Galería no aparece en el menú local.');
 localNavigationAssert(($localSections['visual_tests']['menu_enabled'] ?? false) === true, 'Pruebas visuales no aparece en el menú local.');
@@ -31,17 +42,28 @@ localNavigationAssert(
 putenv('APP_ENV=production');
 putenv('ASTRONOMY_SHOW_TIMINGS=true');
 $productionSections = astronomySiteSections();
-localNavigationAssert(($productionSections['gallery']['menu_enabled'] ?? true) === false, 'Galería aparece en el menú de producción.');
+localNavigationAssert(($productionSections['gallery']['menu_enabled'] ?? false) === true, 'Galería dependió del entorno en vez de su configuración pública.');
 localNavigationAssert(($productionSections['visual_tests']['menu_enabled'] ?? true) === false, 'Pruebas visuales aparece en el menú de producción.');
-localNavigationAssert(($productionSections['content']['menu_enabled'] ?? true) === false, 'Contenidos aparece en producción sin habilitación.');
+localNavigationAssert(($productionSections['content']['menu_enabled'] ?? false) === true, 'Contenidos no permanece visible por defecto en producción.');
 
-putenv('CONTENT_ENABLED_IN_PRODUCTION=true');
-$publishedContentSections = astronomySiteSections();
-localNavigationAssert(($publishedContentSections['content']['menu_enabled'] ?? false) === true, 'Contenidos no aparece al habilitarlo explícitamente en producción.');
-localNavigationAssert(($publishedContentSections['visual_tests']['menu_enabled'] ?? true) === false, 'La publicación de contenidos habilitó herramientas locales.');
+astronomySiteConfigUpdate($connection, array_merge($allEnabled, [
+    'menu.today.enabled' => false,
+    'menu.content.enabled' => false,
+]));
+$restrictedSections = astronomySiteSections();
+localNavigationAssert(($restrictedSections['today']['menu_enabled'] ?? true) === false, 'El menú no ocultó El cielo hoy al deshabilitar su clave.');
+localNavigationAssert(($restrictedSections['content']['menu_enabled'] ?? true) === false, 'El menú no ocultó Contenidos al deshabilitar su clave.');
+localNavigationAssert(($restrictedSections['visual_tests']['menu_enabled'] ?? true) === false, 'La configuración pública habilitó herramientas locales.');
+
+astronomySiteConfigUpdate($connection, array_merge($allEnabled, [
+    'menu.gallery.enabled' => false,
+]));
+$galleryRestrictedSections = astronomySiteSections();
+localNavigationAssert(($galleryRestrictedSections['gallery']['menu_enabled'] ?? true) === false, 'Galería no respetó su clave de configuración pública.');
+
+astronomySiteConfigUpdate($connection, $allEnabled);
 
 putenv('APP_ENV');
 putenv('ASTRONOMY_SHOW_TIMINGS');
-putenv('CONTENT_ENABLED_IN_PRODUCTION');
 
 echo "local-navigation: ok\n";

@@ -178,6 +178,15 @@ $displayDate = homeV2LongDate($now, true);
 $tonightText = homeV2TonightText($tonightData, $upcomingEvents, $now, $timezoneName);
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
 $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el cielo de esta noche y los próximos eventos para tu ubicación.', '/');
+
+$showHomeTodayCard = astronomySiteHomeBlockEnabled('today');
+$showHomeTonightCard = astronomySiteHomeBlockEnabled('tonight');
+$showHomePhasesCard = astronomySiteHomeBlockEnabled('phases');
+$showHomeUpcomingCard = astronomySiteHomeBlockEnabled('upcoming');
+$showHomeExploreCard = astronomySiteHomeBlockEnabled('explore_sky');
+$showHomeInstallCard = astronomySiteHomeBlockEnabled('install');
+$showHomeTriviaCard = astronomySiteHomeBlockEnabled('trivia');
+$showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
 ?>
 <!doctype html>
 <html lang="es">
@@ -203,6 +212,7 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
     <?php renderAstronomyDebugClock($now); ?>
     <?php renderAstronomySiteHeader('home', $location); ?>
     <main class="home-v2"><div class="container public-page-container home-v2__container">
+        <?php if ($showHomeTodayCard): ?>
         <article class="home-v2-card home-v2-moon atmosphere-card--mixed" aria-labelledby="v2-today-title">
             <div class="home-v2-card__heading"><h1 id="v2-today-title">El cielo hoy</h1></div>
             <?php if ($locationMessage !== ''): ?><p class="status-info" role="status"><?= htmlspecialchars($locationMessage) ?></p><?php endif; ?>
@@ -224,13 +234,17 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
             <?php else: ?><p class="home-v2-unavailable">Los datos de la Luna no están disponibles por el momento.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('cielo-de-hoy.php'), ENT_QUOTES, 'UTF-8') ?>">Ver el cielo de hoy en detalle <span aria-hidden="true">→</span></a>
         </article>
+        <?php endif; ?>
 
+        <?php if ($showHomeTonightCard): ?>
         <article class="home-v2-card home-v2-tonight atmosphere-card--night" aria-labelledby="v2-tonight-title">
             <div class="home-v2-card__heading"><h2 id="v2-tonight-title">El cielo esta noche</h2></div>
             <p class="home-v2-tonight__summary"><?= htmlspecialchars($tonightText ?? 'La información de esta noche no está disponible por el momento.') ?></p>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('cielo-de-esta-noche.php'), ENT_QUOTES, 'UTF-8') ?>">Explorar esta noche <span aria-hidden="true">→</span></a>
         </article>
+        <?php endif; ?>
 
+        <?php if ($showHomePhasesCard): ?>
         <article class="home-v2-card home-v2-phases-card atmosphere-card--mixed" aria-labelledby="v2-phases-title">
             <div class="home-v2-card__heading"><h2 id="v2-phases-title">Próximas fases</h2></div>
             <?php if ($nextPhases !== []): ?>
@@ -245,7 +259,9 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
             <?php else: ?><p class="home-v2-unavailable">Las próximas fases no están disponibles por el momento.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('sol-y-luna.php'), ENT_QUOTES, 'UTF-8') ?>">Calendario solar y lunar <span aria-hidden="true">→</span></a>
         </article>
+        <?php endif; ?>
 
+        <?php if ($showHomeUpcomingCard): ?>
         <article class="home-v2-card home-v2-upcoming-card atmosphere-card--night" aria-labelledby="v2-upcoming-title">
             <div class="home-v2-card__heading"><h2 id="v2-upcoming-title">Lo próximo</h2></div>
             <?php if ($upcomingEvents !== []): ?><div class="home-v2-upcoming">
@@ -259,9 +275,11 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
             </div><?php else: ?><p class="home-v2-unavailable">No hay eventos cercanos para mostrar.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('eventos.php'), ENT_QUOTES, 'UTF-8') ?>">Ver todos los eventos <span aria-hidden="true">→</span></a>
         </article>
+        <?php endif; ?>
 
-        <?php if (isContentEnabled()): ?><?php renderAstronomyHomeContentCards(astronomyLoadContentCatalog()); ?><?php endif; ?>
-        <?php renderAstronomyExploreSky(); ?>
+        <?php if (isContentEnabled() && ($showHomeTriviaCard || $showHomeFactCard)): ?><?php renderAstronomyHomeContentCards(astronomyLoadContentCatalog(), $showHomeTriviaCard, $showHomeFactCard); ?><?php endif; ?>
+        <?php if ($showHomeExploreCard): ?><?php renderAstronomyExploreSky(); ?><?php endif; ?>
+        <?php if ($showHomeInstallCard): ?>
         <article class="home-v2-card home-v2-install-card" data-install-card hidden aria-labelledby="v2-install-title">
             <div class="home-v2-card__heading home-v2-install-card__heading">
                 <h2 id="v2-install-title" data-install-title>Tené Aquellas Lunas a mano</h2>
@@ -282,6 +300,7 @@ $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el
                 </ol>
             </div>
         </article>
+        <?php endif; ?>
         <?php renderAstronomyTimings(); ?>
     </div></main>
     <?php renderAstronomySiteFooter(); ?>

@@ -555,7 +555,7 @@ $pageSeo = aquellasLunasSeoPage(
     '/eclipses.php',
     'article'
 );
-if ((string) ($_REQUEST['location_debug'] ?? '') === '1') {
+if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));
 }

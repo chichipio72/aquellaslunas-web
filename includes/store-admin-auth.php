@@ -37,6 +37,73 @@ function storeAdminIsAuthenticated(): bool
     return ($_SESSION[STORE_ADMIN_SESSION_KEY] ?? false) === true;
 }
 
+function storeAdminSessionStoragePath(): string
+{
+    $configured = (string) session_save_path();
+    if (str_contains($configured, ';')) {
+        $parts = explode(';', $configured);
+        $configured = (string) end($parts);
+    }
+    $configured = trim($configured);
+    if ($configured === '') {
+        $configured = sys_get_temp_dir();
+    }
+    return $configured;
+}
+
+function storeAdminSessionDataFromId(string $sessionId): ?string
+{
+    if (preg_match('/^[A-Za-z0-9,-]{8,128}$/', $sessionId) !== 1) {
+        return null;
+    }
+    $path = rtrim(storeAdminSessionStoragePath(), '/\\') . DIRECTORY_SEPARATOR . 'sess_' . $sessionId;
+    if (!is_readable($path) || !is_file($path)) {
+        return null;
+    }
+    $data = @file_get_contents($path);
+    return is_string($data) ? $data : null;
+}
+
+function storeAdminExtractAuthenticatedFromSessionData(string $data): bool
+{
+    $handler = (string) ini_get('session.serialize_handler');
+    if ($handler === 'php_serialize') {
+        $decoded = @unserialize($data, ['allowed_classes' => false]);
+        return is_array($decoded) && (($decoded[STORE_ADMIN_SESSION_KEY] ?? false) === true);
+    }
+
+    if ($handler === 'php') {
+        if (str_contains($data, STORE_ADMIN_SESSION_KEY . '|b:1;')) {
+            return true;
+        }
+        if (str_contains($data, STORE_ADMIN_SESSION_KEY . '|i:1;')) {
+            return true;
+        }
+        return false;
+    }
+
+    return str_contains($data, STORE_ADMIN_SESSION_KEY);
+}
+
+function storeAdminHasValidSessionCookie(): bool
+{
+    if (session_status() === PHP_SESSION_ACTIVE && session_name() === 'aquellas_lunas_admin') {
+        return storeAdminIsAuthenticated();
+    }
+
+    $sessionId = (string) ($_COOKIE['aquellas_lunas_admin'] ?? '');
+    if ($sessionId === '') {
+        return false;
+    }
+
+    $data = storeAdminSessionDataFromId($sessionId);
+    if (!is_string($data) || $data === '') {
+        return false;
+    }
+
+    return storeAdminExtractAuthenticatedFromSessionData($data);
+}
+
 function attemptStoreAdminLogin(string $user, string $password, ?string $productionConfigPath = null): bool
 {
     $config = loadStoreAdminConfig($productionConfigPath);
@@ -57,7 +124,10 @@ function requireStoreAdminAuthentication(): void
     if (storeAdminIsAuthenticated()) {
         return;
     }
-    header('Location: login.php', true, 303);
+    $loginPath = defined('STORE_ADMIN_LOGIN_PATH') && is_string(STORE_ADMIN_LOGIN_PATH) && STORE_ADMIN_LOGIN_PATH !== ''
+        ? STORE_ADMIN_LOGIN_PATH
+        : 'login.php';
+    header('Location: ' . $loginPath, true, 303);
     exit;
 }
 

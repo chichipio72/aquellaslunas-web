@@ -21,27 +21,27 @@ appEnvironmentAssert(appEnvironment() === 'local', 'El escenario local no fue re
 appEnvironmentAssert(isLocalEnvironment(), 'isLocalEnvironment falló en local.');
 appEnvironmentAssert(!isProductionEnvironment(), 'Local fue clasificado también como producción.');
 appEnvironmentAssert(astronomyLocalTimeSimulationEnabled(), 'El simulador no se habilitó en local.');
-appEnvironmentAssert(isContentEnabled(), 'El contenido no se habilitó automáticamente en local.');
+appEnvironmentAssert(isContentEnabled(), 'El contenido público quedó condicionado por APP_ENV en local.');
 
 appEnvironmentSet('local', 'false', null);
 appEnvironmentAssert(isLocalEnvironment(), 'El entorno local dependió de la bandera del simulador.');
 appEnvironmentAssert(!astronomyLocalTimeSimulationEnabled(), 'El simulador ignoró su bandera deshabilitada.');
-appEnvironmentAssert(isContentEnabled(), 'El contenido local dependió de la bandera de producción.');
+appEnvironmentAssert(isContentEnabled(), 'El contenido local dependió de una bandera de entorno obsoleta.');
 
 appEnvironmentSet('production', 'true', 'false');
 appEnvironmentAssert(isProductionEnvironment(), 'Producción explícita no fue reconocida.');
-appEnvironmentAssert(!astronomyLocalTimeSimulationEnabled(), 'El simulador se habilitó en producción.');
-appEnvironmentAssert(!isContentEnabled(), 'El contenido se habilitó por defecto en producción.');
+appEnvironmentAssert(!astronomyLocalTimeSimulationEnabled(), 'El simulador se habilitó en producción sin sesión admin.');
+appEnvironmentAssert(isContentEnabled(), 'El contenido público dependió de APP_ENV=production.');
 
 appEnvironmentSet(null, null, null);
 appEnvironmentAssert(appEnvironment() === 'production', 'La ausencia de APP_ENV no asumió producción.');
 appEnvironmentAssert(!astronomyLocalTimeSimulationEnabled(), 'La ausencia de variables habilitó el simulador.');
-appEnvironmentAssert(!isContentEnabled(), 'La ausencia de variables habilitó contenido.');
+appEnvironmentAssert(isContentEnabled(), 'La ausencia de APP_ENV deshabilitó contenido público.');
 
 appEnvironmentSet('development', 'true', 'false');
 appEnvironmentAssert(isProductionEnvironment(), 'Un APP_ENV inválido no asumió producción.');
 appEnvironmentAssert(!astronomyLocalTimeSimulationEnabled(), 'Un APP_ENV inválido habilitó el simulador.');
-appEnvironmentAssert(!isContentEnabled(), 'Un APP_ENV inválido habilitó contenido.');
+appEnvironmentAssert(isContentEnabled(), 'Un APP_ENV inválido alteró la publicación de contenido.');
 
 appEnvironmentSet('production', 'false', 'true');
 appEnvironmentAssert(!isLocalEnvironment(), 'La publicación de contenido habilitó funciones locales.');

@@ -13,7 +13,7 @@ require_once __DIR__ . '/includes/seo.php';
 
 sendDynamicNoCacheHeaders();
 
-if (!isLocalEnvironment()) {
+if (!canUseSiteDebugTools()) {
     http_response_code(404);
     exit;
 }

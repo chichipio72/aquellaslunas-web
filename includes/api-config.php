@@ -34,15 +34,33 @@ function isProductionEnvironment(): bool
     return appEnvironment() === 'production';
 }
 
-function isContentEnabled(): bool
+/**
+ * Autoriza herramientas técnicas del sitio público.
+ *
+ * En producción la sesión administrativa se comprueba sin abrirla ni alterar la
+ * sesión pública utilizada por preferencias y simulación temporal.
+ */
+function canUseSiteDebugTools(): bool
 {
     if (isLocalEnvironment()) {
         return true;
     }
-    return filter_var(
-        getenv('CONTENT_ENABLED_IN_PRODUCTION') ?: 'false',
-        FILTER_VALIDATE_BOOLEAN
-    ) === true;
+
+    require_once __DIR__ . '/store-admin-auth.php';
+    return storeAdminHasValidSessionCookie();
+}
+
+function isContentEnabled(): bool
+{
+    if (function_exists('astronomySiteConfigBool')) {
+        try {
+            return astronomySiteConfigBool('content.enabled', true);
+        } catch (Throwable $exception) {
+            error_log('Aquellas Lunas content visibility config error: ' . $exception->getMessage());
+        }
+    }
+
+    return true;
 }
 const DEFAULT_STORE_PREVIEW_TIENDA_MAX_SIZE = 800;
 const DEFAULT_STORE_PREVIEW_CONTENIDO_MAX_SIZE = 400;

@@ -26,9 +26,9 @@ La cuenta FTP entra directamente en la carpeta remota efectiva de publicación, 
 `APP_ENV` puede omitirse en el hosting: la aplicación asume `production` ante
 ausencia, vacío o valor desconocido. No usar `ASTRONOMY_SHOW_TIMINGS`,
 `LOCAL_TIME_SIMULATION_ENABLED` ni otra bandera funcional para detectar el entorno.
-El simulador exige simultáneamente `APP_ENV=local` y
-`LOCAL_TIME_SIMULATION_ENABLED=true`. `CONTENT_ENABLED_IN_PRODUCTION` debe permanecer
-ausente o en `false` hasta decidir publicar la futura sección de contenido.
+En local el simulador exige `LOCAL_TIME_SIMULATION_ENABLED=true`; en producción exige
+una sesión admin válida. La publicación editorial se controla mediante
+`admin_configuracion_sitio`, no mediante variables del entorno.
 
 ## Configuración externa previa
 

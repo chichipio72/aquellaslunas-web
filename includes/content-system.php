@@ -4,8 +4,11 @@ require_once __DIR__ . '/api-config.php';
 require_once __DIR__ . '/content-debug.php';
 require_once __DIR__ . '/current-datetime.php';
 require_once __DIR__ . '/asset-url.php';
+require_once __DIR__ . '/web-database.php';
+require_once __DIR__ . '/content-database.php';
+require_once __DIR__ . '/store-admin-auth.php';
+require_once __DIR__ . '/site-configuration.php';
 
-const ASTRONOMY_CONTENT_DIRECTORY = __DIR__ . '/contenido';
 const ASTRONOMY_CONTENT_IMAGE_DIRECTORY = __DIR__ . '/../assets/images/tienda/previews/contenido';
 const ASTRONOMY_CONTENT_IMAGE_URL_PREFIX = 'assets/images/tienda/previews/contenido/';
 
@@ -537,37 +540,50 @@ function astronomyContentValidateFact($raw, string $slug, int $index): array
     ];
 }
 
-function astronomyLoadContentCatalog(?string $directory = null): array
+function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = null): array
 {
     $catalog = ['articles' => [], 'trivias' => [], 'facts' => [], 'diagnostics' => [], 'warnings' => []];
-    if (!isContentEnabled()) {
+    if (!isContentEnabled() && !astronomyContentAdminPreviewEnabled()) {
         return $catalog;
     }
-    $directory ??= ASTRONOMY_CONTENT_DIRECTORY;
-    $files = is_dir($directory) ? scandir($directory) : false;
-    if (!is_array($files)) {
-        $catalog['diagnostics'][] = ['type' => 'catalog', 'slug' => null, 'errors' => [astronomyContentError('directorio', 'No se pudo leer el directorio de contenidos.')]];
+
+    $connectionFactory ??= static fn(): PDO => getWebDatabaseConnection();
+
+    try {
+        $connection = $connectionFactory();
+        if (!$connection instanceof PDO) {
+            throw new RuntimeException('La conexión de contenidos no devolvió un objeto PDO válido.');
+        }
+
+        $rows = astronomyContentDbListArticles($connection);
+        foreach ($rows as $row) {
+            $slug = (string) ($row['slug'] ?? '');
+            if ($slug === '') {
+                continue;
+            }
+            $loaded = astronomyContentDbLoadArticleRaw($connection, $slug);
+            if ($loaded === null || !is_array($loaded['raw'] ?? null)) {
+                $catalog['diagnostics'][] = [
+                    'type' => 'article',
+                    'slug' => $slug,
+                    'errors' => [astronomyContentError('mysql', 'No se pudo cargar el artículo desde la base de datos.')],
+                ];
+                continue;
+            }
+            $article = astronomyContentValidateArticle($slug, $loaded['raw'], $slug . '.php');
+            $article['source'] = 'mysql';
+            $catalog['articles'][$slug] = $article;
+        }
+    } catch (Throwable $exception) {
+        error_log('Aquellas Lunas content load error [mysql]: ' . $exception->getMessage());
+        $catalog['diagnostics'][] = [
+            'type' => 'catalog',
+            'slug' => null,
+            'errors' => [astronomyContentError('mysql', 'No se pudieron cargar los contenidos en este momento.')],
+        ];
         return $catalog;
     }
-    foreach ($files as $filename) {
-        if (pathinfo($filename, PATHINFO_EXTENSION) !== 'php') {
-            continue;
-        }
-        $slug = astronomyContentSlugFromFilename($filename);
-        if ($slug === null) {
-            $catalog['diagnostics'][] = ['type' => 'article', 'slug' => $filename, 'errors' => [astronomyContentError('archivo', 'El nombre no forma un slug válido.')]];
-            continue;
-        }
-        try {
-            $raw = (static fn(string $path) => require $path)($directory . '/' . $filename);
-            $article = astronomyContentValidateArticle($slug, $raw, $filename);
-        } catch (Throwable $exception) {
-            error_log('Aquellas Lunas content load error [' . $filename . ']: ' . $exception->getMessage());
-            $article = astronomyContentValidateArticle($slug, null, $filename);
-            $article['errors'] = [astronomyContentError('archivo', 'El archivo produjo un error al cargarse.')];
-        }
-        $catalog['articles'][$slug] = $article;
-    }
+
     foreach ($catalog['articles'] as $slug => &$article) {
         $raw = is_array($article['raw']) ? $article['raw'] : [];
         $triviaIds = [];
@@ -611,6 +627,7 @@ function astronomyLoadContentCatalog(?string $directory = null): array
         }
     }
     unset($article);
+
     foreach (array_merge($catalog['trivias'], $catalog['facts']) as $entry) {
         if (!$entry['valid']) {
             $catalog['diagnostics'][] = ['type' => $entry['type'], 'slug' => $entry['source_slug'] . '#' . $entry['id'], 'errors' => $entry['errors']];
@@ -619,8 +636,22 @@ function astronomyLoadContentCatalog(?string $directory = null): array
             $catalog['warnings'][] = ['type' => $entry['type'], 'slug' => $entry['source_slug'] . '#' . $entry['id'], 'warnings' => $entry['warnings']];
         }
     }
+
     ksort($catalog['articles']);
     return $catalog;
+}
+
+function astronomyLoadContentCatalog(?callable $connectionFactory = null): array
+{
+    return astronomyLoadContentCatalogFromDatabase($connectionFactory);
+}
+
+function astronomyContentAdminPreviewEnabled(): bool
+{
+    if (function_exists('storeAdminHasValidSessionCookie')) {
+        return storeAdminHasValidSessionCookie();
+    }
+    return false;
 }
 
 function astronomyContentVisibleArticles(array $catalog): array
@@ -630,6 +661,16 @@ function astronomyContentVisibleArticles(array $catalog): array
 
 function astronomyContentRandomEntry(array $catalog, string $type): ?array
 {
+    if (!isContentEnabled()) {
+        return null;
+    }
+    if ($type === 'trivia' && !astronomySiteHomeBlockEnabled('trivia')) {
+        return null;
+    }
+    if ($type === 'fact' && !astronomySiteHomeBlockEnabled('sabias_que')) {
+        return null;
+    }
+
     $entries = $type === 'trivia' ? $catalog['trivias'] : $catalog['facts'];
     if (astronomyContentDebugEnabled()) {
         $invalid = array_values(array_filter($entries, static fn(array $entry): bool => !$entry['valid']));
@@ -637,7 +678,13 @@ function astronomyContentRandomEntry(array $catalog, string $type): ?array
             return ['diagnostic' => $invalid[array_rand($invalid)]];
         }
     }
-    $valid = array_values(array_filter($entries, static fn(array $entry): bool => $entry['valid'] && $entry['visible']));
+    $valid = array_values(array_filter($entries, static function (array $entry) use ($catalog): bool {
+        if (!$entry['valid'] || !$entry['visible']) {
+            return false;
+        }
+        $parent = $catalog['articles'][$entry['source_slug']] ?? null;
+        return is_array($parent) && ($parent['valid'] ?? false) === true && ($parent['visible'] ?? false) === true;
+    }));
     if ($valid === []) {
         return astronomyContentDebugEnabled()
             ? ['diagnostic' => [
@@ -700,10 +747,10 @@ function renderAstronomyContentWarning(array $warning): void
     <?php
 }
 
-function renderAstronomyHomeContentCards(array $catalog): void
+function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = true, bool $factEnabled = true): void
 {
-    $trivia = astronomyContentRandomTrivia($catalog);
-    $fact = astronomyContentRandomFact($catalog);
+    $trivia = $triviaEnabled ? astronomyContentRandomTrivia($catalog) : null;
+    $fact = $factEnabled ? astronomyContentRandomFact($catalog) : null;
     if ($trivia === null && $fact === null) {
         return;
     }

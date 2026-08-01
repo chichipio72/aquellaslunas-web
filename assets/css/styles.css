@@ -2899,7 +2899,7 @@ body :is(
   font-size: .66rem;
 }
 
-.header-local-tools {
+.header-debug-tools {
   min-width: 0;
   display: flex;
   align-items: center;
@@ -3942,7 +3942,7 @@ body :is(
 
 @media (max-width: 767px) {
   .header-inner { grid-template-columns: 1fr auto auto; gap: .6rem; }
-  .header-local-tools { grid-column: 1 / -1; grid-row: 1; justify-content: flex-start; flex-wrap: wrap; }
+  .header-debug-tools { grid-column: 1 / -1; grid-row: 1; justify-content: flex-start; flex-wrap: wrap; }
   .header-time-simulation { justify-items: stretch; }
   .header-time-simulation form { justify-content: flex-start; gap: .2rem; }
   .header-time-simulation__shifts { order: 2; flex-basis: 100%; }
