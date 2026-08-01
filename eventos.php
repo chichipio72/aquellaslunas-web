@@ -19,7 +19,8 @@ require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/eclipse-detail-component.php';
 sendDynamicNoCacheHeaders();
 
-$availableTypes = ['moon_phase', 'apsis', 'conjunction', 'earthshine', 'full_moon_observation', 'libration', 'eclipse'];
+$availableTypes = astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_EVENTS);
+$availableTypeLabels = array_intersect_key(astronomyEventPublicTypeLabels(), array_flip($availableTypes));
 
 function eventsNormalizeCoordinate($value, float $min, float $max): ?float
 {
@@ -76,7 +77,7 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
             'longitude' => $longitude,
             'timezone' => $timezoneName,
             'types' => implode(',', $selectedTypes),
-            'max_difference_minutes' => 70,
+            'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
         ]);
         $requestResult = astronomyApiRequest($apiConfig['base_url'] . '/v1/astronomy/events?' . $query, 'events', 35);
         if ($locationMode !== 'default' && astronomyApiRejectedLocationParameters($requestResult)) {
@@ -99,6 +100,7 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
                     $decoded['items'],
                     static fn($event): bool => is_array($event) && astronomyEarthshineEventIsDisplayable($event)
                 ));
+                $items = astronomyFilterEventsForSurface($items, ASTRONOMY_EVENT_SURFACE_EVENTS);
                 usort($items, static function ($first, $second) use ($timezoneName): int {
                     $firstDate = is_array($first) ? astronomyEventDateTime($first['datetime'] ?? null, $timezoneName) : null;
                     $secondDate = is_array($second) ? astronomyEventDateTime($second['datetime'] ?? null, $timezoneName) : null;
@@ -144,6 +146,7 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/events.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/calendar-scheduler.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/eclipses.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -170,7 +173,7 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
                     <label class="control-field events-days"><span>Días</span><input type="number" name="days" min="1" max="366" value="<?= htmlspecialchars((string) $days) ?>" required></label>
                     <fieldset class="events-filters">
                         <legend>Tipos</legend>
-                        <?php foreach (['moon_phase' => 'Fases', 'apsis' => 'Perigeo y apogeo', 'conjunction' => 'Conjunciones', 'earthshine' => 'Luz cenicienta', 'full_moon_observation' => 'Cerca del amanecer o atardecer', 'libration' => 'Libraciones', 'eclipse' => 'Eclipses'] as $type => $label): ?>
+                        <?php foreach ($availableTypeLabels as $type => $label): ?>
                             <label class="event-filter"><input type="checkbox" name="types[]" value="<?= $type ?>" <?= in_array($type, $selectedTypes, true) ? 'checked' : '' ?>><span><?= $label ?></span></label>
                         <?php endforeach; ?>
                     </fieldset>

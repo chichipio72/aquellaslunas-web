@@ -36,12 +36,14 @@
     Number.isFinite(value) && value >= 0 && value <= 100
   );
 
+  const editorialClouds = globalThis.AstronomyEditorialConfiguration?.clouds || {};
+
   const cloudCategory = (value) => {
     if (!validPercentage(value)) return null;
-    if (value <= 20) return { key: 'clear', label: 'Despejado' };
-    if (value <= 50) return { key: 'some', label: 'Algunas nubes' };
-    if (value <= 80) return { key: 'mostly', label: 'Mayormente nublado' };
-    return { key: 'overcast', label: 'Cubierto' };
+    if (value <= (editorialClouds.clearMaxPercent ?? 20)) return { key: 'clear', label: editorialClouds.labels?.clear ?? 'Despejado' };
+    if (value <= (editorialClouds.someMaxPercent ?? 50)) return { key: 'some', label: editorialClouds.labels?.some ?? 'Algunas nubes' };
+    if (value <= (editorialClouds.mostlyMaxPercent ?? 80)) return { key: 'mostly', label: editorialClouds.labels?.mostly ?? 'Mayormente nublado' };
+    return { key: 'overcast', label: editorialClouds.labels?.overcast ?? 'Cubierto' };
   };
 
   const renderCloudIcon = (output, value, prefix = '') => {
@@ -178,7 +180,7 @@
         nearestIndex = index;
       }
     });
-    return nearestIndex < 0 || nearestDistance > 30 * 60 * 1000
+    return nearestIndex < 0 || nearestDistance > (editorialClouds.eventToleranceMinutes ?? 30) * 60 * 1000
       ? null
       : Math.round(forecast.values[nearestIndex]);
   };
@@ -195,7 +197,7 @@
     });
     if (
       nearestIndex < 0
-      || nearestDistance > 30 * 60 * 1000
+      || nearestDistance > (editorialClouds.eventToleranceMinutes ?? 30) * 60 * 1000
       || !validPercentage(forecast.low?.[nearestIndex])
       || !validPercentage(forecast.mid?.[nearestIndex])
       || !validPercentage(forecast.high?.[nearestIndex])

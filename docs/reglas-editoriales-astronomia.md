@@ -1,5 +1,36 @@
 # Reglas editoriales de presentación astronómica
 
+## Fuente ejecutable y administración
+
+Desde la segunda etapa de Presentación, el catálogo ejecutable de reglas
+administrables está en `includes/editorial-configuration.php`. Este documento
+explica las decisiones, pero no reemplaza ese catálogo. MySQL conserva solamente
+overrides en `admin_parametros_editoriales` y `admin_textos_editoriales`; la
+ausencia de una fila significa usar el valor predeterminado definido en código.
+
+| Contexto | Cálculo técnico (no administrable) | Regla editorial administrable | Defaults principales | Precedencia |
+| --- | --- | --- | --- | --- |
+| Inicio | Horizonte y azimut recibidos; rosa cardinal y Luna nueva más próxima | cercanía a nueva, bandas de altura, ventana de próxima salida y sus mensajes | 1/3 días; 15/35/60/80°; 120/60/15/5 min | fija: horizonte → Luna nueva → salida → altura |
+| El cielo hoy | intervalos de horizonte entregados por API | aviso cercano, partes del día, cinturón de Venus y mensajes de visibilidad | 60 min; 06/12/19 h; 95% y 90 min | fija por estado temporal |
+| El cielo esta noche | recorte de ventanas y estado efectivo | momentos relativos, tolerancias, duración y textos | 0,20/0,72; 10/45/180/240 min; 3 destacados | fija; cambiarla alteraría el compositor técnico |
+| Eventos | tipo, separación, amplitud, iluminación y simultaneidad recibidos | bandas de conjunción, libración, superluna, Luna nueva fina, tolerancia de Luna llena y mensajes | 1/3°; 7,2°; 105%; 0,4%; 70 min | fija dentro de cada tipo |
+| Lo próximo | eventos devueltos y fechas técnicas | ventana progresiva y cantidad final | 30 días; 6 eventos | cronológico, fijo |
+| Condiciones para observar | pronóstico horario de Open-Meteo | bandas, nombres y tolerancia temporal de nubosidad | 20/50/80%; 30 min | bandas crecientes |
+| Eclipses | tipo global y clasificación local de la API | traducción amigable de cada clasificación | textos históricos | clasificación cerrada, fija |
+
+Los placeholders permitidos se declaran por mensaje. El servidor rechaza llaves
+desconocidas y la eliminación de placeholders obligatorios. Las plantillas se
+resuelven únicamente con sustitución de texto; nunca se evalúan como PHP,
+JavaScript, SQL ni expresiones.
+
+Permanecen deliberadamente en código el mes sinódico, la conversión de azimut,
+el cálculo de partes visibles, el recorte de ventanas nocturnas, la simultaneidad
+astronómica, la clasificación de eclipses, la generación de luz cenicienta y los
+límites físicos de gráficos. Son cálculo o estructura técnica, no política
+editorial. También quedan para etapas posteriores los compositores de frases que
+aún combinan muchos datos y no cuentan con un modelo cerrado suficientemente
+seguro.
+
 Relevamiento del comportamiento vigente al 28 de julio de 2026. Este documento
 describe cómo la capa web convierte datos astronómicos en textos y señales visibles.
 No redefine los cálculos de la API ni propone nuevos umbrales: registra los que usa

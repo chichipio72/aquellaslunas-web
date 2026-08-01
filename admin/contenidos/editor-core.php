@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/content-system.php';
 require_once __DIR__ . '/../../includes/web-database.php';
 
 const CONTENT_EDITOR_CSRF_KEY = 'content_editor_csrf';
+const CONTENT_PACKAGE_FORMAT_VERSION = 1;
 
 /**
  * @return array<int, array{slug: string, titulo: string, resumen: string, visible: bool, actualizado_en: string, trivias_count: int, sabias_que_count: int}>
@@ -783,4 +784,292 @@ function contentEditorDbInsertFacts(PDO $connection, int $articleId, array $fact
             'orden' => $index,
         ]);
     }
+}
+
+function contentEditorPackageExample(): array
+{
+    return [
+        'version' => CONTENT_PACKAGE_FORMAT_VERSION,
+        'articulo' => [
+            'slug' => 'ejemplo-luna',
+            'version' => 1,
+            'visible' => true,
+            'titulo' => 'Lorem ipsum sobre la Luna',
+            'resumen' => 'Resumen breve del artículo.',
+            'imagen_principal' => null,
+            'palabras_clave' => ['luna', 'astronomía'],
+            'relaciones' => ['fases-de-la-luna'],
+            'markdown' => "# Lorem ipsum\n\nContenido completo del artículo en Markdown.\n",
+        ],
+        'trivias' => [
+            [
+                'codigo' => 'ejemplo-trivia-1', 'visible' => true,
+                'pregunta' => '¿Pregunta de ejemplo?', 'imagen' => null,
+                'opciones' => [
+                    ['texto' => 'Respuesta correcta', 'correcta' => true, 'explicacion' => 'Explicación de la respuesta correcta.'],
+                    ['texto' => 'Respuesta incorrecta', 'correcta' => false, 'explicacion' => null],
+                ],
+            ],
+            [
+                'codigo' => 'ejemplo-trivia-2', 'visible' => true,
+                'pregunta' => '¿Segunda pregunta de ejemplo?', 'imagen' => null,
+                'opciones' => [
+                    ['texto' => 'Primera opción', 'correcta' => false, 'explicacion' => null],
+                    ['texto' => 'Segunda opción', 'correcta' => true, 'explicacion' => 'Explicación correspondiente.'],
+                ],
+            ],
+        ],
+        'sabias_que' => [
+            ['codigo' => 'ejemplo-sabias-1', 'visible' => true, 'frase' => 'Primer dato curioso de ejemplo.', 'detalle' => 'Detalle completo del primer Sabías que.', 'imagen' => null],
+            ['codigo' => 'ejemplo-sabias-2', 'visible' => true, 'frase' => 'Segundo dato curioso de ejemplo.', 'detalle' => 'Detalle completo del segundo Sabías que.', 'imagen' => null],
+        ],
+    ];
+}
+
+function contentEditorPackageExampleJson(): string
+{
+    return json_encode(contentEditorPackageExample(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+}
+
+function contentEditorPackageError(string $path, string $message): array
+{
+    return astronomyContentError($path, $message);
+}
+
+function contentEditorPackageValidateKeys(array $value, array $allowed, string $path, array &$errors): void
+{
+    foreach (array_keys($value) as $key) {
+        if (!is_string($key) || !in_array($key, $allowed, true)) {
+            $errors[] = contentEditorPackageError($path === '' ? (string) $key : $path . '.' . $key, 'La clave no pertenece al formato admitido.');
+        }
+    }
+}
+
+function contentEditorPackageString(mixed $value, string $path, array &$errors, bool $nullable = false): ?string
+{
+    if ($nullable && $value === null) {
+        return null;
+    }
+    if (!is_string($value)) {
+        $errors[] = contentEditorPackageError($path, $nullable ? 'Debe ser texto o null.' : 'Debe ser texto.');
+        return $nullable ? null : '';
+    }
+    if (preg_match('//u', $value) !== 1) {
+        $errors[] = contentEditorPackageError($path, 'El texto no es UTF-8 válido.');
+        return $nullable ? null : '';
+    }
+    return trim($value);
+}
+
+function contentEditorPackageStringList(mixed $value, string $path, array &$errors): array
+{
+    if (!is_array($value) || !array_is_list($value)) {
+        $errors[] = contentEditorPackageError($path, 'Debe ser una lista JSON.');
+        return [];
+    }
+    $result = [];
+    foreach ($value as $index => $entry) {
+        $text = contentEditorPackageString($entry, $path . '[' . $index . ']', $errors);
+        if ($text !== '') {
+            $result[] = $text;
+        }
+    }
+    return $result;
+}
+
+/**
+ * @return array{valid:bool,errors:array,slug:string,raw:array,summary:?array}
+ */
+function contentEditorValidatePackageJson(string $json, ?string $imageDirectory = null): array
+{
+    $errors = [];
+    if (preg_match('//u', $json) !== 1) {
+        $errors[] = contentEditorPackageError('json', 'El texto no es UTF-8 válido.');
+        return ['valid' => false, 'errors' => $errors, 'slug' => '', 'raw' => [], 'summary' => null];
+    }
+    try {
+        $package = json_decode($json, true, 64, JSON_THROW_ON_ERROR);
+    } catch (JsonException $exception) {
+        $errors[] = contentEditorPackageError('json', 'JSON inválido: ' . $exception->getMessage());
+        return ['valid' => false, 'errors' => $errors, 'slug' => '', 'raw' => [], 'summary' => null];
+    }
+    if (!is_array($package) || array_is_list($package)) {
+        $errors[] = contentEditorPackageError('json', 'La raíz debe ser un objeto JSON.');
+        return ['valid' => false, 'errors' => $errors, 'slug' => '', 'raw' => [], 'summary' => null];
+    }
+    contentEditorPackageValidateKeys($package, ['version', 'articulo', 'trivias', 'sabias_que'], '', $errors);
+    if (($package['version'] ?? null) !== CONTENT_PACKAGE_FORMAT_VERSION) {
+        $errors[] = contentEditorPackageError('version', 'Versión no soportada. Se admite únicamente la versión ' . CONTENT_PACKAGE_FORMAT_VERSION . '.');
+    }
+
+    $article = $package['articulo'] ?? null;
+    if (!is_array($article) || array_is_list($article)) {
+        $errors[] = contentEditorPackageError('articulo', 'Debe ser un objeto JSON.');
+        $article = [];
+    }
+    contentEditorPackageValidateKeys($article, ['slug', 'version', 'visible', 'titulo', 'resumen', 'imagen_principal', 'palabras_clave', 'relaciones', 'markdown'], 'articulo', $errors);
+    $slug = contentEditorPackageString($article['slug'] ?? null, 'articulo.slug', $errors) ?? '';
+    $articleVersion = $article['version'] ?? null;
+    if (!is_int($articleVersion) || $articleVersion < 1) {
+        $errors[] = contentEditorPackageError('articulo.version', 'Debe ser un entero mayor o igual a 1.');
+        $articleVersion = 1;
+    }
+    if (!is_bool($article['visible'] ?? null)) {
+        $errors[] = contentEditorPackageError('articulo.visible', 'Debe ser true o false.');
+    }
+    $raw = [
+        'version' => $articleVersion,
+        'visible' => is_bool($article['visible'] ?? null) ? $article['visible'] : false,
+        'imagen' => contentEditorPackageString($article['imagen_principal'] ?? null, 'articulo.imagen_principal', $errors, true),
+        'imagen_posicion_x' => 50,
+        'imagen_posicion_y' => 50,
+        'titulo' => contentEditorPackageString($article['titulo'] ?? null, 'articulo.titulo', $errors) ?? '',
+        'resumen' => contentEditorPackageString($article['resumen'] ?? null, 'articulo.resumen', $errors) ?? '',
+        'palabras_clave' => contentEditorPackageStringList($article['palabras_clave'] ?? null, 'articulo.palabras_clave', $errors),
+        'relaciones' => contentEditorPackageStringList($article['relaciones'] ?? null, 'articulo.relaciones', $errors),
+        'articulo' => rtrim(contentEditorPackageString($article['markdown'] ?? null, 'articulo.markdown', $errors) ?? '') . "\n",
+        'trivias' => [],
+        'sabias_que' => [],
+    ];
+    foreach ($raw['relaciones'] as $index => $relation) {
+        if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $relation) !== 1) {
+            $errors[] = contentEditorPackageError('articulo.relaciones[' . $index . ']', 'Debe tener formato de slug válido.');
+        }
+    }
+
+    $trivias = $package['trivias'] ?? null;
+    if (!is_array($trivias) || !array_is_list($trivias)) {
+        $errors[] = contentEditorPackageError('trivias', 'Debe ser una lista JSON.');
+        $trivias = [];
+    }
+    $triviaCodes = [];
+    foreach ($trivias as $index => $trivia) {
+        $path = 'trivias[' . $index . ']';
+        if (!is_array($trivia) || array_is_list($trivia)) {
+            $errors[] = contentEditorPackageError($path, 'Debe ser un objeto JSON.');
+            continue;
+        }
+        contentEditorPackageValidateKeys($trivia, ['codigo', 'visible', 'pregunta', 'imagen', 'opciones'], $path, $errors);
+        $code = contentEditorPackageString($trivia['codigo'] ?? null, $path . '.codigo', $errors) ?? '';
+        if ($code !== '' && isset($triviaCodes[$code])) {
+            $errors[] = contentEditorPackageError($path . '.codigo', 'El código está duplicado dentro del paquete.');
+        }
+        $triviaCodes[$code] = true;
+        if (!is_bool($trivia['visible'] ?? null)) {
+            $errors[] = contentEditorPackageError($path . '.visible', 'Debe ser true o false.');
+        }
+        $optionsInput = $trivia['opciones'] ?? null;
+        if (!is_array($optionsInput) || !array_is_list($optionsInput)) {
+            $errors[] = contentEditorPackageError($path . '.opciones', 'Debe ser una lista JSON.');
+            $optionsInput = [];
+        }
+        if (count($optionsInput) < 2) {
+            $errors[] = contentEditorPackageError($path . '.opciones', 'Debe contener al menos dos opciones.');
+        }
+        $options = [];
+        $correctCount = 0;
+        foreach ($optionsInput as $optionIndex => $option) {
+            $optionPath = $path . '.opciones[' . $optionIndex . ']';
+            if (!is_array($option) || array_is_list($option)) {
+                $errors[] = contentEditorPackageError($optionPath, 'Debe ser un objeto JSON.');
+                continue;
+            }
+            contentEditorPackageValidateKeys($option, ['texto', 'correcta', 'explicacion'], $optionPath, $errors);
+            $correct = $option['correcta'] ?? null;
+            if (!is_bool($correct)) {
+                $errors[] = contentEditorPackageError($optionPath . '.correcta', 'Debe ser true o false.');
+                $correct = false;
+            }
+            $explanation = contentEditorPackageString($option['explicacion'] ?? null, $optionPath . '.explicacion', $errors, true);
+            $normalized = ['texto' => contentEditorPackageString($option['texto'] ?? null, $optionPath . '.texto', $errors) ?? ''];
+            if ($correct) {
+                $correctCount++;
+                if ($explanation === null || $explanation === '') {
+                    $errors[] = contentEditorPackageError($optionPath . '.explicacion', 'Es obligatoria para la respuesta correcta.');
+                }
+                $normalized['explicacion'] = $explanation ?? '';
+            }
+            $options[] = $normalized;
+        }
+        if ($correctCount !== 1) {
+            $errors[] = contentEditorPackageError($path . '.opciones', 'Debe existir exactamente una respuesta correcta.');
+        }
+        $raw['trivias'][] = [
+            'id' => $code,
+            'visible' => is_bool($trivia['visible'] ?? null) ? $trivia['visible'] : false,
+            'pregunta' => contentEditorPackageString($trivia['pregunta'] ?? null, $path . '.pregunta', $errors) ?? '',
+            'imagen' => contentEditorPackageString($trivia['imagen'] ?? null, $path . '.imagen', $errors, true),
+            'opciones' => $options,
+        ];
+    }
+
+    $facts = $package['sabias_que'] ?? null;
+    if (!is_array($facts) || !array_is_list($facts)) {
+        $errors[] = contentEditorPackageError('sabias_que', 'Debe ser una lista JSON.');
+        $facts = [];
+    }
+    $factCodes = [];
+    foreach ($facts as $index => $fact) {
+        $path = 'sabias_que[' . $index . ']';
+        if (!is_array($fact) || array_is_list($fact)) {
+            $errors[] = contentEditorPackageError($path, 'Debe ser un objeto JSON.');
+            continue;
+        }
+        contentEditorPackageValidateKeys($fact, ['codigo', 'visible', 'frase', 'detalle', 'imagen'], $path, $errors);
+        $code = contentEditorPackageString($fact['codigo'] ?? null, $path . '.codigo', $errors) ?? '';
+        if ($code !== '' && isset($factCodes[$code])) {
+            $errors[] = contentEditorPackageError($path . '.codigo', 'El código está duplicado dentro del paquete.');
+        }
+        $factCodes[$code] = true;
+        if (!is_bool($fact['visible'] ?? null)) {
+            $errors[] = contentEditorPackageError($path . '.visible', 'Debe ser true o false.');
+        }
+        $raw['sabias_que'][] = [
+            'id' => $code,
+            'visible' => is_bool($fact['visible'] ?? null) ? $fact['visible'] : false,
+            'titulo' => contentEditorPackageString($fact['frase'] ?? null, $path . '.frase', $errors) ?? '',
+            'respuesta' => contentEditorPackageString($fact['detalle'] ?? null, $path . '.detalle', $errors) ?? '',
+            'imagen' => contentEditorPackageString($fact['imagen'] ?? null, $path . '.imagen', $errors, true),
+        ];
+    }
+
+    foreach (contentEditorValidateDbCandidate($slug, $raw) as $error) {
+        $field = (string) ($error['field'] ?? 'contenido');
+        $field = match (true) {
+            $field === 'slug' => 'articulo.slug',
+            $field === 'titulo' => 'articulo.titulo',
+            $field === 'resumen' => 'articulo.resumen',
+            $field === 'articulo' => 'articulo.markdown',
+            $field === 'imagen' => 'articulo.imagen_principal',
+            default => preg_replace('/^(trivias|sabias_que)\.(\d+)/', '$1[$2]', $field) ?? $field,
+        };
+        $errors[] = contentEditorPackageError($field, (string) ($error['message'] ?? 'Contenido inválido.'));
+    }
+    $summary = $errors === [] ? [
+        'slug' => $slug,
+        'titulo' => $raw['titulo'],
+        'palabras_clave' => count($raw['palabras_clave']),
+        'relaciones' => count($raw['relaciones']),
+        'trivias' => count($raw['trivias']),
+        'sabias_que' => count($raw['sabias_que']),
+    ] : null;
+    return ['valid' => $errors === [], 'errors' => $errors, 'slug' => $slug, 'raw' => $raw, 'summary' => $summary];
+}
+
+/** @return array{imported:bool,slug:string,errors:array} */
+function contentEditorDbImportPackage(PDO $connection, string $json, ?string $imageDirectory = null): array
+{
+    $validated = contentEditorValidatePackageJson($json, $imageDirectory);
+    if (!$validated['valid']) {
+        return ['imported' => false, 'slug' => $validated['slug'], 'errors' => $validated['errors']];
+    }
+    if (contentEditorDbSlugExists($connection, $validated['slug'])) {
+        return [
+            'imported' => false,
+            'slug' => $validated['slug'],
+            'errors' => [contentEditorPackageError('articulo.slug', 'Ya existe un artículo con ese slug. Editalo desde el editor normal; la importación nunca sobrescribe contenido.')],
+        ];
+    }
+    $saved = contentEditorDbSaveArticle($connection, $validated['slug'], $validated['slug'], $validated['raw'], true);
+    return ['imported' => $saved['saved'], 'slug' => $saved['slug'], 'errors' => $saved['errors']];
 }

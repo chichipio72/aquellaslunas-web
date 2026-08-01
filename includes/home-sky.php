@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/api-config.php';
+require_once __DIR__ . '/editorial-configuration.php';
 
 function homeNormalizeDailyIntervals($value, string $date, string $timezoneName): ?array
 {
@@ -148,20 +149,15 @@ function homeMoonDirection(float $azimuthDegrees): string
 
 function homeMoonVisibleSituation(float $altitudeDegrees, float $azimuthDegrees): string
 {
-    if ($altitudeDegrees >= 80.0) {
-        return 'Está visible, prácticamente sobre tu cabeza.';
+    if ($altitudeDegrees >= astronomyEditorialNumber('home.altitude.high_max')) {
+        return astronomyEditorialText('home.moon.overhead');
     }
-    if ($altitudeDegrees >= 60.0) {
-        return 'Está visible, muy alta. Mirá casi hacia arriba.';
+    if ($altitudeDegrees >= astronomyEditorialNumber('home.altitude.medium_max')) {
+        return astronomyEditorialText('home.moon.high');
     }
-    if ($altitudeDegrees < 15.0) {
-        $height = 'muy baja';
-    } elseif ($altitudeDegrees < 35.0) {
-        $height = 'baja';
-    } elseif ($altitudeDegrees < 60.0) {
-        $height = 'a media altura';
-    }
-    return 'Está visible, ' . $height . ' hacia ' . homeMoonDirection($azimuthDegrees) . '.';
+    $key = $altitudeDegrees < astronomyEditorialNumber('home.altitude.very_low_max') ? 'home.moon.very_low'
+        : ($altitudeDegrees < astronomyEditorialNumber('home.altitude.low_max') ? 'home.moon.low' : 'home.moon.medium');
+    return astronomyEditorialText($key, ['direccion' => homeMoonDirection($azimuthDegrees)]);
 }
 
 function homeFutureMoonrise($value, DateTimeImmutable $now, string $timezoneName): ?DateTimeImmutable
@@ -180,26 +176,26 @@ function homeFutureMoonrise($value, DateTimeImmutable $now, string $timezoneName
 function homeMoonriseNoticePresentation(DateTimeImmutable $now, ?DateTimeImmutable $nextRise, int $maxMinutes): array
 {
     if ($nextRise === null || $nextRise <= $now) {
-        return ['text' => 'No está sobre el horizonte.', 'level' => null];
+        return ['text' => astronomyEditorialText('home.moon.below'), 'level' => null];
     }
     $secondsUntilRise = $nextRise->getTimestamp() - $now->getTimestamp();
     $minutesUntilRise = max(1, (int) ceil($secondsUntilRise / 60));
     if ($minutesUntilRise > $maxMinutes) {
-        return ['text' => 'No está sobre el horizonte.', 'level' => null];
+        return ['text' => astronomyEditorialText('home.moon.below'), 'level' => null];
     }
-    if ($minutesUntilRise >= 60) {
-        return ['text' => 'La Luna saldrá a las ' . $nextRise->format('H:i') . '.', 'level' => null];
+    if ($minutesUntilRise >= astronomyEditorialNumber('home.moonrise.clock_minutes')) {
+        return ['text' => astronomyEditorialText('home.moonrise.clock', ['hora' => $nextRise->format('H:i')]), 'level' => null];
     }
-    if ($minutesUntilRise >= 15) {
+    if ($minutesUntilRise >= astronomyEditorialNumber('home.moonrise.soon_minutes')) {
         return [
-            'text' => 'La Luna saldrá en ' . $minutesUntilRise . ' ' . ($minutesUntilRise === 1 ? 'minuto' : 'minutos') . '.',
+            'text' => astronomyEditorialText('home.moonrise.minutes', ['minutos' => $minutesUntilRise . ' ' . ($minutesUntilRise === 1 ? 'minuto' : 'minutos')]),
             'level' => 'soon',
         ];
     }
-    if ($minutesUntilRise >= 5) {
-        return ['text' => 'La Luna está por salir.', 'level' => 'imminent'];
+    if ($minutesUntilRise >= astronomyEditorialNumber('home.moonrise.imminent_minutes')) {
+        return ['text' => astronomyEditorialText('home.moonrise.imminent'), 'level' => 'imminent'];
     }
-    return ['text' => 'Preparate: la Luna está por salir.', 'level' => 'now'];
+    return ['text' => astronomyEditorialText('home.moonrise.now'), 'level' => 'now'];
 }
 
 function homeMoonriseNotice(DateTimeImmutable $now, ?DateTimeImmutable $nextRise, int $maxMinutes): string
@@ -217,11 +213,11 @@ function homeMoonSituationPresentation(
     if ($instantData['above_horizon'] === false) {
         return homeMoonriseNoticePresentation($instantData['instant'], $nextRise, $moonriseNoticeMaxMinutes);
     }
-    if ($newMoonDifferenceDays !== null && $newMoonDifferenceDays <= 1.0) {
-        return ['text' => 'Está sobre el horizonte, pero es prácticamente imposible verla.', 'level' => null];
+    if ($newMoonDifferenceDays !== null && $newMoonDifferenceDays <= astronomyEditorialNumber('home.new_moon.impossible_days')) {
+        return ['text' => astronomyEditorialText('home.moon.new_impossible'), 'level' => null];
     }
-    if ($newMoonDifferenceDays !== null && $newMoonDifferenceDays <= 3.0) {
-        return ['text' => 'Está muy finita y cuesta encontrarla a simple vista.', 'level' => null];
+    if ($newMoonDifferenceDays !== null && $newMoonDifferenceDays <= astronomyEditorialNumber('home.new_moon.thin_days')) {
+        return ['text' => astronomyEditorialText('home.moon.new_thin'), 'level' => null];
     }
     return [
         'text' => homeMoonVisibleSituation($instantData['altitude_degrees'], $instantData['azimuth_degrees']),

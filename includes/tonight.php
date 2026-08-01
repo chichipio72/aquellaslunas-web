@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/editorial-configuration.php';
+
 require_once __DIR__ . '/api-client.php';
 
 function astronomyTonightRequest(
@@ -407,7 +409,7 @@ function astronomyTonightRelevantObject(array $object, array $data, DateTimeImmu
     $object['_visibility_start'] = $start;
     $object['_visibility_end'] = $end;
     $object['_next_useful'] = $nextUseful;
-    $object['_moment'] = $position <= .2 ? 'dusk' : ($position >= .72 ? 'dawn' : 'night');
+    $object['_moment'] = $position <= astronomyEditorialNumber('tonight.dusk_max_ratio') ? 'dusk' : ($position >= astronomyEditorialNumber('tonight.dawn_min_ratio') ? 'dawn' : 'night');
     return $object;
 }
 
@@ -483,16 +485,15 @@ function astronomyTonightNaturalSentence(array $object, array $data, DateTimeImm
     }
     if (($object['_effective_status'] ?? '') === 'visible_now') {
         $remainingMinutes = max(0, (int) floor(($end->getTimestamp() - $now->getTimestamp()) / 60));
-        if ($end >= $nightEnd->modify('-10 minutes')) {
-            return 'Está visible ahora y seguirá viéndose hasta el amanecer.';
+        if ($end >= $nightEnd->modify('-' . (int) astronomyEditorialNumber('tonight.dawn_tolerance_minutes') . ' minutes')) {
+            return astronomyEditorialText('tonight.visible.until_dawn');
         }
-        return ($remainingMinutes >= 180 ? 'Seguirá visible' : 'Está visible ahora')
-            . ' hasta las ' . $end->format('H:i') . '.';
+        return astronomyEditorialText($remainingMinutes >= astronomyEditorialNumber('tonight.long_remaining_minutes') ? 'tonight.visible.long_until_time' : 'tonight.visible.until_time', ['fin' => $end->format('H:i')]);
     }
-    $fromDusk = abs($start->getTimestamp() - $nightStart->getTimestamp()) <= 45 * 60;
-    $untilDawn = $end >= $nightEnd->modify('-10 minutes');
+    $fromDusk = abs($start->getTimestamp() - $nightStart->getTimestamp()) <= astronomyEditorialNumber('tonight.dusk_tolerance_minutes') * 60;
+    $untilDawn = $end >= $nightEnd->modify('-' . (int) astronomyEditorialNumber('tonight.dawn_tolerance_minutes') . ' minutes');
     if ($fromDusk && $untilDawn) {
-        return 'Estará visible desde el anochecer hasta el amanecer.';
+        return astronomyEditorialText('tonight.future.all_night');
     }
     if ($fromDusk) {
         return 'Estará visible al comenzar la noche, hasta las ' . $end->format('H:i') . '.';
@@ -501,8 +502,8 @@ function astronomyTonightNaturalSentence(array $object, array $data, DateTimeImm
         return 'Aparecerá a las ' . $start->format('H:i') . ' y podrá verse hasta el amanecer.';
     }
     $durationMinutes = (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60);
-    if ($durationMinutes >= 240) {
-        return 'Podrá verse durante gran parte de la noche, desde las ' . $start->format('H:i') . '.';
+    if ($durationMinutes >= astronomyEditorialNumber('tonight.long_window_minutes')) {
+        return astronomyEditorialText('tonight.future.long', ['inicio' => $start->format('H:i')]);
     }
     return 'Aparecerá a las ' . $start->format('H:i') . ' y seguirá visible hasta las ' . $end->format('H:i') . '.';
 }
@@ -510,9 +511,9 @@ function astronomyTonightNaturalSentence(array $object, array $data, DateTimeImm
 function astronomyTonightMomentLabel(array $object): string
 {
     return match ($object['_moment'] ?? null) {
-        'dusk' => 'Al anochecer',
-        'dawn' => 'Antes del amanecer',
-        default => 'Durante la noche',
+        'dusk' => astronomyEditorialText('tonight.moment.dusk'),
+        'dawn' => astronomyEditorialText('tonight.moment.dawn'),
+        default => astronomyEditorialText('tonight.moment.night'),
     };
 }
 
@@ -535,9 +536,9 @@ function astronomyTonightRelevantState(array $data, DateTimeImmutable $now, stri
         return 'La noche comenzará a las ' . $start->format('H:i') . '.';
     }
     $remainingMinutes = max(0, (int) floor(($end->getTimestamp() - $now->getTimestamp()) / 60));
-    return $remainingMinutes >= 180
-        ? 'La noche ya comenzó. Quedan varias horas para observar.'
-        : 'La noche ya comenzó y continuará hasta las ' . $end->format('H:i') . '.';
+    return $remainingMinutes >= astronomyEditorialNumber('tonight.long_remaining_minutes')
+        ? astronomyEditorialText('tonight.state.hours')
+        : astronomyEditorialText('tonight.state.until', ['fin' => $end->format('H:i')]);
 }
 
 function astronomyTonightHighlights(array $sections): array
@@ -551,5 +552,5 @@ function astronomyTonightHighlights(array $sections): array
     if (count($highlights) < 2 && ($sections['moon'][0] ?? null) !== null) {
         $highlights[] = $sections['moon'][0];
     }
-    return array_slice($highlights, 0, 3);
+    return array_slice($highlights, 0, (int) astronomyEditorialNumber('tonight.highlights.max'));
 }

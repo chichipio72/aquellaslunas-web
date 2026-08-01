@@ -86,14 +86,14 @@ function todayPeriod(array $period, string $timezone): ?array
 function todayDayPart(DateTimeImmutable $date): string
 {
     $hour = (int) $date->format('G');
-    return $hour < 6 ? 'la madrugada' : ($hour < 12 ? 'la mañana' : ($hour < 19 ? 'la tarde' : 'la noche'));
+    return $hour < astronomyEditorialNumber('today.daypart.morning_hour') ? 'la madrugada' : ($hour < astronomyEditorialNumber('today.daypart.afternoon_hour') ? 'la mañana' : ($hour < astronomyEditorialNumber('today.daypart.night_hour') ? 'la tarde' : 'la noche'));
 }
 
 function todayMoonSummary(array $moon, string $timezone, DateTimeImmutable $reference, bool $isToday): string
 {
     $intervals = is_array($moon['visibility_intervals'] ?? null) ? $moon['visibility_intervals'] : [];
     if ($intervals === []) {
-        return 'No estará sobre el horizonte durante esta fecha.';
+        return astronomyEditorialText('today.moon.no_intervals');
     }
     $normalized = [];
     foreach ($intervals as $interval) {
@@ -104,26 +104,26 @@ function todayMoonSummary(array $moon, string $timezone, DateTimeImmutable $refe
         }
     }
     if ($normalized === []) {
-        return 'La visibilidad lunar no está disponible para esta fecha.';
+        return astronomyEditorialText('today.moon.unavailable');
     }
     if ($isToday) {
         foreach ($normalized as $interval) {
             if ($reference >= $interval['start'] && $reference < $interval['end']) {
                 $minutes = (int) floor(($interval['end']->getTimestamp() - $reference->getTimestamp()) / 60);
-                return $minutes > 0 && $minutes <= 60
-                    ? 'Ya está visible y se pondrá dentro de ' . $minutes . ' minutos.'
-                    : 'Ya está visible y seguirá viéndose durante ' . todayDayPart($interval['end']) . '.';
+                return $minutes > 0 && $minutes <= astronomyEditorialNumber('today.visibility.soon_minutes')
+                    ? astronomyEditorialText('today.moon.sets_soon', ['minutos' => $minutes . ' minutos'])
+                    : astronomyEditorialText('today.moon.visible_part', ['parte_dia' => todayDayPart($interval['end'])]);
             }
         }
         foreach ($normalized as $interval) {
             if ($interval['start'] > $reference) {
                 $minutes = (int) floor(($interval['start']->getTimestamp() - $reference->getTimestamp()) / 60);
-                return $minutes > 0 && $minutes <= 60
-                    ? 'Ahora no está sobre el horizonte; saldrá dentro de ' . $minutes . ' minutos.'
-                    : 'Ahora no está sobre el horizonte; volverá a verse durante ' . todayDayPart($interval['start']) . '.';
+                return $minutes > 0 && $minutes <= astronomyEditorialNumber('today.visibility.soon_minutes')
+                    ? astronomyEditorialText('today.moon.rises_soon', ['minutos' => $minutes . ' minutos'])
+                    : astronomyEditorialText('today.moon.returns_part', ['parte_dia' => todayDayPart($interval['start'])]);
             }
         }
-        return 'Ya no volverá a estar sobre el horizonte durante esta fecha.';
+        return astronomyEditorialText('today.moon.finished');
     }
     $first = $normalized[0];
     $last = $normalized[count($normalized) - 1];
@@ -174,9 +174,7 @@ $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $ti
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
 $daily = $nextDaily = $directions = $eventsData = $phasesData = null;
 $apiError = false;
-$eventTypes = TODAY_VISUAL_EXPERIMENT_ENABLED
-    ? 'moon_phase,full_moon_observation,apsis,conjunction,earthshine,libration,eclipse'
-    : 'moon_phase,apsis,conjunction,earthshine,libration,eclipse';
+$eventTypes = implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_TODAY));
 
 try {
     $apiBaseUrl = loadAstronomyApiConfig()['base_url'];
@@ -228,12 +226,12 @@ $moonRiseAzimuth = $moonDirections['rise']['azimuth_degrees'] ?? null;
 $moonRiseDirection = is_numeric($moonRiseAzimuth) ? homeMoonDirection((float) $moonRiseAzimuth) : null;
 $venusBeltOpportunity = TODAY_VISUAL_EXPERIMENT_ENABLED
     && $illumination !== null
-    && $illumination >= 95
+    && $illumination >= astronomyEditorialNumber('today.venus_belt.min_illumination_percent')
     && $moonRise !== null
     && $sunset !== null
     && $eveningCivil !== null
     && in_array($moonRiseDirection, ['noreste', 'este', 'sudeste'], true)
-    && abs($moonRise->getTimestamp() - $sunset->getTimestamp()) <= 90 * 60;
+    && abs($moonRise->getTimestamp() - $sunset->getTimestamp()) <= astronomyEditorialNumber('today.venus_belt.max_difference_minutes') * 60;
 
 $photoRows = [
     'Hora azul matutina' => todayPeriod(is_array($light['photographic']['morning']['blue_hour'] ?? null) ? $light['photographic']['morning']['blue_hour'] : [], $timezoneName),
@@ -252,6 +250,7 @@ $twilightRows = [
 $events = array_values(array_filter($eventsData['items'] ?? [], static function ($event) use ($requestedDate, $timezoneName): bool {
     return is_array($event) && astronomyEventDateTime($event['datetime'] ?? null, $timezoneName)?->format('Y-m-d') === $requestedDate;
 }));
+$events = astronomyFilterEventsForSurface($events, ASTRONOMY_EVENT_SURFACE_TODAY);
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
 $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la Luna, el Sol, la luz y las condiciones del cielo para una fecha y ubicación.', '/cielo-de-hoy.php', 'article');
 ?>
@@ -269,6 +268,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
     <?php if (TODAY_VISUAL_EXPERIMENT_ENABLED): ?><link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/today-visual-experiment.css'), ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/home-sky.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php if (TODAY_VISUAL_EXPERIMENT_ENABLED): ?><script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today-visual-experiment.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script><?php endif; ?>
@@ -302,7 +302,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
                         <?php endforeach; ?>
                     </div>
                     <?php if ($isSupermoon): ?><p class="today-supermoon">Superluna: su tamaño aparente será <?= htmlspecialchars(number_format((float) $moon['apparent_size_percent'], 1, ',', '.')) ?> % del promedio.</p><?php endif; ?>
-                    <?php if ($venusBeltOpportunity): ?><p class="today-venus-opportunity" data-venus-belt-opportunity hidden>Al atardecer, mirá hacia el este: si el cielo acompaña, la Luna podría aparecer sobre el cinturón de Venus, la franja rosada que a veces aparece sobre el horizonte opuesto al Sol.</p><?php endif; ?>
+                    <?php if ($venusBeltOpportunity): ?><p class="today-venus-opportunity" data-venus-belt-opportunity hidden><?= htmlspecialchars(astronomyEditorialText('today.venus_belt.message')) ?></p><?php endif; ?>
                     <p class="today-current-cloud" data-today-summary-cloud hidden></p>
                     <button class="today-detail-trigger" type="button" data-moon-detail-open>Ver datos de la Luna</button>
                 </div>

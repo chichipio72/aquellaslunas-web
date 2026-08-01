@@ -22,11 +22,34 @@ test "$status" = "200"
 grep -Eqi '^Cache-Control: no-store' "$work_dir/auth-headers"
 grep -q '<h1>Contenidos</h1>' "$work_dir/auth"
 grep -q 'Nuevo artículo' "$work_dir/auth"
+grep -q 'Importar contenido completo' "$work_dir/auth"
 grep -q 'href="../contenidos/" aria-current="page"' "$work_dir/auth"
+grep -q '<strong>Contenidos</strong>' "$work_dir/auth"
 grep -q 'href="../configuracion-sitio/"' "$work_dir/auth"
 grep -q 'href="../fotos.php"' "$work_dir/auth"
 grep -q 'href="../laboratorio-astronomico.php"' "$work_dir/auth"
 ! grep -q 'contenidos/contenidos/' "$work_dir/auth"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/import" -D "$work_dir/import-headers" -w '%{http_code}' "$base_url/admin/contenidos/index.php?action=import")"
+test "$status" = "200"
+grep -q 'data-package-import' "$work_dir/import"
+grep -q 'name="package_json"' "$work_dir/import"
+grep -q 'data-copy-package-example' "$work_dir/import"
+grep -q '>Copiar ejemplo<' "$work_dir/import"
+grep -q 'name="package_action" value="validate"' "$work_dir/import"
+grep -q 'name="package_action" value="import" disabled' "$work_dir/import"
+grep -q 'data-package-example' "$work_dir/import"
+grep -q '"ejemplo-trivia-2"' "$work_dir/import"
+grep -q '"ejemplo-sabias-2"' "$work_dir/import"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/import-csrf-invalid" -w '%{http_code}' -X POST \
+  --data-urlencode 'mode=package_import' \
+  --data-urlencode 'package_action=import' \
+  --data-urlencode 'csrf_token=invalid' \
+  --data-urlencode 'package_json={"version":1}' \
+  "$base_url/admin/contenidos/index.php")"
+test "$status" = "200"
+grep -q 'token CSRF no es válido' "$work_dir/import-csrf-invalid"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/csrf-invalid" -w '%{http_code}' -X POST \
   --data-urlencode 'action=save' \

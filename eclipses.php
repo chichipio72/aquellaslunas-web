@@ -16,6 +16,7 @@ require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/eclipse-query-policy.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/eclipse-detail-component.php';
+require_once __DIR__ . '/includes/event-type-configuration.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -504,7 +505,7 @@ if ($filtersWereSubmitted) {
                         astronomyApiRecordValidation('eclipses', false, false);
                     } else {
                         astronomyApiRecordValidation('eclipses', true, true);
-                        foreach ($decoded['items'] as $item) {
+                        foreach (astronomyFilterEventsForSurface($decoded['items'], ASTRONOMY_EVENT_SURFACE_ECLIPSES) as $item) {
                             if (!is_array($item) || ($item['type'] ?? null) !== 'eclipse') {
                                 continue;
                             }

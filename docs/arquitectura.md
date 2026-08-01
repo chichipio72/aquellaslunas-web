@@ -307,6 +307,26 @@ La confirmación bloquea pedido y pago dentro de una transacción. Exige referen
 
 `includes/store-admin-auth.php` conserva la autenticación histórica: cookie de sesión `aquellas_lunas_admin`, estado `store_admin_authenticated`, cookie HttpOnly/SameSite=Lax, validación mediante `password_verify()`, regeneración del ID, CSRF y destrucción completa. `admin/login.php` dirige al panel general después de autenticar y `admin/logout.php` mantiene el cierre por POST. Todas las respuestas administrativas usan `no-store` y `X-Robots-Tag: noindex`.
 
+La configuración editorial de tipos de eventos se mantiene separada de
+`admin_configuracion_sitio`: `admin_tipos_eventos` identifica de forma estable
+cada tipo persistido o derivado y guarda nombre, habilitación y renderer cerrado;
+`admin_tipos_eventos_superficies` relaciona esos tipos con un catálogo cerrado de
+superficies públicas. `includes/event-type-configuration.php` centraliza el
+catálogo, la inicialización idempotente, la resolución de los eventos recibidos y
+el fallback seguro. El frontend filtra después de recibir la respuesta de la API,
+por lo que esta capa no modifica PostgreSQL, generación, cálculos ni contratos de
+la API. Las consultas pueden limitar tipos para evitar trabajo innecesario, pero
+el filtro central por tipo y superficie sigue siendo la autoridad de publicación.
+
+`includes/editorial-configuration.php` implementa la segunda capa. Su catálogo
+cerrado declara bloques, parámetros tipados, unidades, límites, defaults, textos y
+placeholders permitidos/obligatorios. MySQL guarda sólo diferencias en
+`admin_parametros_editoriales` y `admin_textos_editoriales`. Las bandas se validan
+como secuencias estrictamente crecientes y todas las escrituras son preparadas y
+transaccionales. Ante una falla administrativa, los lectores usan los defaults y
+registran un diagnóstico genérico. Para nubosidad, PHP publica únicamente un JSON
+escapado con valores ya validados; JavaScript no interpreta expresiones.
+
 La ruta canónica de contenidos es `/admin/contenidos/`. La navegación calcula rutas válidas según la ubicación del script actual en `/admin` para evitar prefijos relativos frágiles.
 
 `includes/store-admin-photos.php` consulta todas las fotos mediante la conexión PDO compartida y modifica con sentencias preparadas sólo disponibilidad, precio y los campos editoriales `titulo`, `descripcion` y `palabras_clave`. Estos últimos son opcionales, se recortan, validan a 255/5000/2000 caracteres y se guardan como texto o `NULL`. No interpreta HTML ni actualiza EXIF, `metadatos_json`, monedas o previews. La asignación múltiple de precios sigue siendo transaccional; el portal no muestra hashes, originales o nombres de archivo, no borra y no toca `pedido_fotos`.

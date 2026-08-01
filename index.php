@@ -116,8 +116,8 @@ try {
                 $apiBaseUrl . '/v1/astronomy/events?' . http_build_query([
                     'start_date' => $startDate,
                     'days' => $days,
-                    'types' => HOME_UPCOMING_EVENT_TYPES,
-                    'max_difference_minutes' => 70,
+                    'types' => implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING)),
+                    'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
                 ] + $common),
                 'home v2 upcoming ' . $segmentLabel,
                 20,
@@ -125,7 +125,7 @@ try {
             );
         }
     );
-    $upcomingEvents = $upcomingSearch['events'];
+    $upcomingEvents = astronomyFilterEventsForSurface($upcomingSearch['events'], ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING);
     $tonightData = astronomyTonightRequest($apiBaseUrl, $location, $dateParam, 'summary', 'home v2 tonight', 8);
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas home v2 API configuration error: ' . $exception->getMessage());
@@ -140,7 +140,7 @@ $nextPhases = [];
 foreach (($phasesData['items'] ?? []) as $event) {
     $subtype = is_array($event) ? ($event['subtype'] ?? '') : '';
     $date = is_array($event) ? homeV2Date($event['datetime'] ?? null, $timezoneName) : null;
-    if (($event['type'] ?? '') === 'moon_phase' && isset($phaseLabels[$subtype]) && $date !== null && $date >= $now && !isset($nextPhases[$subtype])) {
+    if (($event['type'] ?? '') === 'moon_phase' && astronomyEventVisibleOnSurface($event, ASTRONOMY_EVENT_SURFACE_HOME_PHASES) && isset($phaseLabels[$subtype]) && $date !== null && $date >= $now && !isset($nextPhases[$subtype])) {
         $nextPhases[$subtype] = $event;
     }
 }
@@ -159,7 +159,7 @@ usort($moonHorizonEvents, static fn(array $a, array $b): int => $a['date'] <=> $
 if ($moonInstant !== null) {
     $difference = homeNearestNewMoonDifferenceDays($phasesData['items'] ?? [], $moonInstant['instant'], $timezoneName) ?? homeNewMoonDifferenceFromAge($moonInstant['age_days']);
     try {
-        $moonriseNoticeMaxMinutes = loadMoonriseNoticeMaxMinutes();
+        $moonriseNoticeMaxMinutes = (int) astronomyEditorialNumber('home.moonrise.max_minutes');
     } catch (RuntimeException $exception) {
         error_log('Aquellas Lunas home v2 moonrise configuration error: ' . $exception->getMessage());
         $moonriseNoticeMaxMinutes = DEFAULT_MOONRISE_NOTICE_MAX_MINUTES;
@@ -199,6 +199,7 @@ $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/calendar-scheduler.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/content-trivia.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>

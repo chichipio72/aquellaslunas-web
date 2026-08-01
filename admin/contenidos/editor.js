@@ -1,6 +1,23 @@
 (() => {
   'use strict';
 
+  const importForm = document.querySelector('[data-package-import]');
+  if (importForm) {
+    const textarea = importForm.querySelector('[data-package-json]');
+    const importButton = importForm.querySelector('[name="package_action"][value="import"]');
+    const status = importForm.querySelector('[data-package-copy-status]');
+    textarea?.addEventListener('input', () => { if (importButton) importButton.disabled = true; });
+    importForm.querySelector('[data-copy-package-example]')?.addEventListener('click', async () => {
+      const source = document.querySelector('[data-package-example]')?.textContent || '';
+      try {
+        await navigator.clipboard.writeText(source);
+        status.textContent = 'Ejemplo completo copiado al portapapeles.';
+      } catch {
+        status.textContent = 'No se pudo acceder al portapapeles. Revisá el permiso del navegador.';
+      }
+    });
+  }
+
   const form = document.querySelector('[data-content-editor]');
   if (!form) return;
 

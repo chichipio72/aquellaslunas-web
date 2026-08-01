@@ -2,20 +2,23 @@
 
 require_once __DIR__ . '/presentation.php';
 require_once __DIR__ . '/api-config.php';
+require_once __DIR__ . '/event-type-configuration.php';
+require_once __DIR__ . '/editorial-configuration.php';
+
+function astronomyEventApplyConfiguredBaseName(array $event, array $presentation): array
+{
+    if (astronomyEventFriendlyNameIsCustomized($event)) {
+        $name = astronomyEventFriendlyName($event);
+        if ($name !== null) {
+            $presentation['title'] = $name;
+        }
+    }
+    return $presentation;
+}
 
 function astronomySupermoonMinApparentSizePercent(): float
 {
-    static $threshold = null;
-    if ($threshold !== null) {
-        return $threshold;
-    }
-    try {
-        $threshold = loadSupermoonMinApparentSizePercent();
-    } catch (RuntimeException $exception) {
-        error_log('Aquellas Lunas supermoon configuration error: ' . $exception->getMessage());
-        $threshold = DEFAULT_SUPERMOON_MIN_APPARENT_SIZE_PERCENT;
-    }
-    return $threshold;
+    return astronomyEditorialNumber('event.supermoon.min_percent');
 }
 
 function astronomyEventDateTime($value, string $timezoneName): ?DateTimeImmutable
@@ -111,7 +114,7 @@ function astronomyEarthshineEventIsDisplayable(array $event): bool
         && is_finite((float) $details['illumination_percent'])
         ? (float) $details['illumination_percent']
         : null;
-    return !($offsetDays === 0 && $illumination !== null && $illumination < 0.4);
+    return !($offsetDays === 0 && $illumination !== null && $illumination < astronomyEditorialNumber('event.new_moon.max_illumination_percent'));
 }
 
 function astronomyEventRelationText(int $minutes, string $before, string $after): string
@@ -346,26 +349,26 @@ function astronomyEclipseVisibilityKey(string $subtype, ?string $classification)
 function astronomyEclipseVisibilityMessage(string $subtype, ?string $classification): string
 {
     if ($classification === null || trim($classification) === '') {
-        return 'No se pudo determinar la visibilidad local desde tu ubicación.';
+        return astronomyEditorialText('eclipse.visibility.unknown');
     }
     $normalized = strtolower(trim($classification));
     if ($subtype === 'lunar_eclipse') {
         return match ($normalized) {
-            'not_visible' => 'No será visible desde tu ubicación.',
-            'visible_penumbral_only' => 'Desde tu ubicación sólo será visible la fase penumbral.',
-            'visible_partial' => 'Desde tu ubicación se podrá ver parcialmente.',
-            'visible_total' => 'Desde tu ubicación se podrá ver la fase total.',
-            default => 'No se pudo determinar la visibilidad local desde tu ubicación.',
+            'not_visible' => astronomyEditorialText('eclipse.lunar.not_visible'),
+            'visible_penumbral_only' => astronomyEditorialText('eclipse.lunar.penumbral'),
+            'visible_partial' => astronomyEditorialText('eclipse.lunar.partial'),
+            'visible_total' => astronomyEditorialText('eclipse.lunar.total'),
+            default => astronomyEditorialText('eclipse.visibility.unknown'),
         };
     }
 
     return match ($normalized) {
-        'not_visible' => 'El eclipse ocurrirá, pero no será visible desde tu ubicación.',
-        'visible_partial', 'partial' => 'Desde tu ubicación se verá como un eclipse parcial.',
-        'visible_annular', 'annular' => 'Desde tu ubicación se podrá observar la fase anular.',
-        'visible_total', 'total' => 'Desde tu ubicación se podrá observar la fase total.',
-        'visible_hybrid', 'hybrid' => 'Desde tu ubicación se podrá observar una fase central del eclipse.',
-        default => 'No se pudo determinar la visibilidad local desde tu ubicación.',
+        'not_visible' => astronomyEditorialText('eclipse.solar.not_visible'),
+        'visible_partial', 'partial' => astronomyEditorialText('eclipse.solar.partial'),
+        'visible_annular', 'annular' => astronomyEditorialText('eclipse.solar.annular'),
+        'visible_total', 'total' => astronomyEditorialText('eclipse.solar.total'),
+        'visible_hybrid', 'hybrid' => astronomyEditorialText('eclipse.solar.hybrid'),
+        default => astronomyEditorialText('eclipse.visibility.unknown'),
     };
 }
 
@@ -451,24 +454,24 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
     if ($type === 'conjunction') {
         $objectName = astronomyEventConjunctionObject($event);
         $separation = is_numeric($details['separation_degrees'] ?? null) ? (float) $details['separation_degrees'] : null;
-        if ($separation !== null && $separation <= 1.0) {
-            $presentation['title'] = $objectName . ' y la Luna estarán muy juntas';
-        } elseif ($separation !== null && $separation <= 3.0) {
-            $presentation['title'] = $objectName . ' y la Luna estarán muy cerca';
+        if ($separation !== null && $separation <= astronomyEditorialNumber('event.conjunction.very_close_degrees')) {
+            $presentation['title'] = astronomyEditorialText('event.conjunction.very_close', ['objeto' => $objectName]);
+        } elseif ($separation !== null && $separation <= astronomyEditorialNumber('event.conjunction.close_degrees')) {
+            $presentation['title'] = astronomyEditorialText('event.conjunction.close', ['objeto' => $objectName]);
         } elseif ($separation !== null) {
-            $presentation['title'] = $objectName . ' pasará cerca de la Luna';
+            $presentation['title'] = astronomyEditorialText('event.conjunction.other', ['objeto' => $objectName]);
         }
         $bothVisible = ($details['both_above_horizon'] ?? false) === true;
-        $presentation['summary'] = $bothVisible ? 'Se podrán ver juntos alrededor de esa hora.' : '';
+        $presentation['summary'] = $bothVisible ? astronomyEditorialText('event.conjunction.visible') : '';
         $presentation['explanation'] = $bothVisible
-            ? 'Ambos estarán sobre el horizonte desde esta ubicación.'
-            : 'No estarán visibles simultáneamente desde esta ubicación.';
+            ? astronomyEditorialText('event.conjunction.both_above')
+            : astronomyEditorialText('event.conjunction.not_together');
         $presentation['technical_details'] = astronomyEventTechnicalDetails([
             'Separación angular' => ($value = astronomyEventNumber($details['separation_degrees'] ?? null, 2)) !== null ? $value . '°' : null,
             'Iluminación lunar' => astronomyEventPercent($details['illumination_percent'] ?? null),
             'Altura lunar' => ($value = astronomyEventNumber($details['moon_altitude_degrees'] ?? null, 1)) !== null ? $value . '°' : null,
         ]);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'apsis' && in_array($subtype, ['perigee', 'apogee'], true)) {
@@ -477,8 +480,8 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
             ? 'La Luna estará en su punto más cercano a la Tierra'
             : 'La Luna estará en su punto más lejano de la Tierra';
         $presentation['summary'] = $isPerigee
-            ? 'Se verá un poco más grande de lo habitual.'
-            : 'Se verá un poco más pequeña de lo habitual.';
+            ? astronomyEditorialText('event.perigee.summary')
+            : astronomyEditorialText('event.apogee.summary');
         $presentation['show_time'] = false;
         $presentation['time_label'] = '';
         $presentation['technical_details'] = astronomyEventTechnicalDetails([
@@ -486,7 +489,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
             'Tamaño relativo' => ($value = astronomyEventNumber($details['apparent_size_percent'] ?? null, 1)) !== null ? $value . '%' : null,
             'Iluminación' => astronomyEventPercent($details['illumination_percent'] ?? null),
         ]);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'earthshine') {
@@ -503,7 +506,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         $presentation['time_label'] = $timeLabel . ($endDate !== null ? '–' . $endDate->format('H:i') : '');
         $presentation['observation'] = $observation;
         if ($observation !== null && $observation['earthshine_visible']) {
-            $presentation['explanation'] = 'También puede verse la parte oscura del disco lunar.';
+            $presentation['explanation'] = astronomyEditorialText('event.earthshine.explanation');
         }
         $presentation['technical_details'] = astronomyEventTechnicalDetails([
             'Carácter' => 'Ventana observacional estimada.',
@@ -516,7 +519,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
                 : null,
             'Altura lunar' => ($value = astronomyEventNumber($details['moon_altitude_degrees'] ?? null, 1)) !== null ? $value . '°' : null,
         ]);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'moon_phase') {
@@ -529,18 +532,18 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
             && $apparentSizePercent !== null
             && $apparentSizePercent >= astronomySupermoonMinApparentSizePercent()
         ) {
-            $presentation['title'] = 'Superluna';
-            $presentation['summary'] = 'La Luna llena se verá más grande de lo habitual.';
+            $presentation['title'] = astronomyEditorialText('event.supermoon.title');
+            $presentation['summary'] = astronomyEditorialText('event.supermoon.summary');
         }
         if (in_array($subtype, ['first_quarter', 'last_quarter'], true)) {
-            $presentation['summary'] = 'Un buen momento para observar cráteres, montañas y sombras en la superficie lunar.';
+            $presentation['summary'] = astronomyEditorialText('event.quarter.summary');
         }
         $presentation['technical_details'] = astronomyEventTechnicalDetails([
             'Iluminación' => astronomyEventPercent($details['illumination_percent'] ?? null),
             'Distancia' => ($value = astronomyEventNumber($details['distance_km'] ?? null, 0)) !== null ? $value . ' km' : null,
             'Tamaño relativo' => ($value = astronomyEventNumber($apparentSizePercent, 1)) !== null ? $value . '%' : null,
         ]);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'libration') {
@@ -569,11 +572,11 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         }
 
         $phaseSummary = astronomyLibrationPhaseSummary($details);
-        $observationNote = ($amplitudeValue !== null && $amplitudeValue >= 7.2)
-            ? 'Con telescopio o una fotografía detallada puede notarse mejor cerca del borde favorecido.'
-            : 'Es un efecto sutil, más fácil de apreciar comparando fotografías tomadas en distintas fechas.';
+        $observationNote = ($amplitudeValue !== null && $amplitudeValue >= astronomyEditorialNumber('event.libration.strong_degrees'))
+            ? astronomyEditorialText('event.libration.strong')
+            : astronomyEditorialText('event.libration.subtle');
         $presentation['explanation'] = trim($phaseSummary . ' ' . $observationNote);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'eclipse' && in_array($subtype, ['lunar_eclipse', 'solar_eclipse'], true)) {
@@ -666,7 +669,7 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
         if ($visibilityClassification === null || trim($visibilityClassification) === '') {
             $presentation['explanation'] = 'No se pudo determinar la visibilidad local.';
         }
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
     if ($type === 'full_moon_observation' && in_array($subtype, ['morning', 'evening'], true)) {
@@ -685,8 +688,8 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
             'Iluminación lunar' => astronomyEventPercent($details['illumination_percent'] ?? null),
             'Clasificación temporal' => is_string($details['temporal_classification'] ?? null) ? $details['temporal_classification'] : null,
         ]);
-        return $presentation;
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }
 
-    return $presentation;
+    return astronomyEventApplyConfiguredBaseName($event, $presentation);
 }

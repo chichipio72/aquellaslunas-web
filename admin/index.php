@@ -36,6 +36,11 @@ requireStoreAdminAuthentication();
                 <span>Activá o desactivá visibilidad de contenidos, entradas del menú principal y tarjetas de portada.</span>
                 <strong>Entrar a Configuración del sitio</strong>
             </a>
+            <a class="card store-admin-dashboard__card" href="presentacion/">
+                <span class="store-admin-dashboard__card-label">Presentación del sitio</span>
+                <span>Configurá nombres y superficies públicas para los tipos de eventos astronómicos.</span>
+                <strong>Entrar a Presentación</strong>
+            </a>
             <a class="card store-admin-dashboard__card" href="fotos.php">
                 <span class="store-admin-dashboard__card-label">Galería y tienda</span>
                 <span>Gestioná imágenes, publicaciones, productos y descargas.</span>

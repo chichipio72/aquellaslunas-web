@@ -31,9 +31,10 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
     $rootPrefix = storeAdminNavigationRootPrefix();
 
     $sections = [
-        'home' => ['label' => 'Inicio', 'href' => 'index.php'],
+        'home' => ['label' => 'Inicio', 'href' => './'],
         'contents' => ['label' => 'Contenidos', 'href' => 'contenidos/'],
-        'site_configuration' => ['label' => 'Configuración del sitio', 'href' => 'configuracion-sitio/'],
+        'site_configuration' => ['label' => 'Visibilidad de secciones', 'href' => 'configuracion-sitio/'],
+        'presentation' => ['label' => 'Visibilidad de eventos', 'href' => 'presentacion/'],
         'gallery' => ['label' => 'Galería', 'href' => 'fotos.php'],
         'laboratory' => ['label' => 'Laboratorio', 'href' => 'laboratorio-astronomico.php'],
     ];
@@ -46,11 +47,16 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
             <p class="eyebrow">Área privada</p>
             <h1><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h1>
         </div>
-        <nav class="store-admin-navigation" aria-label="Administración">
-            <div class="store-admin-navigation__links">
+        <nav class="store-admin-navigation" aria-label="Administración" data-store-admin-navigation>
+            <div class="store-admin-navigation__menu">
+                <button type="button" class="store-admin-navigation__menu-button" aria-expanded="false" aria-haspopup="true" aria-controls="store-admin-navigation-menu" data-store-admin-menu-button>
+                    <span>Menú</span><strong><?= htmlspecialchars($sections[$activeSection]['label'], ENT_QUOTES, 'UTF-8') ?></strong><span class="store-admin-navigation__chevron" aria-hidden="true"></span>
+                </button>
+                <div id="store-admin-navigation-menu" class="store-admin-navigation__links" role="menu" hidden data-store-admin-menu>
             <?php foreach ($sections as $section => $item): ?>
-                <a class="store-admin-navigation__link<?= $section === $activeSection ? ' is-active' : '' ?>" href="<?= htmlspecialchars($rootPrefix . $item['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $section === $activeSection ? ' aria-current="page"' : '' ?>><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></a>
+                <a class="store-admin-navigation__link<?= $section === $activeSection ? ' is-active' : '' ?>" href="<?= htmlspecialchars($rootPrefix . $item['href'], ENT_QUOTES, 'UTF-8') ?>"<?= $section === $activeSection ? ' aria-current="page"' : '' ?> role="menuitem"><?= htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8') ?></a>
             <?php endforeach; ?>
+                </div>
             </div>
             <form method="post" action="<?= htmlspecialchars($rootPrefix . 'logout.php', ENT_QUOTES, 'UTF-8') ?>" class="store-admin-navigation__logout">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(storeAdminCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
@@ -58,5 +64,39 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
             </form>
         </nav>
     </header>
+    <script>
+    (() => {
+        const navigation = document.querySelector('[data-store-admin-navigation]');
+        const button = navigation?.querySelector('[data-store-admin-menu-button]');
+        const menu = navigation?.querySelector('[data-store-admin-menu]');
+        if (!navigation || !button || !menu) return;
+        const links = [...menu.querySelectorAll('[role="menuitem"]')];
+        const close = (restoreFocus = false) => {
+            menu.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) button.focus();
+        };
+        const open = (focusFirst = false) => {
+            menu.hidden = false;
+            button.setAttribute('aria-expanded', 'true');
+            if (focusFirst) (menu.querySelector('[aria-current="page"]') || links[0])?.focus();
+        };
+        button.addEventListener('click', () => menu.hidden ? open() : close());
+        button.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); open(true); }
+        });
+        menu.addEventListener('keydown', (event) => {
+            const current = links.indexOf(document.activeElement);
+            if (event.key === 'Escape') { event.preventDefault(); close(true); return; }
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === 'Home' ? 0 : (event.key === 'End' ? links.length - 1 : (current + (event.key === 'ArrowDown' ? 1 : -1) + links.length) % links.length);
+            links[next]?.focus();
+        });
+        links.forEach((link) => link.addEventListener('click', () => close()));
+        document.addEventListener('click', (event) => { if (!navigation.contains(event.target)) close(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !menu.hidden) close(true); });
+    })();
+    </script>
     <?php
 }

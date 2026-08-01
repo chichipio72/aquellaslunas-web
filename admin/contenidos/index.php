@@ -151,6 +151,8 @@ $notice = '';
 $message = '';
 $raw = contentEditorEmptyArticle();
 $articleMetadata = null;
+$importJson = '';
+$importValidation = null;
 
 $dbArticles = [];
 $dbArticleDiagnostics = [];
@@ -181,29 +183,60 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mode = (string) ($_POST['mode'] ?? 'edit');
+    if ($mode === 'package_import') {
+        $action = 'import';
+        $importJson = (string) ($_POST['package_json'] ?? '');
+        if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+            $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
+        } elseif ($dbConnection === null) {
+            $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para validar o importar el paquete.');
+        } else {
+            $importValidation = contentEditorValidatePackageJson($importJson);
+            if ($importValidation['valid'] && contentEditorDbSlugExists($dbConnection, $importValidation['slug'])) {
+                $importValidation['valid'] = false;
+                $importValidation['summary'] = null;
+                $importValidation['errors'][] = contentEditorPackageError(
+                    'articulo.slug',
+                    'Ya existe un artículo con ese slug. Editalo desde el editor normal; la importación nunca sobrescribe contenido.'
+                );
+            }
+            if (!$importValidation['valid']) {
+                $errors = array_merge($errors, $importValidation['errors']);
+            } elseif (($_POST['package_action'] ?? '') === 'import') {
+                $import = contentEditorDbImportPackage($dbConnection, $importJson);
+                if ($import['imported']) {
+                    header('Location: index.php?action=edit&slug=' . rawurlencode($import['slug']) . '&imported=1', true, 303);
+                    exit;
+                }
+                $errors = array_merge($errors, $import['errors']);
+                $importValidation['valid'] = false;
+                $importValidation['summary'] = null;
+            }
+        }
+    }
     if (in_array($mode, ['new', 'edit'], true)) {
         $action = $mode === 'new' ? 'new' : 'edit';
-    }
-    $slug = trim((string) ($_POST['slug'] ?? $slug));
-    $raw = contentEditorNormalizePost($_POST);
-    $activeTab = in_array((string) ($_POST['active_tab'] ?? ''), ['content', 'facts', 'trivias'], true)
-        ? (string) $_POST['active_tab']
-        : $activeTab;
+        $slug = trim((string) ($_POST['slug'] ?? $slug));
+        $raw = contentEditorNormalizePost($_POST);
+        $activeTab = in_array((string) ($_POST['active_tab'] ?? ''), ['content', 'facts', 'trivias'], true)
+            ? (string) $_POST['active_tab']
+            : $activeTab;
 
-    if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
-        $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
-    } elseif ($dbConnection === null) {
-        $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para guardar el artículo.');
-    } else {
-        $isNew = $action === 'new';
-        $originalSlug = trim((string) ($_POST['original_slug'] ?? ''));
-        $save = contentEditorDbSaveArticle($dbConnection, $originalSlug, $slug, $raw, $isNew);
-        if ($save['saved']) {
-            $targetSlug = trim((string) $save['slug']);
-            header('Location: index.php?action=edit&slug=' . rawurlencode($targetSlug) . '&saved=1', true, 303);
-            exit;
+        if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+            $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
+        } elseif ($dbConnection === null) {
+            $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para guardar el artículo.');
+        } else {
+            $isNew = $action === 'new';
+            $originalSlug = trim((string) ($_POST['original_slug'] ?? ''));
+            $save = contentEditorDbSaveArticle($dbConnection, $originalSlug, $slug, $raw, $isNew);
+            if ($save['saved']) {
+                $targetSlug = trim((string) $save['slug']);
+                header('Location: index.php?action=edit&slug=' . rawurlencode($targetSlug) . '&saved=1', true, 303);
+                exit;
+            }
+            $errors = array_merge($errors, $save['errors']);
         }
-        $errors = array_merge($errors, $save['errors']);
     }
 }
 
@@ -229,9 +262,12 @@ if ($action === 'new' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 if (($_GET['saved'] ?? '') === '1') {
     $message = 'Cambios guardados correctamente en MySQL.';
+} elseif (($_GET['imported'] ?? '') === '1') {
+    $message = 'Paquete editorial importado completamente en MySQL.';
 }
 
 $editing = ($action === 'edit' && $slug !== '') || $action === 'new';
+$importing = $action === 'import';
 $isNewArticle = $action === 'new';
 $editorImageGallery = contentEditorImageGallery();
 $saveFailed = $_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [];
@@ -252,12 +288,12 @@ $tabErrorCounts = editorTabErrorCounts($errors);
 <main class="container editor-container">
 <?php if ($notice !== ''): ?><p class="editor-notice" role="status"><?= editorHtml($notice) ?></p><?php endif; ?>
 <?php if ($message !== ''): ?><section class="editor-notice" role="status"><strong><?= editorHtml($message) ?></strong></section><?php endif; ?>
-<?php if ($errors !== []): ?><section class="editor-errors" role="alert"><h2>Error de lectura MySQL</h2><ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'mysql') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
+<?php if ($errors !== []): ?><section class="editor-errors" role="alert"><h2>No se pudo completar la operación</h2><ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'mysql') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
 <?php if ($dbGlobalWarnings !== []): ?><section class="editor-warnings" role="status"><h2>Advertencias globales de MySQL</h2><ul><?php foreach ($dbGlobalWarnings as $warning): ?><li><code><?= editorHtml($warning['field'] ?? 'mysql') ?></code>: <?= editorHtml($warning['message'] ?? 'Advertencia') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
-<?php if (!$editing): ?>
+<?php if (!$editing && !$importing): ?>
     <div class="editor-heading">
         <div><p class="eyebrow">GESTIÓN EDITORIAL</p><h2>Contenidos desde MySQL</h2></div>
-        <a class="editor-button editor-button--primary" href="index.php?action=new">Nuevo artículo</a>
+        <div class="editor-heading__actions"><a class="editor-button editor-button--quiet" href="index.php?action=import">Importar contenido completo</a><a class="editor-button editor-button--primary" href="index.php?action=new">Nuevo artículo</a></div>
     </div>
     <?php if ($errors !== []): ?>
         <p class="editor-title-note">No se muestra el listado porque la consulta a MySQL falló.</p>
@@ -297,6 +333,42 @@ $tabErrorCounts = editorTabErrorCounts($errors);
         </table>
     </div>
     <?php endif; ?>
+<?php elseif ($importing): ?>
+    <div class="editor-heading">
+        <div><p class="eyebrow">IMPORTACIÓN JSON</p><h2>Importar contenido completo</h2></div>
+        <a class="editor-link" href="index.php">Volver al listado</a>
+    </div>
+    <section class="editor-panel editor-import-help">
+        <h3>Paquete editorial versionado</h3>
+        <p>La operación crea un artículo nuevo junto con todas sus trivias y tarjetas “Sabías que…”. Nunca reemplaza contenido existente.</p>
+    </section>
+    <form class="editor-form editor-import-form" method="post" data-package-import>
+        <input type="hidden" name="csrf_token" value="<?= editorHtml(contentEditorCsrfToken()) ?>">
+        <input type="hidden" name="mode" value="package_import">
+        <label for="package-json">JSON del paquete</label>
+        <textarea id="package-json" name="package_json" rows="30" spellcheck="false" data-package-json required><?= editorHtml($importJson) ?></textarea>
+        <div class="editor-import-actions">
+            <button class="editor-button editor-button--quiet" type="button" data-copy-package-example>Copiar ejemplo</button>
+            <button class="editor-button editor-button--quiet" type="submit" name="package_action" value="validate">Validar</button>
+            <button class="editor-button editor-button--primary" type="submit" name="package_action" value="import"<?= is_array($importValidation) && ($importValidation['valid'] ?? false) ? '' : ' disabled' ?>>Importar</button>
+        </div>
+        <p class="editor-import-copy-status" data-package-copy-status role="status" aria-live="polite"></p>
+    </form>
+    <?php if (is_array($importValidation) && ($importValidation['valid'] ?? false) && is_array($importValidation['summary'] ?? null)): ?>
+        <?php $summary = $importValidation['summary']; ?>
+        <section class="editor-panel editor-import-summary" aria-labelledby="editor-import-summary-title">
+            <h3 id="editor-import-summary-title">Paquete válido, listo para importar</h3>
+            <dl>
+                <div><dt>Slug</dt><dd><code><?= editorHtml($summary['slug']) ?></code></dd></div>
+                <div><dt>Título</dt><dd><?= editorHtml($summary['titulo']) ?></dd></div>
+                <div><dt>Palabras clave</dt><dd><?= (int) $summary['palabras_clave'] ?></dd></div>
+                <div><dt>Relaciones</dt><dd><?= (int) $summary['relaciones'] ?></dd></div>
+                <div><dt>Trivias</dt><dd><?= (int) $summary['trivias'] ?></dd></div>
+                <div><dt>Sabías que</dt><dd><?= (int) $summary['sabias_que'] ?></dd></div>
+            </dl>
+        </section>
+    <?php endif; ?>
+    <script type="application/json" data-package-example><?= str_replace('</', '<\/', contentEditorPackageExampleJson()) ?></script>
 <?php else: ?>
     <div class="editor-heading">
         <div><p class="eyebrow">EDICIÓN MYSQL</p><h2><?= $isNewArticle ? 'Nuevo artículo' : editorHtml($raw['titulo'] ?? $slug) ?></h2><?php if (is_array($articleMetadata) && isset($articleMetadata['actualizado_en'])): ?><p class="editor-title-note">Actualizado en MySQL: <?= editorHtml((string) $articleMetadata['actualizado_en']) ?></p><?php endif; ?></div>

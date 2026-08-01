@@ -1,0 +1,42 @@
+.presentation-admin { max-width: 76rem; margin: 0 auto; }
+.presentation-admin__intro { margin-bottom: 1rem; }
+.presentation-admin__intro h2 { margin-top: .2rem; }
+.presentation-admin__intro p { max-width: 58rem; line-height: 1.55; }
+.presentation-admin__tip { color: var(--muted); font-size: .82rem; }
+.presentation-admin__areas { display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 1rem; }
+.presentation-admin__areas a { color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: .45rem .8rem; text-decoration: none; }
+.presentation-admin__areas a[aria-current="page"] { background: rgba(214, 185, 255, .15); border-color: var(--accent); }
+.editorial-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin: .8rem 0; }
+.editorial-rule { display: grid; align-content: start; gap: .65rem; padding: .75rem; border: 1px solid rgba(170, 178, 197, .2); border-radius: .6rem; background: rgba(5, 10, 21, .34); }
+.editorial-rule header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.editorial-rule h4 { margin: 0; color: #f2f5ff; font-size: .96rem; }
+.editorial-origin { flex: 0 0 auto; padding: .2rem .45rem; border: 1px solid rgba(170, 178, 197, .25); border-radius: 999px; color: var(--muted); font-size: .7rem; }
+.editorial-origin.is-modified { border-color: rgba(239, 217, 151, .55); color: #efd997; background: rgba(239, 217, 151, .08); }
+.editorial-field { display: grid; gap: .35rem; }
+.editorial-field > span:first-child { color: #c9d4f4; font-size: .8rem; font-weight: 650; }
+.editorial-field__control { display: flex; align-items: center; gap: .5rem; }
+.editorial-field input { max-width: 8rem; padding: .5rem .6rem; border: 1px solid #4b5d88; border-radius: .45rem; color: #fff; background: #111b34; }
+.editorial-field textarea { width: 100%; min-height: 4.35rem; padding: .6rem .7rem; border: 1px solid #53658d; border-radius: .5rem; color: #fff; background: #111b34; resize: vertical; font: inherit; line-height: 1.4; }
+.editorial-field input:focus, .editorial-field textarea:focus { border-color: #9ab4ff; outline: 2px solid rgba(154, 180, 255, .2); outline-offset: 1px; }
+.editorial-field small, .editorial-preview { color: var(--muted); font-size: .85rem; }
+.editorial-preview { display: block; padding: .55rem .7rem; border-left: 2px solid var(--border); }
+.editorial-restore { margin-top: .5rem; }
+.presentation-admin__status { max-width: 76rem; margin-inline: auto; }
+.presentation-admin__form { display: grid; gap: 1rem; }
+.presentation-category { padding: 1rem; border: 1px solid var(--border); border-radius: .8rem; background: rgba(14, 21, 37, .78); }
+.presentation-category h3 { margin: 0 0 .8rem; color: #efd997; font-size: 1.05rem; }
+.presentation-category__items { display: grid; gap: .55rem; }
+.presentation-event { border: 1px solid rgba(170, 178, 197, .2); border-radius: .6rem; background: rgba(5, 10, 21, .42); }
+.presentation-event summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem .85rem; cursor: pointer; }
+.presentation-event summary span { font-weight: 650; }
+.presentation-event summary small { color: var(--muted); }
+.presentation-event__body { display: grid; gap: .9rem; padding: .2rem .85rem 1rem; border-top: 1px solid rgba(170, 178, 197, .15); }
+.presentation-event__name { display: grid; gap: .35rem; max-width: 36rem; color: var(--muted); font-size: .78rem; }
+.presentation-event__name input { width: 100%; padding: .58rem .65rem; border: 1px solid rgba(170, 178, 197, .28); border-radius: .45rem; background: rgba(6, 11, 23, .7); color: var(--text); font: inherit; }
+.presentation-event__enabled { display: flex; align-items: center; gap: .5rem; width: fit-content; font-weight: 650; }
+.presentation-event fieldset { padding: .75rem; border: 1px solid rgba(170, 178, 197, .18); border-radius: .55rem; }
+.presentation-event legend { padding-inline: .35rem; color: var(--muted); font-size: .76rem; }
+.presentation-event__surfaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; }
+.presentation-event__surfaces label { display: flex; align-items: center; gap: .45rem; }
+.presentation-admin__actions { position: sticky; bottom: .5rem; display: flex; justify-content: flex-end; gap: .65rem; padding: .75rem; border: 1px solid var(--border); border-radius: .7rem; background: rgba(8, 13, 27, .96); }
+@media (max-width: 700px) { .editorial-fields, .presentation-event__surfaces { grid-template-columns: 1fr; } .presentation-admin__actions { justify-content: stretch; } .presentation-admin__actions > * { flex: 1; } }

@@ -12,6 +12,8 @@ require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/tonight.php';
 require_once __DIR__ . '/includes/explore-sky.php';
+require_once __DIR__ . '/includes/event-type-configuration.php';
+require_once __DIR__ . '/includes/editorial-configuration.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -58,8 +60,8 @@ try {
             'latitude' => $location['latitude'],
             'longitude' => $location['longitude'],
             'timezone' => $timezoneName,
-            'types' => 'moon_phase,conjunction,eclipse,earthshine,full_moon_observation,apsis,libration',
-            'max_difference_minutes' => 70,
+            'types' => implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_TONIGHT)),
+            'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
         ]);
         $eventsResult = astronomyApiRequest(
             $apiConfig['base_url'] . '/v1/astronomy/events?' . $eventsQuery,
@@ -69,7 +71,7 @@ try {
         if ($eventsResult['body'] !== false && (int) $eventsResult['http_code'] === 200) {
             $decodedEvents = json_decode((string) $eventsResult['body'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decodedEvents['items'] ?? null)) {
-                $tonightEvents = $decodedEvents['items'];
+                $tonightEvents = astronomyFilterEventsForSurface($decodedEvents['items'], ASTRONOMY_EVENT_SURFACE_TONIGHT);
             }
         }
     }
@@ -109,6 +111,7 @@ $pageSeo = aquellasLunasSeoPage(
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>

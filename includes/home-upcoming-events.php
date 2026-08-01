@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/editorial-configuration.php';
+
 const HOME_UPCOMING_EVENT_LIMIT = 6;
 const HOME_UPCOMING_EVENT_TYPES = 'moon_phase,apsis,conjunction,earthshine,full_moon_observation';
 const HOME_UPCOMING_SEGMENTS = [
@@ -64,13 +66,20 @@ function homeUpcomingProgressiveSearch(
     DateTimeImmutable $now,
     string $timezoneName,
     callable $fetchSegment,
-    int $limit = HOME_UPCOMING_EVENT_LIMIT
+    ?int $limit = null
 ): array {
+    $limit ??= (int) astronomyEditorialNumber('home.upcoming.max_items');
     $initialDate = new DateTimeImmutable($now->format('Y-m-d'), new DateTimeZone($timezoneName));
     $collected = [];
     $queries = [];
     $valid = [];
-    foreach (HOME_UPCOMING_SEGMENTS as $segment) {
+    $maxDays = (int) astronomyEditorialNumber('home.upcoming.max_days');
+    $segments = [
+        ['offset_days' => 0, 'days' => 7, 'label' => '1-7'],
+        ['offset_days' => 7, 'days' => 7, 'label' => '8-14'],
+        ['offset_days' => 14, 'days' => $maxDays - 14, 'label' => '15-' . $maxDays],
+    ];
+    foreach ($segments as $segment) {
         $startDate = $initialDate->modify('+' . $segment['offset_days'] . ' days')->format('Y-m-d');
         $days = (int) $segment['days'];
         $queries[] = ['start_date' => $startDate, 'days' => $days, 'label' => $segment['label']];

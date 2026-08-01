@@ -6,6 +6,7 @@
 .editor-brand small { display: block; color: var(--muted); font-size: .68rem; font-weight: 400; }
 .editor-container { max-width: 74rem; padding-block: 2rem 4rem; }
 .editor-heading { margin-bottom: 1.25rem; }
+.editor-heading__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; }
 .editor-heading h1 { margin: .2rem 0 0; }
 .editor-link, .editor-link:visited { color: #b8caef; text-decoration: none; border-bottom: 1px solid rgba(184, 202, 239, .3); }
 .editor-link:hover, .editor-link:focus-visible { color: #fff; border-color: currentColor; }
@@ -47,6 +48,17 @@
 .editor-warning-action:hover { color: #fff; border-color: currentColor; }
 .editor-warning-action:focus-visible { border-radius: .15rem; outline: 2px solid #9fb7e6; outline-offset: 2px; }
 .editor-notice { border-color: rgba(166, 194, 153, .4); color: #c8dbbd; }
+.editor-import-help h3, .editor-import-summary h3 { margin-top: 0; color: #e7d69e; font-size: 1rem; }
+.editor-import-help p { margin-bottom: 0; color: var(--muted); line-height: 1.55; }
+.editor-import-form { display: grid; gap: .65rem; margin-bottom: 1rem; }
+.editor-import-form > label { color: var(--muted); font-size: .78rem; }
+.editor-import-form textarea { min-height: 32rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; tab-size: 2; }
+.editor-import-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.editor-import-copy-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .74rem; text-align: right; }
+.editor-import-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-bottom: 0; }
+.editor-import-summary dl > div { padding: .65rem; border: 1px solid rgba(170, 178, 197, .18); border-radius: .5rem; background: rgba(5, 10, 21, .35); }
+.editor-import-summary dt { color: var(--muted); font-size: .68rem; text-transform: uppercase; }
+.editor-import-summary dd { margin: .25rem 0 0; overflow-wrap: anywhere; color: var(--text); font-size: .84rem; }
 .editor-tabs { display: flex; gap: .25rem; margin-bottom: 1rem; padding: .25rem; border: 1px solid var(--border); border-radius: .65rem; background: rgba(8, 13, 27, .72); }
 .editor-tab { position: relative; flex: 0 1 auto; min-height: 2.5rem; padding: .48rem .9rem; border: 0; border-radius: .45rem; background: transparent; color: var(--muted); font: 600 .82rem/1.2 inherit; cursor: pointer; }
 .editor-tab:hover { color: var(--text); background: rgba(255, 255, 255, .035); }
@@ -149,6 +161,8 @@
   .editor-image-block-builder__fields { grid-template-columns: 1fr; }
   .editor-wide { grid-column: auto; }
   .editor-heading, .editor-section-heading { align-items: flex-start; flex-direction: column; }
+  .editor-heading__actions { width: 100%; justify-content: flex-start; }
+  .editor-import-summary dl { grid-template-columns: 1fr; }
   .editor-tabs { width: 100%; overflow: hidden; }
   .editor-tab { min-width: 0; flex: 1 1 0; padding-inline: .35rem; }
   .editor-collection { grid-template-columns: 1fr; }
