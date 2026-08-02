@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
@@ -107,21 +108,24 @@ try {
     $daily = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $dateParam] + $common), 'home v2 daily', 12, $usingCustomLocation);
     $nextDaily = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $now->modify('+1 day')->format('Y-m-d')] + $common), 'home v2 next daily', 12, $usingCustomLocation);
     $moonInstantRaw = homeV2ApiRequest($apiBaseUrl . '/v1/moon/instant?' . http_build_query(['datetime' => $now->format(DateTimeInterface::ATOM)] + $common), 'home v2 moon instant', 12, $usingCustomLocation);
-    $phasesData = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $now->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common), 'home v2 phases', 35, $usingCustomLocation);
+    $phasesData = astronomyEvents([
+        'start_date' => $now->modify('-35 days')->format('Y-m-d'),
+        'days' => 80,
+        'types' => 'moon_phase',
+    ] + $common, 'home v2 phases', 35);
     $upcomingSearch = homeUpcomingProgressiveSearch(
         $now,
         $timezoneName,
-        static function (string $startDate, int $days, string $segmentLabel) use ($apiBaseUrl, $common, $usingCustomLocation): ?array {
-            return homeV2ApiRequest(
-                $apiBaseUrl . '/v1/astronomy/events?' . http_build_query([
+        static function (string $startDate, int $days, string $segmentLabel) use ($common): ?array {
+            return astronomyEvents(
+                [
                     'start_date' => $startDate,
                     'days' => $days,
                     'types' => implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING)),
                     'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
-                ] + $common),
+                ] + $common,
                 'home v2 upcoming ' . $segmentLabel,
-                20,
-                $usingCustomLocation
+                20
             );
         }
     );

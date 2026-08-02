@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
@@ -54,7 +55,7 @@ try {
         }
     }
     if ($tonightData !== null) {
-        $eventsQuery = http_build_query([
+        $eventsData = astronomyEvents([
             'start_date' => $date,
             'days' => 2,
             'latitude' => $location['latitude'],
@@ -62,18 +63,11 @@ try {
             'timezone' => $timezoneName,
             'types' => implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_TONIGHT)),
             'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
-        ]);
-        $eventsResult = astronomyApiRequest(
-            $apiConfig['base_url'] . '/v1/astronomy/events?' . $eventsQuery,
+        ],
             'tonight lunar events',
             20
         );
-        if ($eventsResult['body'] !== false && (int) $eventsResult['http_code'] === 200) {
-            $decodedEvents = json_decode((string) $eventsResult['body'], true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedEvents['items'] ?? null)) {
-                $tonightEvents = astronomyFilterEventsForSurface($decodedEvents['items'], ASTRONOMY_EVENT_SURFACE_TONIGHT);
-            }
-        }
+        $tonightEvents = astronomyFilterEventsForSurface($eventsData['items'], ASTRONOMY_EVENT_SURFACE_TONIGHT);
     }
 } catch (RuntimeException $exception) {
     $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';

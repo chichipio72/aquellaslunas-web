@@ -41,6 +41,11 @@ requireStoreAdminAuthentication();
                 <span>Configurá nombres y superficies públicas para los tipos de eventos astronómicos.</span>
                 <strong>Entrar a Presentación</strong>
             </a>
+            <a class="card store-admin-dashboard__card" href="fuentes-astronomicas/">
+                <span class="store-admin-dashboard__card-label">Fuentes astronómicas</span>
+                <span>Elegí la fuente disponible para cada grupo de eventos astronómicos.</span>
+                <strong>Configurar fuentes</strong>
+            </a>
             <a class="card store-admin-dashboard__card" href="fotos.php">
                 <span class="store-admin-dashboard__card-label">Galería y tienda</span>
                 <span>Gestioná imágenes, publicaciones, productos y descargas.</span>
@@ -50,6 +55,11 @@ requireStoreAdminAuthentication();
                 <span class="store-admin-dashboard__card-label">Laboratorio astronómico</span>
                 <span>Explorá y compará datos astronómicos mediante gráficos interactivos.</span>
                 <strong>Entrar al Laboratorio</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="notificaciones-prueba.php">
+                <span class="store-admin-dashboard__card-label">Notificaciones de prueba</span>
+                <span>Suscribí este dispositivo y enviá notificaciones Web Push manuales.</span>
+                <strong>Probar notificaciones</strong>
             </a>
         </div>
     </main>

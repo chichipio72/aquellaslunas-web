@@ -27,6 +27,7 @@ grep -q 'href="../fotos.php"' "$work_dir/auth"
 grep -q 'href="../laboratorio-astronomico.php"' "$work_dir/auth"
 grep -q 'name="settings\[content.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[menu.today.enabled\]"' "$work_dir/auth"
+grep -q 'name="settings\[menu.administration.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[home.today.enabled\]"' "$work_dir/auth"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/csrf-invalid" -w '%{http_code}' -X POST \
@@ -53,6 +54,7 @@ status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/s
   --data-urlencode 'settings[menu.location.enabled]=1' \
   --data-urlencode 'settings[menu.capabilities.enabled]=1' \
   --data-urlencode 'settings[menu.about.enabled]=1' \
+  --data-urlencode 'settings[menu.administration.enabled]=1' \
   --data-urlencode 'settings[home.today.enabled]=1' \
   --data-urlencode 'settings[home.tonight.enabled]=1' \
   --data-urlencode 'settings[home.phases.enabled]=1' \

@@ -49,6 +49,8 @@ noche y eclipses combinan estados técnicos conocidos. La configuración de
 nubosidad llega al navegador como JSON validado y escapado; el resto se consume
 por helpers PHP comunes.
 
+Las familias de tipos y los bloques de reglas arrancan contraídos y admiten varias secciones abiertas simultáneamente. La grilla usa columnas automáticas según el ancho disponible. En Reglas y mensajes, el buscador localiza texto efectivo, defaults, etiquetas y placeholders sin requests; abre los bloques coincidentes, resalta tarjeta y campo, y restaura el estado anterior al limpiar.
+
 ### Estructura de `/admin`
 
 | Ruta | Responsabilidad |
@@ -59,10 +61,12 @@ por helpers PHP comunes.
 | `/admin/fotos.php` | Administración de la galería y tienda. |
 | `/admin/laboratorio-astronomico.php` | Interfaz del Laboratorio Astronómico. |
 | `/admin/contenidos/` y `/admin/contenidos/index.php` | Editor administrativo de artículos, trivias y bloques “Sabías que...”. |
+| `/admin/configuracion-sitio/` | Visibilidad de secciones públicas. |
+| `/admin/presentacion/` | Nombres, habilitación y superficies de tipos de eventos. |
+| `/admin/presentacion/reglas.php` | Parámetros, precedencias informadas y mensajes editoriales. |
 | `/admin/api/datos-astronomicos.php` | Endpoint JSON privado del laboratorio. |
 
-`admin/index.php` no redirige a una herramienta concreta: presenta tarjetas para
-Galería y tienda, Laboratorio Astronómico y Contenidos editoriales. Una nueva herramienta debe agregarse al
+`admin/index.php` no redirige a una herramienta concreta: presenta las áreas disponibles. Una nueva herramienta debe agregarse al
 panel y a la navegación común sólo si corresponde que sea accesible desde todo el
 administrador.
 
@@ -102,8 +106,8 @@ herramienta.
 ### Navegación y componentes compartidos
 
 `includes/store-admin-navigation.php` genera el encabezado común mediante
-`renderStoreAdminNavigation($activeSection, $title)`. Incluye Inicio, Contenidos,
-Galería, Laboratorio y el formulario seguro para cerrar sesión; aplica
+`renderStoreAdminNavigation($activeSection, $title)`. Su menú desplegable incluye Inicio, Contenidos,
+Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio. El formulario seguro para cerrar sesión queda fuera del menú; aplica
 `aria-current="page"` y la clase activa correspondiente.
 
 La navegación resuelve enlaces válidos en todo `/admin` a partir de la ruta actual
@@ -135,6 +139,9 @@ el tipo técnico necesario y no exponer rutas, DSN ni credenciales.
   y extremos sobre `datos_astronomicos` en modo sólo consulta.
 - Contenidos (`/admin/contenidos/`): edición estructurada de artículos editoriales en
   MySQL con validación y persistencia transaccional.
+- Visibilidad de secciones (`/admin/configuracion-sitio/`): publicación de bloques y rutas públicas mediante claves cerradas.
+- Visibilidad de eventos (`/admin/presentacion/`): nombres amigables, habilitación, superficies y relevancia nocturna.
+- Reglas y mensajes (`/admin/presentacion/reglas.php`): umbrales y textos efectivos con defaults en código y overrides MySQL.
 
 ## Editor de contenidos
 
@@ -189,7 +196,9 @@ Cada artículo (`contenido_articulos`) puede tener múltiples:
 Cada trivia puede tener múltiples opciones (`contenido_trivia_opciones`) y una sola
 opción correcta representada por `correcta = 1` con explicación asociada.
 
-### Importador histórico de migración
+### Importación editorial JSON e importador histórico
+
+La opción **Importar paquete JSON** de `/admin/contenidos/` es el flujo operativo para crear de una vez un artículo, relaciones, palabras clave, trivias, opciones y bloques “Sabías que...”. Valida esquema cerrado, tipos, claves desconocidas, slug, imágenes, referencias y UTF-8 antes de escribir. Primero permite validar y mostrar un resumen; importar exige CSRF, usa una transacción y nunca sobrescribe un slug existente.
 
 La migración inicial desde archivos PHP quedó documentada en
 `scripts/migrations/import-content-to-web-db.php`.
@@ -230,22 +239,9 @@ Relaciones lógicas:
 - `contenido_articulos` 1:N `contenido_articulos_palabras_clave`.
 - `contenido_articulos` 1:N `contenido_articulos_relaciones`.
 
-## Modo Administrador
+## Herramientas de administrador en el sitio público
 
-Decisión de arquitectura:
-
-Cuando un usuario tenga sesión administrativa válida, el sitio público podrá habilitar
-herramientas adicionales sólo para ese usuario, sin depender de `APP_ENV=local`.
-
-Ejemplos previstos:
-
-- enlaces “Editar artículo”,
-- accesos rápidos al editor,
-- funciones de depuración,
-- herramientas de mantenimiento,
-- información técnica no visible para visitantes normales.
-
-Esta línea reemplaza progresivamente utilidades históricas exclusivas de entorno local.
+Una sesión administrativa válida autoriza en producción las herramientas técnicas ya integradas: simulación temporal, timings y diagnóstico de contenidos, según la bandera específica de cada función. Se comprueba la cookie admin sin mezclarla con `aquellas_lunas_local`; una sesión anónima no hereda el estado del administrador. En local, `APP_ENV=local` autoriza las herramientas y el simulador requiere además su interruptor técnico.
 
 ## Entorno local y sesiones
 
@@ -274,16 +270,9 @@ Regla permanente:
 "Ningún módulo administrativo debe incluir componentes que puedan iniciar otra sesión
 antes de ejecutar `startStoreAdminSession()` y `requireStoreAdminAuthentication()`."
 
-## Pendientes
+## Estado administrativo actual
 
-Próximas líneas de trabajo definidas:
-
-- habilitación pública progresiva de contenidos desde la capa editorial MySQL,
-- integración de configuración del sitio desde `admin_configuracion_sitio`,
-- editor administrativo para configuración del sitio,
-- importación masiva de contenido mediante texto estructurado,
-- mejoras del flujo editorial ya unificado en MySQL,
-- automatización de cargas masivas en formato estructurado.
+La migración operativa está completa: contenido público y editor usan MySQL; visibilidad de secciones, tipos de eventos y reglas editoriales tienen interfaces autenticadas; la importación JSON está disponible. El script de importación desde PHP queda únicamente como historia de migración. Los pendientes reales generales se mantienen en [estado-actual.md](estado-actual.md).
 
 ## Laboratorio Astronómico
 
@@ -332,6 +321,8 @@ Responsabilidades:
   ECharts, ejes, leyendas, tooltips, zoom y mensajes.
 - `assets/css/styles.css`: presentación de ancho amplio, controles, paneles y
   adaptación móvil.
+
+No existe botón **Actualizar gráfico**. Los cambios que sólo afectan representación —Coincidencia/oposición, Refuerzo positivo/negativo y variables A/B— redibujan sin consultar el backend. Fechas, variables y modos que sí cambian la consulta disparan una única actualización automática con debounce y cancelación de la solicitud anterior. El estado solicitado de ambos análisis se conserva cuando temporalmente queda una sola variable; la banda reaparece al volver a dos o más, manteniendo A/B mientras sigan disponibles.
 
 ### Contrato del endpoint
 

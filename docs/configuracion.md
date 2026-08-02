@@ -20,12 +20,17 @@ valor, `appEnvironment()` devuelve `production`.
 |---|---|---:|---|---|
 | `APP_ENV` | — | `production` | únicamente `local`; todo otro valor es producción | entorno general de ejecución |
 | `ASTRONOMY_API_BASE_URL` | `astronomy_api_base_url` | sin valor válido | URL HTTP/HTTPS | API server-side |
+| `ASTRONOMY_EVENT_SOURCE_MOON_PHASE` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback cuando no existe selección administrativa persistida para fases |
+| `ASTRONOMY_EVENT_SOURCE_LUNAR_APSIS` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para ápsides lunares |
+| `ASTRONOMY_EVENT_SOURCE_LUNAR_ORBIT` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para nodos lunares |
+| `ASTRONOMY_EVENT_SOURCE_LUNAR_LIBRATION` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para libraciones |
+| `ASTRONOMY_EVENT_SOURCE_LUNAR_CONJUNCTION` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para conjunciones lunares |
 | `ASTRONOMY_REVERSE_GEOCODER_URL` | — | URL de Nominatim | URL HTTPS | geocodificación inversa server-side |
 | `ASTRONOMY_REVERSE_GEOCODER_USER_AGENT` | — | identificación de Aquellas Lunas | texto | `User-Agent` para Nominatim |
 | `LOCAL_TIME_SIMULATION_ENABLED` | `local_time_simulation_enabled` | `false` | booleano mediante `filter_var` | control y sesión local de simulación temporal |
 | `ALTITUDE_PROFILE_INTERVAL_MINUTES` | `altitude_profile_interval_minutes` | `15` | entero 5–60 | Sol y Luna, mismo intervalo |
-| `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` | `supermoon_min_apparent_size_percent` | `105` | número finito 90–120 | clasificación editorial de Luna llena |
-| `MOONRISE_NOTICE_MAX_MINUTES` | `moonrise_notice_max_minutes` | `120` | entero 1–1440 | ventana de aviso de salida |
+| `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` | `supermoon_min_apparent_size_percent` | `105` | número finito 90–120 | compatibilidad histórica; el criterio público efectivo se administra como `event.supermoon.min_percent` |
+| `MOONRISE_NOTICE_MAX_MINUTES` | `moonrise_notice_max_minutes` | `120` | entero 1–1440 | compatibilidad histórica; la ventana pública efectiva se administra como `home.moonrise.max_minutes` |
 | `MOBILE_SWIPE_NAVIGATION_ENABLED` | `mobile_swipe_navigation_enabled` | `true` | `true/false`, `1/0`, `yes/no`, `on/off` | script y contexto swipe |
 | `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` | `mobile_swipe_navigation_hint_enabled` | `true` | los mismos booleanos | aviso inicial localStorage |
 | `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED` | `mobile_swipe_navigation_debug_enabled` | `false` | los mismos booleanos | panel visual, combinado con timings |
@@ -37,6 +42,14 @@ valor, `appEnvironment()` devuelve `production`.
 | `STORE_DB_NAME` | `store_db_name` | sin valor | texto no vacío | base MySQL de la tienda |
 | `STORE_DB_USER` | `store_db_user` | sin valor | texto no vacío | usuario MySQL, secreto |
 | `STORE_DB_PASSWORD` | `store_db_password` | sin valor | texto no vacío | contraseña MySQL, secreto |
+| `WEB_DB_HOST` | `web_db_host` | sin valor | texto no vacío | MySQL de contenidos, configuración editorial y laboratorio |
+| `WEB_DB_PORT` | `web_db_port` | `3306` | entero 1–65535 | puerto de `WEB_DB` |
+| `WEB_DB_NAME` | `web_db_name` | sin valor | texto no vacío | nombre de `WEB_DB` |
+| `WEB_DB_USER` | `web_db_user` | sin valor | texto no vacío | usuario de `WEB_DB`, secreto |
+| `WEB_DB_PASSWORD` | `web_db_password` | sin valor | texto no vacío | contraseña de `WEB_DB`, secreto |
+| `WEB_PUSH_VAPID_PUBLIC_KEY` | `web_push_vapid_public_key` | sin valor | Base64 URL de clave pública P-256 | suscripción desde el piloto administrativo; único valor VAPID entregado al navegador |
+| `WEB_PUSH_VAPID_PRIVATE_KEY` | `web_push_vapid_private_key` | sin valor | Base64 URL privada P-256 | emisor administrativo en hosting y CLI de la mini PC; nunca se entrega al navegador |
+| `WEB_PUSH_VAPID_SUBJECT` | `web_push_vapid_subject` | sin valor | `mailto:` válido o URL HTTPS | identidad VAPID compartida por portada y emisor |
 | `STORE_ADMIN_USER` | `store_admin_user` | sin valor | texto no vacío, máximo 190 caracteres | usuario del portal privado |
 | `STORE_ADMIN_PASSWORD_HASH` | `store_admin_password_hash` | sin valor | hash reconocido por PHP | autenticación mediante `password_verify()` |
 | `STORE_INITIAL_PRICE` | `store_initial_price` | sin valor | decimal mayor que 0, hasta 8 enteros y 2 decimales | precio de fotos nuevas |
@@ -55,6 +68,8 @@ valor, `appEnvironment()` devuelve `production`.
 | `MERCADO_PAGO_FAILURE_URL` | `mercado_pago_failure_url` | sin valor | URL HTTPS | retorno fallido futuro |
 | `MERCADO_PAGO_NOTIFICATION_URL` | `mercado_pago_notification_url` | sin valor | URL HTTPS | receptor público de pagos |
 
+Cuando un grupo está configurado en `api`, una falla técnica de FastAPI activa la cadena interna API → MariaDB → PHP para los grupos que disponen de esas tres fuentes. `eclipse` usa únicamente API → MariaDB. Una respuesta API válida sin eventos no activa fallback. Las opciones `database`, `php`, `auto` y `compare` conservan su semántica propia.
+
 `MERCADO_PAGO_NOTIFICATION_URL` documenta y valida la URL registrada centralmente en **Tus integraciones → Webhooks**. No se incluye como `notification_url` al crear preferencias, para no reemplazar el canal firmado configurado en el panel.
 
 Los tiempos de API se renderizan automáticamente para `canUseSiteDebugTools()`. `LOCAL_TIME_SIMULATION_ENABLED` es el interruptor técnico local; en producción la sesión admin válida autoriza el simulador. No existe una opción para Analytics: el ID `G-GFZJ3D3MF3` está definido en `includes/analytics.php` y se carga también en local.
@@ -68,19 +83,25 @@ El `.env` local deseado contiene:
 ```dotenv
 APP_ENV=local
 LOCAL_TIME_SIMULATION_ENABLED=true
-CONTENT_ENABLED_IN_PRODUCTION=false
-ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=false
 STORE_ORIGINALS_PATH=/srv/proyectos/astronomia/web/storage/tienda/originales
 STORE_PREVIEWS_PATH=/srv/proyectos/astronomia/web/assets/images/tienda/previews
 STORE_CATALOG_PATH=/srv/proyectos/astronomia/web/storage/tienda/catalogo
-STORE_DB_HOST=167.250.5.41
+STORE_DB_HOST=HOST_MYSQL
 STORE_DB_PORT=3306
-STORE_DB_NAME=aquellaslunascom_tienda_dev
+STORE_DB_NAME=BASE_TIENDA
 STORE_DB_USER=
 STORE_DB_PASSWORD=
+WEB_DB_HOST=
+WEB_DB_PORT=3306
+WEB_DB_NAME=
+WEB_DB_USER=
+WEB_DB_PASSWORD=
+WEB_PUSH_VAPID_PUBLIC_KEY=
+WEB_PUSH_VAPID_PRIVATE_KEY=
+WEB_PUSH_VAPID_SUBJECT=mailto:tu-correo@example.com
 STORE_ADMIN_USER=
 STORE_ADMIN_PASSWORD_HASH=
 STORE_INITIAL_PRICE=
@@ -106,6 +127,50 @@ Después de cambiar `.env` o variables de Compose hay que recrear el servicio, s
 docker compose up -d --force-recreate web
 ```
 
+## Web Push MVP
+
+El piloto no ofrece suscripción pública. `/admin/notificaciones-prueba.php` carga la clave pública para suscribir el dispositivo autenticado y usa la clave privada sólo server-side al enviar. `loadWebPushServerConfig()` exige las tres claves; la privada nunca se serializa en HTML.
+
+Generar una única pareja VAPID con OpenSSL y conservarla sin rotarla mientras existan suscripciones:
+
+```bash
+openssl ecparam -genkey -name prime256v1 -out /tmp/aquellas-lunas-vapid.pem
+openssl ec -in /tmp/aquellas-lunas-vapid.pem -pubout -outform DER | tail -c 65 | base64 | tr -d '=' | tr '/+' '_-'
+openssl ec -in /tmp/aquellas-lunas-vapid.pem -outform DER | tail -c +8 | head -c 32 | base64 | tr -d '=' | tr '/+' '_-'
+```
+
+La primera salida es `WEB_PUSH_VAPID_PUBLIC_KEY` y la segunda `WEB_PUSH_VAPID_PRIVATE_KEY`. El PEM temporal también es secreto y debe eliminarse de forma segura después de guardar las dos claves. En producción agregar `web_push_vapid_public_key`, `web_push_vapid_private_key` y `web_push_vapid_subject` al arreglo privado externo. El navegador recibe únicamente la pública.
+
+La tabla se prepara una vez con:
+
+```bash
+docker exec web-astro php /var/www/html/scripts/migrations/create-web-push-subscriptions.php
+```
+
+El envío manual requiere Python 3.10+ y las dependencias de `requirements.txt` (`pywebpush` 2.x, `mysql-connector-python` y `python-dotenv`):
+
+```bash
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python scripts/send-test-push.py
+.venv/bin/python scripts/send-test-push.py --id 1
+```
+
+El panel del hosting usa las dependencias PHP bloqueadas en `composer.lock`. Prepararlas antes de desplegar:
+
+```bash
+docker run --rm -u 1000:1000 -v /srv/proyectos/astronomia/web:/app -w /app composer:2 install --no-dev --optimize-autoloader
+```
+
+Cuando se actualicen dependencias, el despliegue debe ejecutarse con `--include-vendor` para incluir `vendor/autoload.php` y `vendor/`. Composer no necesita estar instalado en cPanel.
+
+La suscripción puede comprobarse sin consultar ni mostrar sus claves:
+
+```sql
+SELECT id, active, created_at, updated_at, last_success_at, last_error_at
+FROM web_push_subscriptions
+ORDER BY id DESC;
+```
+
 Usar `--build` sólo si cambian `Dockerfile`, `php.ini` o Apache.
 
 ## Configuración externa de producción
@@ -117,10 +182,7 @@ Ejemplo completo:
 
 return [
     'astronomy_api_base_url' => 'https://api.aquellaslunas.com.ar',
-    'astronomy_show_timings' => false,
     'altitude_profile_interval_minutes' => 15,
-    'supermoon_min_apparent_size_percent' => 105,
-    'moonrise_notice_max_minutes' => 120,
     'mobile_swipe_navigation_enabled' => true,
     'mobile_swipe_navigation_hint_enabled' => true,
     'mobile_swipe_navigation_debug_enabled' => false,
@@ -129,6 +191,14 @@ return [
     'store_catalog_path' => '/home8/aquellaslunascom/fotos_tienda/catalogo',
     'store_admin_user' => 'usuario-administrativo',
     'store_admin_password_hash' => 'HASH_GENERADO_FUERA_DEL_REPOSITORIO',
+    'web_db_host' => 'HOST_PRIVADO',
+    'web_db_port' => 3306,
+    'web_db_name' => 'BASE_WEB',
+    'web_db_user' => 'USUARIO_WEB',
+    'web_db_password' => 'VALOR_PRIVADO',
+    'web_push_vapid_public_key' => 'CLAVE_PUBLICA_BASE64URL',
+    'web_push_vapid_private_key' => 'CLAVE_PRIVADA_BASE64URL',
+    'web_push_vapid_subject' => 'mailto:tu-correo@example.com',
     'store_preview_tienda_max_size' => 800,
     'store_preview_tienda_jpeg_quality' => 72,
     'store_preview_contenido_max_size' => 400,
@@ -150,6 +220,8 @@ return [
 
 `loadStoreDatabaseConfig()` resuelve las cinco opciones MySQL con la misma prioridad, exige que ninguna esté vacía y valida el puerto entre 1 y 65535. El cargador no conecta por sí mismo; `getStoreDatabaseConnection()` consume su resultado cuando una conexión es necesaria. Usuario y contraseña se completan exclusivamente en el `.env` local ignorado y en el archivo externo privado de producción; no deben escribirse en documentación, logs ni respuestas públicas.
 
+`loadWebDatabaseConfig()` y `getWebDatabaseConnection()` resuelven de igual forma `WEB_DB`. Esta conexión sirve al contenido público y su editor, visibilidad de secciones, tipos de eventos, reglas editoriales y Laboratorio. Usa `utf8mb4`, excepciones, fetch asociativo y prepares nativos. No es PostgreSQL ni reemplaza la API astronómica.
+
 `loadStoreAdminConfig()` resuelve usuario y hash administrativo con la misma prioridad. No existe contraseña predeterminada ni tabla de usuarios. El hash se genera con `password_hash()` y se valida con `password_verify()`; el valor real y la contraseña no deben versionarse ni aparecer en mensajes.
 
 En producción deben agregarse al arreglo externo las claves `store_db_host`, `store_db_port`, `store_db_name`, `store_db_user` y `store_db_password` con los valores reales administrados fuera del repositorio. Los valores no se reproducen en esta documentación.
@@ -162,12 +234,14 @@ Los cuatro cargadores de previews resuelven por separado tamaño y calidad de ti
 
 `loadStoreDownloadExpiryHours()` y `loadStoreDownloadMaxCount()` aplican entorno → configuración externa → 72/5 y validan los rangos de la tabla. Estos valores sólo crean permisos en `descargas`; todavía no existe un endpoint público para consumirlos.
 
-`APP_ENV` puede omitirse en producción: ausencia, vacío y valores desconocidos se interpretan como producción. Timings y simulación requieren allí una sesión admin válida. El panel y la pausa de navegación requieren además `mobile_swipe_navigation_debug_enabled => true`.
+`APP_ENV` puede omitirse en producción: ausencia, vacío y valores desconocidos se interpretan como producción. Timings y simulación requieren allí una sesión admin válida. El panel de navegación táctil requiere además `mobile_swipe_navigation_debug_enabled => true`.
 
 La detección está centralizada en `appEnvironment()`, `isLocalEnvironment()` e
 `isProductionEnvironment()` dentro de `includes/api-config.php`.
 `isContentEnabled()` consulta `content.enabled` en `admin_configuracion_sitio`; no
 depende de `APP_ENV` ni de una bandera de publicación por entorno.
+
+Los parámetros y textos de presentación no se agregan a este archivo externo: sus defaults cerrados viven en `includes/editorial-configuration.php` y los overrides en `admin_parametros_editoriales` y `admin_textos_editoriales`. La visibilidad y los nombres de eventos siguen el mismo patrón mediante su catálogo PHP y las tablas `admin_tipos_eventos*`.
 
 ## Reloj simulado
 

@@ -2,7 +2,7 @@
 
 ## Estado y alcance
 
-Este repositorio contiene la web pública PHP de Aquellas Lunas. Presenta datos astronómicos del día y rangos diarios consumidos desde una API FastAPI separada. El navegador no consulta directamente los endpoints de cálculo: PHP valida los parámetros, llama a la API y renderiza el resultado.
+Este repositorio contiene la web pública PHP de Aquellas Lunas y su área administrativa. Los cálculos astronómicos y eventos provienen de una API FastAPI/PostgreSQL separada; PHP valida las solicitudes y presenta sus respuestas. MySQL (`WEB_DB`) conserva contenido público y configuración administrativa, pero no duplica los cálculos ni los eventos de la API.
 
 La web usa PHP, HTML, CSS y JavaScript sin frameworks. La API, su infraestructura y sus cálculos no forman parte de este repositorio.
 
@@ -13,7 +13,7 @@ Documentación complementaria:
 - [reglas editoriales de presentación astronómica](docs/reglas-editoriales-astronomia.md);
 - [configuración completa](docs/configuracion.md);
 - [entorno local y validación](docs/entorno-local.md);
-- [despliegue operativo](docs/despliegue.md).
+- [despliegue operativo](docs/despliegue.md);
 - [estado verificado, despliegue y pendientes](docs/estado-actual.md).
 
 ## Arquitectura por entorno
@@ -29,8 +29,7 @@ Documentación complementaria:
 - Reinicio: `unless-stopped`.
 - Código montado en `/var/www/html`.
 - Flujo de trabajo habitual: VS Code conectado a la mini PC mediante Remote SSH.
-- Configuración Compose local en `.env`; `APP_ENV=local` identifica la mini PC y
-  `ASTRONOMY_SHOW_TIMINGS=true` habilita únicamente el diagnóstico.
+- Configuración Compose local en `.env`; `APP_ENV=local` identifica la mini PC y autoriza las herramientas técnicas.
 
 ### Producción
 
@@ -82,9 +81,7 @@ http://host.docker.internal:18000
 
 Los perfiles de altura de la portada comparten `ALTITUDE_PROFILE_INTERVAL_MINUTES`. El valor predeterminado es 15 y se admiten enteros de 5 a 60. La variable de entorno tiene prioridad sobre `altitude_profile_interval_minutes` en el archivo externo de producción. El proxy PHP envía siempre el intervalo efectivo a la API y lo devuelve en su respuesta JSON.
 
-La presentación de superlunas usa `SUPERMOON_MIN_APPARENT_SIZE_PERCENT`. El valor predeterminado es 105 y se admiten números entre 90 y 120. La variable de entorno tiene prioridad sobre `supermoon_min_apparent_size_percent` en el archivo externo. Se aplica solamente a eventos `moon_phase/full_moon`; el porcentaje real continúa disponible en sus datos técnicos.
-
-El aviso previo a la salida lunar usa `MOONRISE_NOTICE_MAX_MINUTES`. El valor predeterminado es 120 y se admiten enteros de 1 a 1440. La variable de entorno tiene prioridad sobre `moonrise_notice_max_minutes` en el archivo externo. Cuando la Luna está debajo y la salida del día ya pasó, la portada consulta condicionalmente el día siguiente mediante el mismo endpoint diario.
+La clasificación editorial de Superluna y la ventana del aviso de salida lunar se administran actualmente en `/admin/presentacion/reglas.php`. Sus defaults viven en `includes/editorial-configuration.php` y MySQL guarda únicamente overrides. Los cargadores históricos `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` y `MOONRISE_NOTICE_MAX_MINUTES` permanecen por compatibilidad interna, pero no son la fuente operativa de esos dos criterios públicos.
 
 La navegación táctil móvil se controla con `MOBILE_SWIPE_NAVIGATION_ENABLED`, su aviso inicial con `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` y el panel visual con `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED`. El recorrido real es Inicio → Esta noche → Sol y Luna → Planificador → Eventos. Eclipses, Ubicación, Galería y Acerca quedan fuera; Galería además está temporalmente oculta del menú aunque conserva su URL directa.
 
@@ -97,10 +94,7 @@ En producción, el archivo externo está fuera de `public_html` y debe devolver:
 
 return [
     'astronomy_api_base_url' => 'https://api.aquellaslunas.com.ar',
-    'astronomy_show_timings' => false,
     'altitude_profile_interval_minutes' => 15,
-    'supermoon_min_apparent_size_percent' => 105,
-    'moonrise_notice_max_minutes' => 120,
     'mobile_swipe_navigation_enabled' => true,
     'mobile_swipe_navigation_hint_enabled' => true,
     'mobile_swipe_navigation_debug_enabled' => false,
@@ -109,6 +103,11 @@ return [
     'store_catalog_path' => '/home8/aquellaslunascom/fotos_tienda/catalogo',
     'store_admin_user' => 'usuario-administrativo',
     'store_admin_password_hash' => 'HASH_GENERADO_FUERA_DEL_REPOSITORIO',
+    'web_db_host' => 'HOST_PRIVADO',
+    'web_db_port' => 3306,
+    'web_db_name' => 'BASE_WEB',
+    'web_db_user' => 'USUARIO_WEB',
+    'web_db_password' => 'VALOR_PRIVADO',
     'store_preview_tienda_max_size' => 800,
     'store_preview_tienda_jpeg_quality' => 72,
     'store_preview_contenido_max_size' => 400,
@@ -136,24 +135,30 @@ Los errores de configuración, cURL, HTTP y JSON se registran en `error_log`; el
 
 El tiempo de API es el valor interno informado mediante `X-Response-Time-Ms`. El tiempo total incluye además conexión, red y transferencia hasta la web. La petición independiente de `moon-image.php` queda medida en su propio registro; las páginas HTML muestran al final únicamente las llamadas realizadas durante su renderizado.
 
-El diagnóstico visible está deshabilitado por defecto en la aplicación. Docker Compose lee automáticamente el archivo local `.env`; con el valor actual:
+El diagnóstico visible está autorizado automáticamente en local y, en producción, sólo para una sesión admin válida. Docker Compose lee el archivo local `.env`; un ejemplo sin secretos es:
 
 ```dotenv
 APP_ENV=local
 LOCAL_TIME_SIMULATION_ENABLED=true
-CONTENT_ENABLED_IN_PRODUCTION=false
-ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=false
 STORE_ORIGINALS_PATH=/srv/proyectos/astronomia/web/storage/tienda/originales
 STORE_PREVIEWS_PATH=/srv/proyectos/astronomia/web/assets/images/tienda/previews
 STORE_CATALOG_PATH=/srv/proyectos/astronomia/web/storage/tienda/catalogo
-STORE_DB_HOST=167.250.5.41
+STORE_DB_HOST=HOST_MYSQL
 STORE_DB_PORT=3306
-STORE_DB_NAME=aquellaslunascom_tienda_dev
+STORE_DB_NAME=BASE_TIENDA
 STORE_DB_USER=
 STORE_DB_PASSWORD=
+WEB_DB_HOST=HOST_MYSQL
+WEB_DB_PORT=3306
+WEB_DB_NAME=BASE_WEB
+WEB_DB_USER=
+WEB_DB_PASSWORD=
+WEB_PUSH_VAPID_PUBLIC_KEY=
+WEB_PUSH_VAPID_PRIVATE_KEY=
+WEB_PUSH_VAPID_SUBJECT=mailto:tu-correo@example.com
 STORE_ADMIN_USER=
 STORE_ADMIN_PASSWORD_HASH=
 STORE_INITIAL_PRICE=
@@ -173,6 +178,12 @@ MERCADO_PAGO_FAILURE_URL=https://aquellaslunas.com.ar/astro/tienda/pago-fallido.
 MERCADO_PAGO_NOTIFICATION_URL=https://aquellaslunas.com.ar/astro/webhooks/mercado-pago.php
 ```
 
+El piloto Web Push se prueba únicamente desde `/admin/notificaciones-prueba.php`. El envío PHP usa las dependencias reproducibles de `composer.lock`; generar `vendor/` antes de desplegar con:
+
+```bash
+docker run --rm -u 1000:1000 -v /srv/proyectos/astronomia/web:/app -w /app composer:2 install --no-dev --optimize-autoloader
+```
+
 Una variable exportada en la sesión de shell tiene prioridad sobre el valor del archivo `.env`.
 
 Las rutas de tienda se resuelven con la misma prioridad: variable de entorno y luego claves `store_originals_path`, `store_previews_path` y `store_catalog_path` del archivo externo de producción. Deben ser absolutas; las tres carpetas deben existir y ser legibles, y previews/catálogo además escribibles. `loadStoreConfig()` informa fallos sin revelar rutas internas. Los procesos CLI sincronizan metadatos y generan previews; la galería pública consume únicamente esas previews. La referencia completa está en [docs/configuracion.md](docs/configuracion.md).
@@ -185,34 +196,13 @@ Los derivados de tienda usan 800 px, calidad 72 y una marca semitransparente rep
 
 `galeria.php` presenta las fotos disponibles que ya tienen `archivo_preview_tienda`, ordenadas por creación descendente. La cuadrícula y el modal usan siempre esa versión comercial; no exponen la variante de contenido, originales ni rutas internas.
 
-El portal privado vive bajo `admin/` y no aparece en la navegación pública. `admin/index.php` es el panel general y enlaza Galería y tienda, Laboratorio Astronómico y Contenidos editoriales (`/admin/contenidos/`) mediante navegación administrativa compartida. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, reutiliza la sesión `aquellas_lunas_admin` y usa CSRF en todos los cambios. El laboratorio consulta de forma privada `datos_astronomicos`. El editor de contenidos lee y escribe en MySQL con transacciones sobre tablas editoriales de contenido. La arquitectura administrativa, el contrato JSON, el catálogo de variables, la base de contenidos y los pendientes se describen en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
+El portal privado vive bajo `admin/` y no aparece en la navegación pública. Su menú compartido contiene Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio; “Cerrar sesión” permanece separado. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa la sesión `aquellas_lunas_admin` y exige CSRF en todos los cambios. Contenidos, visibilidad y reglas escriben en `WEB_DB`; el laboratorio sólo consulta `datos_astronomicos`. La arquitectura administrativa completa se describe en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
 
 La galería permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
 
 Mercado Pago Checkout Pro se integra server-side sin SDK. La galería crea pedidos pendientes y preferencias sin confiar en importes del navegador. `webhooks/mercado-pago.php` acepta sólo POST, valida `x-signature`, consulta el pago real por API y confirma en una transacción monto, moneda y `external_reference`. Un pago aprobado actualiza `pagos`/`pedidos` y crea una única fila en `descargas`; todavía no existe descarga pública ni email. En modo `test`, un secreto vacío sólo permite mocks desde loopback; toda notificación externa se rechaza. Las páginas de retorno continúan siendo informativas y nunca aprueban pedidos.
 
-se activa recreando el servicio:
-
-```bash
-docker compose up -d --force-recreate web
-```
-
-Para volver a ocultarlo localmente, cambiar `.env` a `ASTRONOMY_SHOW_TIMINGS=false` y recrear. También se puede sobrescribir el valor para una ejecución puntual:
-
-```bash
-ASTRONOMY_SHOW_TIMINGS=false docker compose up -d --force-recreate
-```
-
-En producción puede habilitarse explícitamente en `/home8/aquellaslunascom/config/astronomia.php`:
-
-```php
-return [
-    'astronomy_api_base_url' => 'https://api.aquellaslunas.com.ar',
-    'astronomy_show_timings' => true,
-];
-```
-
-Si existe la variable de entorno `ASTRONOMY_SHOW_TIMINGS`, tiene prioridad sobre el archivo externo. Con valor falso o ausente no se genera el bloque ni espacio vacío.
+El diagnóstico se muestra automáticamente en local. En producción se muestra sólo al navegador que conserva una sesión administrativa válida; no existe un flag adicional de timings.
 
 Los nombres públicos usados actualmente son `moon instant`, `daily`, `home phases`, `home upcoming`, `range`, `events` y `moon image`. Mediciones locales observadas como referencia, no como garantía de rendimiento:
 
@@ -220,7 +210,7 @@ Los nombres públicos usados actualmente son `moon instant`, `daily`, `home phas
 - `home phases`: aproximadamente 90 ms;
 - `home upcoming`: aproximadamente 288 ms.
 
-El diagnóstico debe permanecer desactivado en producción salvo durante una revisión puntual.
+En producción, una sesión anónima o incógnita no debe ver el diagnóstico; la autorización no se comparte con otros navegadores.
 
 El panel del swipe requiere `canUseSiteDebugTools()` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa fuente Touch/Pointer, movimientos, coordenadas, deltas, `touch-action`, exclusiones, resultado y destino. Sin autorización el panel no se renderiza.
 
@@ -377,7 +367,7 @@ El gráfico solar conserva salida, puesta y duración, y compara invierno, hoy y
 
 La portada realiza una única consulta adicional server-side a `/v1/moon/instant`, usando la misma latitud, longitud, zona horaria y el instante actual. El navegador nunca consulta ese endpoint. PHP valida `observer.altitude_degrees`, `observer.azimuth_degrees`, `observer.above_horizon` y `datetime.local`; si la petición falla o falta algún campo, omite solamente la frase y mantiene la tarjeta, los perfiles y el resto de la página.
 
-Cuando `above_horizon` es falso, PHP busca una salida estrictamente futura. Usa primero `moon.rise` del día y, si esa hora ya pasó o no existe, consulta condicionalmente el día siguiente. La ventana `MOONRISE_NOTICE_MAX_MINUTES` usa entorno → configuración externa → 120 y valida enteros de 1 a 1440. Las reglas son:
+Cuando `above_horizon` es falso, PHP busca una salida estrictamente futura. Usa primero `moon.rise` del día y, si esa hora ya pasó o no existe, consulta condicionalmente el día siguiente. La ventana efectiva `home.moonrise.max_minutes` usa el default editorial 120 o su override de MySQL. Las reglas son:
 
 1. Fuera de la ventana: “No está sobre el horizonte.”
 2. Entre 60 minutos y el límite: “La Luna saldrá a las HH:MM.”
@@ -461,7 +451,7 @@ se abre en un `<dialog>` y separa **Datos generales**, **Desde tu ubicación** y
 
 Para lunares consume `details.eclipse_global`/`details.eclipse_local`; para solares, `details.solar_eclipse_global`/`details.solar_eclipse_local`. El bloque global puede incluir `visibility_map` con `status`, `available`, `source`, `catalog_url`, `source_url`, `local_filename`, `retrieved_at`, `map_kind` y `attribution`. La sección mundial exige `available === true`, `status === "available"` y un nombre simple seguro. La imagen usa `versionedAssetUrl("assets/images/eclipses/<local_filename>")`: resuelve `/assets/...` en Docker y `/astro/assets/...` en producción. `source_url` nunca se usa como imagen; sólo puede aparecer como enlace discreto. Metadatos ausentes, estados `not_found`, `ambiguous` o `download_error` y nombres inseguros ocultan la sección.
 
-En `moon_phase/full_moon`, y sólo allí, el helper compara `details.apparent_size_percent` con `SUPERMOON_MIN_APPARENT_SIZE_PERCENT` (entorno → configuración externa → 105; rango 90–120). Al alcanzar el umbral presenta **Superluna** y el resumen “La Luna llena se verá más grande de lo habitual.” Es el mismo evento: no se agrega ni duplica y el porcentaje real sigue en datos técnicos.
+En `moon_phase/full_moon`, y sólo allí, el helper compara `details.apparent_size_percent` con el valor efectivo `event.supermoon.min_percent` (default 105, rango administrativo 90–120). Al alcanzar el umbral usa el nombre y el resumen editoriales efectivos. Es el mismo evento: no se agrega ni duplica y el porcentaje real sigue en datos técnicos.
 
 Si no hay coincidencias se muestra un estado vacío; los fallos de configuración, cURL, HTTP o JSON se registran sin exponer detalles técnicos al visitante.
 
@@ -635,6 +625,12 @@ El popover abre con puntero, foco o toque, se cierra con Escape o interacción e
 │   ├── home-sky.php
 │   ├── presentation.php
 │   └── moon-images.php
+├── admin/
+│   ├── contenidos/                 # editor e importación JSON
+│   ├── configuracion-sitio/        # visibilidad de secciones
+│   ├── presentacion/               # tipos de eventos y reglas/mensajes
+│   ├── fotos.php
+│   └── laboratorio-astronomico.php
 ├── assets/
 │   ├── css/styles.css
 │   ├── js/location.js

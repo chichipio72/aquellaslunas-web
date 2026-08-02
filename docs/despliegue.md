@@ -24,8 +24,7 @@ produce un error público 503 sin filtrar la URL interna. El proxy
 La cuenta FTP entra directamente en la carpeta remota efectiva de publicación, que corresponde a la carpeta pública `astro`. El script no ejecuta `cd public_html/astro` porque ese directorio ya es la raíz visible de la cuenta. Producción no usa Docker.
 
 `APP_ENV` puede omitirse en el hosting: la aplicación asume `production` ante
-ausencia, vacío o valor desconocido. No usar `ASTRONOMY_SHOW_TIMINGS`,
-`LOCAL_TIME_SIMULATION_ENABLED` ni otra bandera funcional para detectar el entorno.
+ausencia, vacío o valor desconocido. No usar `LOCAL_TIME_SIMULATION_ENABLED` ni otra bandera funcional para detectar el entorno.
 En local el simulador exige `LOCAL_TIME_SIMULATION_ENABLED=true`; en producción exige
 una sesión admin válida. La publicación editorial se controla mediante
 `admin_configuracion_sitio`, no mediante variables del entorno.
@@ -45,10 +44,7 @@ Contenido, sin incluir secretos en el repositorio:
 
 return [
     'astronomy_api_base_url' => 'https://api.aquellaslunas.com.ar',
-    'astronomy_show_timings' => false,
     'altitude_profile_interval_minutes' => 15,
-    'supermoon_min_apparent_size_percent' => 105,
-    'moonrise_notice_max_minutes' => 120,
     'mobile_swipe_navigation_enabled' => true,
     'mobile_swipe_navigation_hint_enabled' => true,
     'mobile_swipe_navigation_debug_enabled' => false,
@@ -57,6 +53,14 @@ return [
     'store_catalog_path' => '/home8/aquellaslunascom/fotos_tienda/catalogo',
     'store_admin_user' => 'usuario-administrativo',
     'store_admin_password_hash' => 'HASH_GENERADO_FUERA_DEL_REPOSITORIO',
+    'web_db_host' => 'HOST_PRIVADO',
+    'web_db_port' => 3306,
+    'web_db_name' => 'BASE_WEB',
+    'web_db_user' => 'USUARIO_WEB',
+    'web_db_password' => 'VALOR_PRIVADO',
+    'web_push_vapid_public_key' => 'CLAVE_PUBLICA_BASE64URL',
+    'web_push_vapid_private_key' => 'CLAVE_PRIVADA_BASE64URL',
+    'web_push_vapid_subject' => 'mailto:tu-correo@example.com',
     'store_preview_tienda_max_size' => 800,
     'store_preview_tienda_jpeg_quality' => 72,
     'store_preview_contenido_max_size' => 400,
@@ -78,11 +82,15 @@ Esta es la fuente de producción cuando `ASTRONOMY_API_BASE_URL` no está dispon
 
 El archivo debe permanecer fuera de `public_html`, no forma parte del repositorio y nunca se transfiere mediante el script FTPS.
 
-El mismo arreglo privado debe incluir `store_db_host`, `store_db_port`, `store_db_name`, `store_db_user` y `store_db_password`. Sus valores reales no se documentan ni se incorporan al repositorio. `loadStoreDatabaseConfig()` exige las cinco claves y un puerto entre 1 y 65535. La conexión PDO reutilizable no revela credenciales al fallar; registra únicamente tipo y código técnico sanitizados.
+El mismo arreglo privado debe incluir tanto `store_db_*` como `web_db_*`. `STORE_DB` pertenece a tienda/pagos; `WEB_DB` contiene contenido público, configuración administrativa y `datos_astronomicos` para el Laboratorio. Sus usuarios deben tener permisos mínimos separados cuando el hosting lo permita. Los valores reales no se documentan ni se incorporan al repositorio.
+
+Para el piloto Web Push administrativo, producción necesita `web_push_vapid_public_key`, `web_push_vapid_private_key` y `web_push_vapid_subject`. Las tres quedan en el archivo externo privado; sólo la pública llega al navegador. Antes de probar en Android, importar `scripts/migrations/web-push-subscriptions.sql` mediante phpMyAdmin o ejecutar la migración PHP contra `WEB_DB`, publicar `service-worker.js` en la raíz de `/astro/` y confirmar que su alcance sea `https://aquellaslunas.com.ar/astro/`.
+
+El envío desde el panel requiere `vendor/`. El despliegue normal lo excluye; cuando sea necesario actualizar esas dependencias, ejecutar localmente `composer install --no-dev --optimize-autoloader` —o el contenedor Composer documentado en `configuracion.md`—, comprobar que exista `vendor/autoload.php` y desplegar con `--include-vendor`. Composer no necesita ejecutarse en cPanel. Verificar en el hosting PHP 8.2 o superior, cURL, OpenSSL con P-256 e iconv. `symfony/polyfill-mbstring` evita depender de la extensión mbstring ausente.
 
 La sincronización requiere además `store_initial_price`, un decimal positivo compatible con `DECIMAL(10,2)`. El script se ejecuta primero con `--dry-run` y luego, tras revisar el resumen, sin esa opción. `scripts/` no se publica por FTPS: la sincronización en hosting debe ejecutarse desde una copia interna autorizada o mediante una tarea CLI fuera del document root, nunca como endpoint web.
 
-La generación usa parámetros separados: tienda 800/72 con marca de agua y contenido 400/72 sin marca. Producción necesita GD con JPEG y, para orientación, EXIF. Los derivados viven bajo `tienda/` y `contenido/`, están excluidos del FTPS y deben generarse directamente en el entorno correspondiente mediante el proceso CLI interno.
+La generación usa parámetros separados: tienda 800/72 con marca de agua y contenido 400/72 sin marca. Producción necesita GD con JPEG y, para orientación, EXIF. Los derivados viven bajo `tienda/` y `contenido/`. El script FTPS actual sí transfiere `assets/images/tienda/previews/`; también pueden generarse directamente en producción mediante el proceso CLI interno. Antes de publicar, confirmar que esa carpeta contenga sólo derivados públicos y nunca originales.
 
 El usuario administrativo y el hash real se agregan únicamente al archivo externo privado mediante `store_admin_user` y `store_admin_password_hash`. Generar el hash con `password_hash()` en una consola segura; no almacenar ni documentar la contraseña en texto plano. Verificar que `/astro/admin/fotos.php` redirija al login sin sesión y que `/astro/scripts/` continúe respondiendo 403.
 
@@ -96,11 +104,9 @@ Antes de habilitar cualquier función futura de tienda, crear las tres carpetas 
 
 Asignar en cPanel el propietario/grupo correspondiente al proceso PHP y permisos mínimos equivalentes: lectura en originales, y lectura/escritura en previews y catálogo. No usar permisos públicos `777`. Verificar mediante PHP bajo el mismo usuario que atiende la web, sin imprimir las rutas en una respuesta HTTP.
 
-`astronomy_show_timings` debe permanecer en `false` normalmente. Al cambiarlo explícitamente a `true`, las páginas HTML agregan al final un bloque discreto con estado HTTP, tiempo interno de la API y tiempo total observado por la web. Esta bandera no habilita `debug_now`, el simulador ni páginas locales. La imagen lunar se mide en su petición independiente y deja el resultado en `error_log`.
+Las páginas HTML muestran timings en producción exclusivamente a una sesión admin válida. En las secciones con swipe, el panel táctil requiere además `mobile_swipe_navigation_debug_enabled => true`; sólo entonces evita la navegación automática hasta pulsar **Ir al destino detectado**. La opción de diagnóstico táctil no debe quedar activa normalmente.
 
-En las secciones con swipe, el panel táctil requiere además `mobile_swipe_navigation_debug_enabled => true`. Sólo entonces evita la navegación automática hasta pulsar **Ir al destino detectado**. Timings puede permanecer activo sin ese panel; la opción de diagnóstico táctil no debe permanecer activa para visitantes.
-
-Las claves numéricas se validan así: intervalo 5–60 minutos, Superluna 90–120% y aviso de salida 1–1440 minutos. Las opciones móviles aceptan `true/false`, `1/0`, `yes/no` y `on/off`. La variable de entorno correspondiente tiene prioridad sobre este archivo; la tabla completa está en [configuracion.md](configuracion.md).
+El intervalo técnico de perfiles se valida entre 5 y 60 minutos. Superluna, salida lunar y los demás criterios editoriales se gestionan desde **Reglas y mensajes** con rangos cerrados; no deben duplicarse en la configuración externa. Las opciones móviles aceptan `true/false`, `1/0`, `yes/no` y `on/off`. La tabla completa está en [configuracion.md](configuracion.md).
 
 Analytics no usa este archivo: `includes/analytics.php` carga siempre `G-GFZJ3D3MF3` en las nueve vistas públicas. No hay una bandera separada por entorno.
 
@@ -125,7 +131,7 @@ La conexión usa FTP en puerto 21 con:
 - validación del certificado;
 - validación del hostname.
 
-La sincronización usa `mirror --reverse --verbose`. Actualiza archivos modificados y no incluye `--delete`, por lo que nunca elimina archivos remotos.
+La sincronización usa `mirror --reverse --verbose`. Actualiza archivos modificados y no incluye `--delete`, por lo que nunca elimina archivos remotos. Esta propiedad también implica que una exclusión no retira copias antiguas que ya estén en el hosting: `.env`, `.git`, backups, `local-tools`, documentación, pruebas y versiones viejas deben comprobarse y retirarse manualmente desde cPanel/FTPS.
 
 Los mapas mundiales de eclipses bajo `assets/images/eclipses/` son assets generados o descargados, no archivos fuente versionados. `.gitignore` conserva fuera de Git los GIF de esa carpeta, pero el script de despliegue no la excluye: `lftp` los transfiere junto con el resto de `assets/images/`. La ausencia de `--delete` también impide que un despliegue borre mapas ya existentes en el hosting.
 
@@ -183,6 +189,14 @@ unset ASTRONOMY_FTP_PASSWORD ASTRONOMY_ROOT_FTP_USER ASTRONOMY_ROOT_FTP_PASSWORD
 
 El modo prueba se conecta y compara los árboles, pero no transfiere archivos.
 
+`vendor/` se excluye por defecto. Para incluirlo en el listado, la prueba remota o el despliegue real, agregar `--include-vendor`; esta opción puede combinarse con las anteriores:
+
+```bash
+./scripts/desplegar.sh --list-local --include-vendor
+./scripts/desplegar.sh --dry-run --include-vendor
+./scripts/desplegar.sh --include-vendor
+```
+
 ## Despliegue real
 
 ```bash
@@ -206,18 +220,20 @@ No se transfieren:
 - `.env` y sus variantes;
 - `requirements.txt`, archivos Python, `*.pyc`, `__pycache__/` y `*.csv`;
 - `.env` y `.env.*`;
-- originales y catálogo bajo `storage/`, y previews locales bajo `assets/images/tienda/previews/`;
+- originales y catálogo bajo `storage/`;
 - `README.md`, `php.ini` y `pytest.ini`;
 - ZIP;
 - logs, PID, temporales y respaldos de editor;
 - `.cache/`, `cache/`, `__pycache__/`, `coverage/` y bytecode;
 - metadatos de macOS y Windows.
+- `vendor/`, salvo que se indique `--include-vendor`.
 
 Sí se transfieren:
 
 - `index.php`, `cielo-de-esta-noche.php`, `sol-y-luna.php`, `eventos.php`, `planificador.php`, `galeria.php`, `acerca.php`, `acerca-del-sitio.php`, `moon-image.php`, `altitude-profile.php`, `astronomy-directions.php`, `astronomy-featured-dates.php` y `sitemap.xml`;
 - `includes/`;
 - `assets/css/` y `assets/js/`;
+- previews públicas bajo `assets/images/tienda/previews/`;
 - las 404 imágenes de `assets/images/moon-phases/`;
 - los mapas disponibles de `assets/images/eclipses/`, aunque estén ignorados por Git;
 - `.htaccess`, que bloquea por HTTP `includes/`, `scripts/` y las pruebas PHP/shell sin impedir el HTML de prueba táctil local.
@@ -232,6 +248,8 @@ curl -fsSI "https://aquellaslunas.com.ar/astro/assets/images/eclipses/<local_fil
 El primer comando confirma el archivo en el árbol que se desplegó y el segundo debe devolver una respuesta HTTP satisfactoria desde `/astro/assets/images/eclipses/`. No usar `source_url` para esta comprobación ni como URL pública de la imagen.
 
 El archivo real `/home8/aquellaslunascom/config/astronomia.php` no forma parte del repositorio ni del despliegue.
+
+Las exclusiones del script son una defensa de despliegue, no una autorización para publicar todo el árbol. Antes y después de cada publicación comprobar desde Internet que `/.env`, `/.git/HEAD`, `/docs/`, `/tests/`, `/scripts/`, `/local-tools/`, `/Dockerfile`, `/docker-compose.yml`, backups y logs respondan 403 o 404. El `.htaccess` versionado no cubre por sí solo todas esas rutas.
 
 ## Verificación posterior
 
@@ -278,8 +296,10 @@ Revisar:
 - configuración móvil deshabilitada: sin `mobile-swipe-navigation.js` ni atributos de destinos;
 - configuración de tienda válida, comprobada desde PHP sin imprimir las rutas; originales legible y previews/catálogo legibles y escribibles;
 - Galería con sólo fotos disponibles y preview, orden descendente, títulos opcionales, precio/moneda y modal responsive;
-- con timings deshabilitados, abrir `index.php?debug_now=2026-07-29T18:15:00-03:00` y comprobar que no aparece la barra de simulación ni cambia la hora mostrada;
+- en una sesión incógnita, abrir `index.php?debug_now=2026-07-29T18:15:00-03:00` y comprobar que no aparecen timings ni simulación y no cambia la hora mostrada;
 - `error_log` de cPanel sin errores de configuración, cURL, TLS o JSON.
+
+Comprobar además desde una ventana sin sesión que `/astro/admin/`, `/astro/admin/contenidos/`, `/astro/admin/configuracion-sitio/`, `/astro/admin/presentacion/`, `/astro/admin/presentacion/reglas.php`, `/astro/admin/fotos.php` y `/astro/admin/laboratorio-astronomico.php` redirijan al login, y que `/astro/admin/api/datos-astronomicos.php` responda 401. Con sesión, verificar logout, rechazo de CSRF inválido y que una cookie anterior al logout no vuelva a autenticar.
 
 Para comprobar directamente el proxy, usar una fecha y ubicación válidas:
 
@@ -297,11 +317,9 @@ El hosting usa PHP 8.5 sin garantía de mbstring. La versión desplegada debe in
 
 El intervalo de los perfiles de altura se configura con `altitude_profile_interval_minutes` en el arreglo externo de producción. Es opcional, vale 15 de forma predeterminada y admite enteros entre 5 y 60.
 
-El umbral de superluna se configura con `supermoon_min_apparent_size_percent` en el mismo arreglo. Es opcional, vale 105 de forma predeterminada y admite números entre 90 y 120. La variable de entorno `SUPERMOON_MIN_APPARENT_SIZE_PERCENT`, cuando existe, tiene prioridad.
+El umbral de Superluna y la anticipación del aviso de salida lunar se verifican en `/admin/presentacion/reglas.php`. Sin overrides se aplican los defaults del catálogo PHP; no requieren claves en el arreglo externo.
 
-La anticipación del aviso de salida lunar se configura con `moonrise_notice_max_minutes`. Es opcional, vale 120 minutos de forma predeterminada y admite enteros entre 1 y 1440. La variable `MOONRISE_NOTICE_MAX_MINUTES`, cuando existe, tiene prioridad.
-
-La navegación táctil, su aviso inicial y el panel se configuran por separado mediante `mobile_swipe_navigation_enabled`, `mobile_swipe_navigation_hint_enabled` y `mobile_swipe_navigation_debug_enabled`. Sus valores predeterminados son `true`, `true` y `false`; las variables de entorno equivalentes tienen prioridad. Con la navegación deshabilitada no se publica contexto ni se carga el script. El panel requiere además timings activos.
+La navegación táctil, su aviso inicial y el panel se configuran por separado mediante `mobile_swipe_navigation_enabled`, `mobile_swipe_navigation_hint_enabled` y `mobile_swipe_navigation_debug_enabled`. Sus valores predeterminados son `true`, `true` y `false`; las variables de entorno equivalentes tienen prioridad. Con la navegación deshabilitada no se publica contexto ni se carga el script. El panel requiere además autorización de herramientas técnicas.
 
 CSS, JavaScript y miniaturas lunares locales se publican con URLs versionadas por `includes/asset-url.php` a partir de `filemtime()`. El despliegue debe incluir ese helper; no hace falta desactivar la caché de estáticos ni purgarla en cada publicación, porque la URL cambia junto con el archivo.
 

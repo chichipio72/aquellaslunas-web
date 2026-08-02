@@ -47,8 +47,17 @@ foreach ($cleanup->fetchAll(PDO::FETCH_COLUMN) as $staleSlug) {
 
 $articles = contentEditorDbListArticles($connection);
 $slugs = array_column($articles, 'slug');
-adminContentAssert(count($articles) === 5, 'El listado inicial no tiene cinco artículos tras la limpieza de pruebas.');
-adminContentAssert($slugs === ['eclipses-lunares', 'fases-de-la-luna', 'pascua', 'semana', 'superluna'], 'Los slugs iniciales no coinciden con el catálogo esperado.');
+$firstArticle = $articles[0] ?? null;
+adminContentAssert(is_array($firstArticle) && is_bool($firstArticle['has_main_image'] ?? null), 'El listado no informa si existe imagen principal.');
+$requiredSlugs = ['eclipses-lunares', 'fases-de-la-luna', 'pascua', 'semana', 'superluna'];
+adminContentAssert(count($articles) >= count($requiredSlugs), 'El listado inicial no contiene los artículos base esperados.');
+adminContentAssert(array_diff($requiredSlugs, $slugs) === [], 'Faltan artículos base en el catálogo actual.');
+$imageGallery = contentEditorImageGallery();
+foreach ($imageGallery as $image) {
+    adminContentAssert(is_bool($image['hero_compatible'] ?? null), 'La galería no clasifica imágenes 16:9.');
+    adminContentAssert(is_bool($image['vertical'] ?? null), 'La galería no clasifica imágenes verticales.');
+    adminContentAssert(!($image['hero_compatible'] && $image['vertical']), 'Una imagen quedó clasificada simultáneamente como 16:9 y vertical.');
+}
 
 foreach ($slugs as $slug) {
     $loaded = contentEditorDbLoadArticleRaw($connection, $slug);
@@ -117,6 +126,12 @@ $updated = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
 adminContentAssert(is_array($updated), 'El artículo actualizado no pudo recargarse por nuevo slug.');
 adminContentAssert(($updated['raw']['version'] ?? 0) === 2, 'No se guardó la versión actualizada.');
 adminContentAssert(($updated['raw']['visible'] ?? true) === false, 'No se guardó la visibilidad actualizada.');
+adminContentAssert(contentEditorDbSetArticleVisibility($connection, $updatedSlug, true), 'No se pudo hacer visible el artículo desde el listado.');
+$visibleFromList = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+adminContentAssert(($visibleFromList['raw']['visible'] ?? false) === true, 'El cambio rápido no hizo visible el artículo.');
+adminContentAssert(contentEditorDbSetArticleVisibility($connection, $updatedSlug, false), 'No se pudo volver a ocultar el artículo desde el listado.');
+adminContentAssert(contentEditorDbSetArticleVisibility($connection, '../slug-invalido', true) === false, 'El cambio rápido aceptó un slug inválido.');
+adminContentAssert(contentEditorDbSetArticleVisibility($connection, 'articulo-inexistente', true) === false, 'El cambio rápido informó éxito para un artículo inexistente.');
 adminContentAssert(($updated['raw']['trivias'][0]['pregunta'] ?? '') === 'Pregunta actualizada', 'No se guardó la trivia actualizada.');
 adminContentAssert(($updated['raw']['sabias_que'][0]['titulo'] ?? '') === 'Dato actualizado', 'No se guardó el bloque “Sabías que…” actualizado.');
 

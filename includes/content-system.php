@@ -659,6 +659,75 @@ function astronomyContentVisibleArticles(array $catalog): array
     return array_values(array_filter($catalog['articles'], static fn(array $article): bool => $article['valid'] && $article['visible']));
 }
 
+function astronomyContentSearchNormalize(string $value): string
+{
+    $value = strtr(trim($value), [
+        'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ü' => 'u', 'Ñ' => 'n',
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n',
+    ]);
+    $value = strtolower($value);
+    $value = preg_replace('/\p{Mn}+/u', '', $value) ?? $value;
+    return preg_replace('/\s+/u', ' ', $value) ?? $value;
+}
+
+function astronomyContentSearchLimitQuery(string $query): string
+{
+    $query = trim($query);
+    if (preg_match('/^.{0,120}/us', $query, $match) === 1) {
+        return $match[0];
+    }
+    return substr($query, 0, 120);
+}
+
+function astronomyContentSearchArticles(array $articles, string $query): array
+{
+    $normalizedQuery = astronomyContentSearchNormalize(astronomyContentSearchLimitQuery($query));
+    if ($normalizedQuery === '') {
+        return array_values($articles);
+    }
+    $terms = array_values(array_unique(array_filter(preg_split('/[^\p{L}\p{N}]+/u', $normalizedQuery) ?: [])));
+    if ($terms === []) {
+        return [];
+    }
+
+    $ranked = [];
+    foreach (array_values($articles) as $position => $article) {
+        if (($article['valid'] ?? false) !== true || ($article['visible'] ?? false) !== true) {
+            continue;
+        }
+        $raw = is_array($article['raw'] ?? null) ? $article['raw'] : [];
+        $fields = [
+            'title' => astronomyContentSearchNormalize((string) ($raw['titulo'] ?? '')),
+            'keywords' => astronomyContentSearchNormalize(implode(' ', is_array($raw['palabras_clave'] ?? null) ? $raw['palabras_clave'] : [])),
+            'summary' => astronomyContentSearchNormalize((string) ($raw['resumen'] ?? '')),
+            'markdown' => astronomyContentSearchNormalize((string) ($raw['articulo'] ?? '')),
+        ];
+        $combined = implode(' ', $fields);
+        if (count(array_filter($terms, static fn(string $term): bool => str_contains($combined, $term))) !== count($terms)) {
+            continue;
+        }
+
+        $weights = ['title' => 1000000, 'keywords' => 10000, 'summary' => 100, 'markdown' => 1];
+        $score = 0;
+        foreach ($fields as $field => $text) {
+            if (str_contains($text, $normalizedQuery)) {
+                $score += $weights[$field] * 2;
+            }
+            foreach ($terms as $term) {
+                if (str_contains($text, $term)) {
+                    $score += $weights[$field];
+                }
+            }
+        }
+        $ranked[] = ['article' => $article, 'score' => $score, 'position' => $position];
+    }
+
+    usort($ranked, static fn(array $left, array $right): int =>
+        ($right['score'] <=> $left['score']) ?: ($left['position'] <=> $right['position'])
+    );
+    return array_column($ranked, 'article');
+}
+
 function astronomyContentRandomEntry(array $catalog, string $type): ?array
 {
     if (!isContentEnabled()) {
@@ -719,6 +788,21 @@ function astronomyContentArticleUrl(string $slug, string $anchor = ''): string
     );
 }
 
+function astronomyContentEntryArticleUrl(array $catalog, array $entry): ?string
+{
+    $sourceSlug = (string) ($entry['source_slug'] ?? '');
+    $article = $catalog['articles'][$sourceSlug] ?? null;
+    if (
+        preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $sourceSlug) !== 1
+        || !is_array($article)
+        || ($article['valid'] ?? false) !== true
+        || ($article['visible'] ?? false) !== true
+    ) {
+        return null;
+    }
+    return astronomyContentArticleUrl($sourceSlug);
+}
+
 function renderAstronomyContentDiagnostic(array $diagnostic, string $heading = 'Contenido con errores'): void
 {
     if (!astronomyContentDebugEnabled()) {
@@ -751,6 +835,8 @@ function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = t
 {
     $trivia = $triviaEnabled ? astronomyContentRandomTrivia($catalog) : null;
     $fact = $factEnabled ? astronomyContentRandomFact($catalog) : null;
+    $triviaArticleUrl = is_array($trivia) && !isset($trivia['diagnostic']) ? astronomyContentEntryArticleUrl($catalog, $trivia) : null;
+    $factArticleUrl = is_array($fact) && !isset($fact['diagnostic']) ? astronomyContentEntryArticleUrl($catalog, $fact) : null;
     if ($trivia === null && $fact === null) {
         return;
     }
@@ -788,6 +874,7 @@ function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = t
                         <div class="interactive-feedback" data-trivia-feedback aria-live="polite" aria-atomic="true" tabindex="-1" hidden>
                             <strong data-trivia-result></strong>
                             <p><?= htmlspecialchars($correctExplanation) ?></p>
+                            <?php if ($triviaArticleUrl !== null): ?><a class="content-card__read-link" href="<?= htmlspecialchars($triviaArticleUrl, ENT_QUOTES, 'UTF-8') ?>">Leer más sobre este tema <span aria-hidden="true">→</span></a><?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -803,6 +890,7 @@ function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = t
                     <?= astronomyContentProtectedImageHtml($fact['image'], '') ?>
                     <h2><?= htmlspecialchars((string) $fact['raw']['titulo']) ?></h2>
                     <p><?= htmlspecialchars((string) $fact['raw']['respuesta']) ?></p>
+                    <?php if ($factArticleUrl !== null): ?><a class="content-card__read-link" href="<?= htmlspecialchars($factArticleUrl, ENT_QUOTES, 'UTF-8') ?>">Ver artículo <span aria-hidden="true">→</span></a><?php endif; ?>
                 <?php endif; ?>
             </article>
         <?php endif; ?>

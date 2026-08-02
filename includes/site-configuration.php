@@ -91,6 +91,12 @@ function astronomySiteConfigCatalog(): array
             'default' => true,
             'description' => 'Muestra la entrada Acerca del sitio en el menú principal.',
         ],
+        'menu.administration.enabled' => [
+            'group' => 'menu',
+            'label' => 'Administración',
+            'default' => true,
+            'description' => 'Muestra la entrada Administración en el menú principal.',
+        ],
 
         'home.today.enabled' => [
             'group' => 'home',
@@ -169,6 +175,7 @@ function astronomySiteMenuConfigBySectionId(): array
         'location' => 'menu.location.enabled',
         'capabilities' => 'menu.capabilities.enabled',
         'about' => 'menu.about.enabled',
+        'administration' => 'menu.administration.enabled',
     ];
 }
 

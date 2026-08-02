@@ -4,7 +4,23 @@ function storePhotoSupportsFile(SplFileInfo $file): bool
 {
     return $file->isFile()
         && !$file->isLink()
-        && in_array(strtolower($file->getExtension()), ['jpg', 'jpeg'], true);
+        && in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png', 'webp'], true);
+}
+
+function storePhotoImageDetails(string $path, string $extension): array
+{
+    $extension = strtolower($extension);
+    $image = @getimagesize($path);
+    $extensionsByType = [
+        IMAGETYPE_JPEG => ['jpg', 'jpeg'],
+        IMAGETYPE_PNG => ['png'],
+        IMAGETYPE_WEBP => ['webp'],
+    ];
+    $imageType = is_array($image) ? ($image[2] ?? null) : null;
+    if (!is_int($imageType) || !isset($extensionsByType[$imageType]) || !in_array($extension, $extensionsByType[$imageType], true)) {
+        throw new RuntimeException('El contenido de la imagen no coincide con un formato permitido.');
+    }
+    return $image;
 }
 
 function storePhotoExifValue(array $exif, array $keys): mixed
@@ -57,17 +73,14 @@ function storePhotoBuildRecord(SplFileInfo $file, string $price): array
         throw new RuntimeException('El nombre del archivo no es UTF-8 válido.');
     }
 
-    $image = @getimagesize($path);
-    if (!is_array($image) || ($image[2] ?? null) !== IMAGETYPE_JPEG) {
-        throw new RuntimeException('El archivo no contiene una imagen JPEG válida.');
-    }
+    $image = storePhotoImageDetails($path, $file->getExtension());
     $photoId = hash_file('sha256', $path);
     if (!is_string($photoId) || preg_match('/^[a-f0-9]{64}$/', $photoId) !== 1) {
         throw new RuntimeException('No se pudo calcular la huella del archivo.');
     }
 
     $exif = [];
-    if (function_exists('exif_read_data')) {
+    if (($image[2] ?? null) === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
         $readExif = @exif_read_data($path, null, true, false);
         $exif = is_array($readExif) ? $readExif : [];
     }
@@ -121,7 +134,8 @@ function synchronizeStorePhotos(
 ): array {
     $summary = ['encontrados' => 0, 'nuevos' => 0, 'existentes' => 0, 'omitidos' => 0, 'errores' => 0];
     $seenPhotoIds = [];
-    $existsStatement = $connection->prepare('SELECT id FROM fotos WHERE foto_id = :foto_id LIMIT 1');
+    $existsByPhotoIdStatement = $connection->prepare('SELECT id FROM fotos WHERE foto_id = :foto_id LIMIT 1');
+    $existsByOriginalStatement = $connection->prepare('SELECT id FROM fotos WHERE archivo_original = :archivo_original LIMIT 1');
     $insertStatement = $connection->prepare(
         'INSERT INTO fotos '
         . '(foto_id, nombre_archivo, archivo_original, ancho_px, alto_px, fecha_captura, camara, lente, metadatos_json, precio, disponible) '
@@ -143,8 +157,13 @@ function synchronizeStorePhotos(
                 continue;
             }
             $seenPhotoIds[$record['foto_id']] = true;
-            $existsStatement->execute(['foto_id' => $record['foto_id']]);
-            if ($existsStatement->fetchColumn() !== false) {
+            $existsByPhotoIdStatement->execute(['foto_id' => $record['foto_id']]);
+            if ($existsByPhotoIdStatement->fetchColumn() !== false) {
+                $summary['existentes']++;
+                continue;
+            }
+            $existsByOriginalStatement->execute(['archivo_original' => $record['archivo_original']]);
+            if ($existsByOriginalStatement->fetchColumn() !== false) {
                 $summary['existentes']++;
                 continue;
             }
@@ -154,15 +173,22 @@ function synchronizeStorePhotos(
             $summary['nuevos']++;
         } catch (Throwable $exception) {
             if ($exception instanceof PDOException && (string) $exception->getCode() === '23000') {
-                $existsStatement->execute(['foto_id' => $record['foto_id'] ?? '']);
-                if ($existsStatement->fetchColumn() !== false) {
+                $existsByPhotoIdStatement->execute(['foto_id' => $record['foto_id'] ?? '']);
+                $existsByOriginalStatement->execute(['archivo_original' => $record['archivo_original'] ?? '']);
+                if ($existsByPhotoIdStatement->fetchColumn() !== false || $existsByOriginalStatement->fetchColumn() !== false) {
                     $summary['existentes']++;
                     continue;
                 }
             }
             $summary['errores']++;
             if ($reportError !== null) {
-                $reportError($file->getFilename());
+                $reportError(
+                    $file->getFilename()
+                    . ' | '
+                    . get_class($exception)
+                    . ' | '
+                    . $exception->getMessage()
+                );
             }
         }
     }

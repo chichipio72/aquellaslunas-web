@@ -91,9 +91,11 @@ try {
     siteConfigurationAssert((string) $storedContentEnabled === '0', 'La inicialización idempotente modificó un valor existente.');
 
     $connection->prepare("DELETE FROM admin_configuracion_sitio WHERE clave = 'menu.about.enabled'")->execute();
+    $connection->prepare("DELETE FROM admin_configuracion_sitio WHERE clave = 'menu.administration.enabled'")->execute();
     astronomySiteConfigResetCache();
     $loaded = astronomySiteConfigLoadAll();
     siteConfigurationAssert(($loaded['menu.about.enabled'] ?? false) === true, 'No se aplicó el valor por defecto al faltar una clave.');
+    siteConfigurationAssert(($loaded['menu.administration.enabled'] ?? false) === true, 'No se aplicó el valor predeterminado de Administración al faltar su clave.');
 
     $threwUnknown = false;
     try {
@@ -105,10 +107,12 @@ try {
 
     astronomySiteConfigUpdate($connection, [
         'menu.today.enabled' => false,
+        'menu.administration.enabled' => false,
         'home.install.enabled' => false,
     ]);
     $reloaded = astronomySiteConfigLoadAll();
     siteConfigurationAssert(($reloaded['menu.today.enabled'] ?? true) === false, 'No se guardó la actualización de menú.');
+    siteConfigurationAssert(($reloaded['menu.administration.enabled'] ?? true) === false, 'No se guardó la visibilidad de Administración.');
     siteConfigurationAssert(($reloaded['home.install.enabled'] ?? true) === false, 'No se guardó la actualización de portada.');
 
     $fallbackValue = astronomySiteConfigBool(

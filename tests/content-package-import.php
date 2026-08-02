@@ -27,6 +27,20 @@ $exampleValidation = contentEditorValidatePackageJson($exampleJson);
 packageImportAssert($exampleValidation['valid'], 'El ejemplo central no pasa el validador del importador.');
 packageImportAssert(count($exampleValidation['raw']['trivias']) === 2, 'El ejemplo no contiene dos trivias.');
 packageImportAssert(count($exampleValidation['raw']['sabias_que']) === 2, 'El ejemplo no contiene dos Sabías que.');
+packageImportAssert(
+    $exampleValidation['raw']['sabias_que'][0]['titulo'] === '¿Sabías que la Luna se aleja lentamente de la Tierra?',
+    'La primera frase del ejemplo no es la pregunta esperada.'
+);
+packageImportAssert(
+    $exampleValidation['raw']['sabias_que'][1]['titulo'] === '¿Sabías que siempre vemos casi la misma cara de la Luna?',
+    'La segunda frase del ejemplo no es la pregunta esperada.'
+);
+foreach ($exampleValidation['raw']['sabias_que'] as $fact) {
+    packageImportAssert(
+        str_starts_with($fact['titulo'], '¿') && str_ends_with($fact['titulo'], '?'),
+        'Cada frase de Sabías que del ejemplo debe ser una pregunta completa.'
+    );
+}
 
 $invalidJson = contentEditorValidatePackageJson('{"version":');
 packageImportAssert(!$invalidJson['valid'] && ($invalidJson['errors'][0]['field'] ?? '') === 'json', 'Se aceptó JSON inválido.');

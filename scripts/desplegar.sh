@@ -9,22 +9,20 @@ readonly FTP_USER='andres@aquellaslunas.com.ar'
 readonly ROOT_ROBOTS_REMOTE_PATH='robots.txt'
 
 usage() {
-    printf 'Uso: %s [--dry-run|--list-local]\n' "$0" >&2
+    printf 'Uso: %s [--dry-run] [--list-local] [--include-vendor]\n' "$0" >&2
 }
 
 dry_run_option=''
 list_local=false
-case "${1:-}" in
-    '') ;;
-    --dry-run) dry_run_option='--dry-run' ;;
-    --list-local) list_local=true ;;
-    *) usage; exit 2 ;;
-esac
-
-if (( $# > 1 )); then
-    usage
-    exit 2
-fi
+include_vendor=false
+for argument in "$@"; do
+    case "$argument" in
+        --dry-run) dry_run_option='--dry-run' ;;
+        --list-local) list_local=true ;;
+        --include-vendor) include_vendor=true ;;
+        *) usage; exit 2 ;;
+    esac
+done
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 local_root="$(cd -- "${script_dir}/.." && pwd -P)"
@@ -34,7 +32,7 @@ if [[ "$local_root" != "$EXPECTED_ROOT" || ! -f "$local_root/index.php" || ! -f 
     exit 1
 fi
 
-readonly -a DEPLOY_EXCLUDE_PATTERNS=(
+DEPLOY_EXCLUDE_PATTERNS=(
     '^\.git(/|$)'
     '^\.github(/|$)'
     '^\.vscode(/|$)'
@@ -70,6 +68,11 @@ readonly -a DEPLOY_EXCLUDE_PATTERNS=(
     '~$'
     '^\.phpunit\.result\.cache$'
 )
+
+if [[ "$include_vendor" != true ]]; then
+    DEPLOY_EXCLUDE_PATTERNS+=('^vendor(/|$)')
+fi
+readonly -a DEPLOY_EXCLUDE_PATTERNS
 
 deployment_path_is_excluded() {
     local relative_path="$1"

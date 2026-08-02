@@ -35,9 +35,7 @@ ASTRONOMY_API_BASE_URL=http://host.docker.internal:18000
 
 La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-profile.php`. Este proxy del mismo origen valida ubicación, fecha y zona horaria antes de consultar `/v1/astronomy/altitude-profile`; una falla de un perfil no impide cargar el otro. `ALTITUDE_PROFILE_INTERVAL_MINUTES` configura ambos perfiles, admite valores de 5 a 60 y usa 15 de forma predeterminada.
 
-`SUPERMOON_MIN_APPARENT_SIZE_PERCENT` configura desde qué tamaño relativo una Luna llena se presenta como **Superluna**. Admite números entre 90 y 120, usa 105 de forma predeterminada y puede definirse en `.env` para Docker Compose.
-
-`MOONRISE_NOTICE_MAX_MINUTES` configura con cuánta anticipación la portada empieza a anunciar la próxima salida lunar. Admite enteros de 1 a 1440 y usa 120 de forma predeterminada. También respeta `debug_now`.
+Superluna y la anticipación de salida lunar se prueban con los valores efectivos de `/admin/presentacion/reglas.php`: defaults del catálogo PHP más overrides opcionales en `WEB_DB`. Las variables históricas homónimas pueden seguir existiendo en el entorno, pero no son la fuente operativa de estas reglas.
 
 `MOBILE_SWIPE_NAVIGATION_ENABLED` habilita el recorrido táctil móvil entre Inicio, Esta noche, Sol y Luna, Planificador y Eventos. `MOBILE_SWIPE_NAVIGATION_HINT_ENABLED` controla por separado el aviso inicial guardado en `localStorage`. Ambas usan `true` de forma predeterminada. `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED` controla únicamente el panel visual y usa `false`: incluso en modo timings, el swipe navega automáticamente mientras esa opción siga apagada.
 
@@ -50,10 +48,9 @@ La publicación de contenido se controla mediante `admin_configuracion_sitio` y 
 independiente de `APP_ENV`.
 
 La sección **Contenidos** lee desde MySQL mediante `includes/content-system.php`.
-En la cabecera local aparece **Ver errores de contenido**: activa por sesión un
+En local, y en producción sólo para una sesión administrativa válida, aparece **Ver errores de contenido**: activa por sesión un
 diagnóstico que mantiene visibles los problemas de metadatos, Markdown,
-referencias, trivias, entradas “Sabías que…” e imágenes. El control no existe en
-producción y no requiere variables adicionales.
+referencias, trivias, entradas “Sabías que…” e imágenes. No requiere variables adicionales.
 
 Los recursos reutilizables de artículos, trivias y “Sabías que…” se colocan en
 `assets/images/tienda/previews/contenido/`. Si una referencia editorial no coincide con un
@@ -76,19 +73,25 @@ Docker Compose carga automáticamente `.env`. El archivo local actual contiene:
 ```dotenv
 APP_ENV=local
 LOCAL_TIME_SIMULATION_ENABLED=true
-CONTENT_ENABLED_IN_PRODUCTION=false
-ASTRONOMY_SHOW_TIMINGS=true
 MOBILE_SWIPE_NAVIGATION_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_HINT_ENABLED=true
 MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=false
 STORE_ORIGINALS_PATH=/srv/proyectos/astronomia/web/storage/tienda/originales
 STORE_PREVIEWS_PATH=/srv/proyectos/astronomia/web/assets/images/tienda/previews
 STORE_CATALOG_PATH=/srv/proyectos/astronomia/web/storage/tienda/catalogo
-STORE_DB_HOST=167.250.5.41
+STORE_DB_HOST=HOST_MYSQL
 STORE_DB_PORT=3306
-STORE_DB_NAME=aquellaslunascom_tienda_dev
+STORE_DB_NAME=BASE_TIENDA
 STORE_DB_USER=
 STORE_DB_PASSWORD=
+WEB_DB_HOST=
+WEB_DB_PORT=3306
+WEB_DB_NAME=
+WEB_DB_USER=
+WEB_DB_PASSWORD=
+WEB_PUSH_VAPID_PUBLIC_KEY=
+WEB_PUSH_VAPID_PRIVATE_KEY=
+WEB_PUSH_VAPID_SUBJECT=mailto:tu-correo@example.com
 STORE_ADMIN_USER=
 STORE_ADMIN_PASSWORD_HASH=
 STORE_INITIAL_PRICE=
@@ -115,9 +118,9 @@ cd /srv/proyectos/astronomia/web
 docker compose up -d --force-recreate web
 ```
 
-Con valor verdadero muestra al final de las vistas que consultan la API, incluida Esta noche, el tiempo interno informado por la API, cuando existe, el tiempo total observado por PHP/cURL, intentos, validación y código HTTP. También incorpora `Server-Timing` si está disponible. Para desactivarlo, establecer `ASTRONOMY_SHOW_TIMINGS=false` en `.env` y recrear.
+En local, `canUseSiteDebugTools()` muestra al final de las vistas que consultan la API, incluida Esta noche, el tiempo interno informado por la API, cuando existe, el tiempo total observado por PHP/cURL, intentos, validación y código HTTP. También incorpora `Server-Timing` si está disponible. No existe un flag separado para timings.
 
-El panel fijo de swipe sólo aparece si también se cambia `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true` y se recrea el servicio. Registra fuente Touch/Pointer, movimientos, `touch-action`, coordenadas, exclusión, resultado y URL. Sólo con ambas opciones activas deja el destino pendiente para el botón. La configuración local normal conserva timings y reloj simulado, pero no muestra el panel y permite navegación automática.
+El panel fijo de swipe sólo aparece si se cambia `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true` y se recrea el servicio. Registra fuente Touch/Pointer, movimientos, `touch-action`, coordenadas, exclusión, resultado y URL. Con esa opción deja el destino pendiente para el botón. La configuración local normal conserva timings y reloj simulado, pero no muestra el panel y permite navegación automática.
 
 ### Rutas de la tienda
 
@@ -502,10 +505,7 @@ El archivo debe permanecer fuera de `/home8/aquellaslunascom/public_html`:
 
 return [
     'astronomy_api_base_url' => 'https://api.aquellaslunas.com.ar',
-    'astronomy_show_timings' => false,
     'altitude_profile_interval_minutes' => 15,
-    'supermoon_min_apparent_size_percent' => 105,
-    'moonrise_notice_max_minutes' => 120,
     'mobile_swipe_navigation_enabled' => true,
     'mobile_swipe_navigation_hint_enabled' => true,
     'mobile_swipe_navigation_debug_enabled' => false,
@@ -514,6 +514,11 @@ return [
     'store_catalog_path' => '/home8/aquellaslunascom/fotos_tienda/catalogo',
     'store_admin_user' => 'usuario-administrativo',
     'store_admin_password_hash' => 'HASH_GENERADO_FUERA_DEL_REPOSITORIO',
+    'web_db_host' => 'HOST_PRIVADO',
+    'web_db_port' => 3306,
+    'web_db_name' => 'BASE_WEB',
+    'web_db_user' => 'USUARIO_WEB',
+    'web_db_password' => 'VALOR_PRIVADO',
     'store_preview_tienda_max_size' => 800,
     'store_preview_tienda_jpeg_quality' => 72,
     'store_preview_contenido_max_size' => 400,

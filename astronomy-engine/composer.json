@@ -1,0 +1,14 @@
+{
+    "name": "aquellas-lunas/astronomy-engine",
+    "description": "Motor astronómico PHP portable.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "AstronomyEngine\\": "src/"
+        }
+    }
+}

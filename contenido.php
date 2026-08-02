@@ -67,13 +67,15 @@ $pageSeo['robots'] = 'noindex, nofollow';
                     <h1><?= htmlspecialchars((string) $article['raw']['titulo']) ?></h1>
                     <p><?= htmlspecialchars((string) $article['raw']['resumen']) ?></p>
                 </header>
-                <?php if ($adminPreview): ?>
-                    <div class="content-local-actions">
+                <div class="content-local-actions">
+                    <?php if ($adminPreview): ?>
                         <?php if (!$contentEnabled): ?><p class="content-local-note">Sección pública deshabilitada</p><?php endif; ?>
                         <?php if (!$article['visible']): ?><p class="content-local-note">Contenido oculto</p><?php endif; ?>
-                        <a class="content-local-edit-link" href="<?= htmlspecialchars('/admin/contenidos/?action=edit&slug=' . rawurlencode($article['slug']), ENT_QUOTES, 'UTF-8') ?>">Editar artículo <span aria-hidden="true">→</span></a>
-                    </div>
-                <?php endif; ?>
+                        <a class="content-local-edit-link" href="<?= htmlspecialchars('admin/contenidos/?action=edit&slug=' . rawurlencode($article['slug']), ENT_QUOTES, 'UTF-8') ?>">Editar artículo <span aria-hidden="true">→</span></a>
+                    <?php else: ?>
+                        <a class="content-local-edit-link" href="contenidos.php"><span aria-hidden="true">←</span> Ver otros temas</a>
+                    <?php endif; ?>
+                </div>
                 <?php if (($article['image']['url'] ?? null) !== null): ?>
                     <figure class="article-hero"><?= astronomyContentProtectedImageHtml(
                         $article['image'],
@@ -83,6 +85,9 @@ $pageSeo['robots'] = 'noindex, nofollow';
                     ) ?></figure>
                 <?php endif; ?>
                 <div class="content-article__body"><?= astronomyContentRenderMarkdown(astronomyContentArticleBodyMarkdown((string) $article['raw']['articulo'])) ?></div>
+                <footer class="content-local-actions">
+                    <a class="content-local-edit-link" href="contenidos.php"><span aria-hidden="true">←</span> Ver otros temas</a>
+                </footer>
             </article>
         <?php endif; ?>
     </div></main>

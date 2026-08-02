@@ -36,6 +36,8 @@ test "$status" = "200"
 grep -q '<meta charset="utf-8">' "$work_dir/visible-public"
 ! grep -q 'Contenido oculto' "$work_dir/visible-public"
 ! grep -q 'Editar artículo' "$work_dir/visible-public"
+test "$(grep -c 'Ver otros temas' "$work_dir/visible-public")" = "2"
+grep -q 'href="contenidos.php"' "$work_dir/visible-public"
 
 status="$(curl -sS -o "$work_dir/hidden-public" -D "$work_dir/hidden-public-headers" -w '%{http_code}' "$base_url/contenido.php?slug=$hidden_slug")"
 test "$status" = "404"
@@ -52,7 +54,8 @@ status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/h
 test "$status" = "200"
 grep -q 'Contenido oculto' "$work_dir/hidden-admin"
 grep -q 'Editar artículo' "$work_dir/hidden-admin"
-grep -q "href=\"/admin/contenidos/?action=edit&amp;slug=$hidden_slug\"" "$work_dir/hidden-admin"
+grep -q "href=\"admin/contenidos/?action=edit&amp;slug=$hidden_slug\"" "$work_dir/hidden-admin"
+test "$(grep -c 'Ver otros temas' "$work_dir/hidden-admin")" = "1"
 
 if [[ "$without_trivia_slug" != "" ]]; then
   status="$(curl -sS -o "$work_dir/without-trivia" -w '%{http_code}' "$base_url/contenido.php?slug=$without_trivia_slug")"

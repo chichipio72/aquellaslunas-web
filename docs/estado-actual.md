@@ -1,6 +1,6 @@
 # Estado actual verificado
 
-Fecha de auditoría: 2026-07-25.
+Fecha de revisión documental: 2026-08-01.
 
 ## Implementado en el árbol web
 
@@ -14,6 +14,11 @@ Fecha de auditoría: 2026-07-25.
 - galería, administración privada, sincronización y generación de previews;
 - creación server-side de preferencias de Mercado Pago y procesamiento firmado del webhook;
 - creación de permisos en `descargas` tras un pago aprobado.
+- contenido público y editor administrativo respaldados por MySQL (`WEB_DB`);
+- importación editorial JSON con validación previa y sin sobrescritura;
+- administración de visibilidad de secciones, tipos de eventos y reglas/mensajes;
+- defaults editoriales en catálogos PHP y overrides opcionales en MySQL;
+- Laboratorio con actualización automática, análisis recordados y endpoint privado.
 
 ## Probado localmente durante esta auditoría
 
@@ -29,6 +34,8 @@ Las pruebas HTTP dependen de que Docker y la API local estén activos. Los coman
 ## Despliegue
 
 El mecanismo FTPS está implementado y documentado. Incluye `assets/images/eclipses/` aunque sus GIF estén ignorados por Git y no usa `--delete`. Esta auditoría no ejecutó un despliegue real ni verificó por credenciales el contenido remoto; no debe inferirse que cada cambio local ya esté publicado.
+
+El servidor local monta el repositorio completo y no representa la selección FTPS de producción. El script excluye `.env`, `.git`, documentación, pruebas, scripts, herramientas locales y archivos Docker; como no usa `--delete`, el hosting debe auditarse por separado para detectar copias antiguas o sensibles.
 
 ## Pendiente
 

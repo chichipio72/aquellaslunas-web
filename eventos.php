@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
@@ -45,7 +46,6 @@ $latitude = $location['latitude'];
 $longitude = $location['longitude'];
 $timezoneName = $location['timezone'];
 $locationLabel = $location['name'];
-$locationMode = $location['mode'];
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
 
 $today = get_current_datetime($timezoneName);
@@ -68,9 +68,7 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
     $apiErrorMessage = 'Seleccioná al menos un tipo de evento.';
 } else {
     try {
-        $apiConfig = loadAstronomyApiConfig();
-        error_log('Aquellas Lunas API configuration source: ' . $apiConfig['source']);
-        $query = http_build_query([
+        $eventsData = astronomyEvents([
             'start_date' => $startDate,
             'days' => $days,
             'latitude' => $latitude,
@@ -78,43 +76,18 @@ if ($filtersWereSubmitted && $selectedTypes === []) {
             'timezone' => $timezoneName,
             'types' => implode(',', $selectedTypes),
             'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
-        ]);
-        $requestResult = astronomyApiRequest($apiConfig['base_url'] . '/v1/astronomy/events?' . $query, 'events', 35);
-        if ($locationMode !== 'default' && astronomyApiRejectedLocationParameters($requestResult)) {
-            astronomyRecoverDefaultLocationFromApi($requestResult);
-        }
-        $response = $requestResult['body'];
-        $httpCode = $requestResult['http_code'];
-        if ($response === false || $httpCode !== 200) {
-            $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
-            error_log('Aquellas Lunas API events request failed with HTTP status ' . $httpCode . '.');
-            astronomyApiRecordValidation('events', null, false);
-        } else {
-            $decoded = json_decode($response, true);
-            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded) || !is_array($decoded['items'] ?? null)) {
-                $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
-                error_log('Aquellas Lunas API events invalid response: ' . json_last_error_msg());
-                astronomyApiRecordValidation('events', false, false);
-            } else {
-                $items = array_values(array_filter(
-                    $decoded['items'],
-                    static fn($event): bool => is_array($event) && astronomyEarthshineEventIsDisplayable($event)
-                ));
-                $items = astronomyFilterEventsForSurface($items, ASTRONOMY_EVENT_SURFACE_EVENTS);
-                usort($items, static function ($first, $second) use ($timezoneName): int {
-                    $firstDate = is_array($first) ? astronomyEventDateTime($first['datetime'] ?? null, $timezoneName) : null;
-                    $secondDate = is_array($second) ? astronomyEventDateTime($second['datetime'] ?? null, $timezoneName) : null;
-                    return ($firstDate?->getTimestamp() ?? PHP_INT_MAX) <=> ($secondDate?->getTimestamp() ?? PHP_INT_MAX);
-                });
-                astronomyApiRecordValidation('events', true, true);
-                if ($items === []) {
-                    $emptyMessage = 'No se encontraron eventos lunares para este período y estos filtros.';
-                }
-            }
+        ], 'events', 35);
+        $items = array_values(array_filter(
+            $eventsData['items'],
+            static fn($event): bool => is_array($event) && astronomyEarthshineEventIsDisplayable($event)
+        ));
+        $items = astronomyFilterEventsForSurface($items, ASTRONOMY_EVENT_SURFACE_EVENTS);
+        if ($items === []) {
+            $emptyMessage = 'No se encontraron eventos lunares para este período y estos filtros.';
         }
     } catch (RuntimeException $exception) {
         $apiErrorMessage = 'No se pudieron cargar los eventos lunares en este momento.';
-        error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
+        error_log('Aquellas Lunas events source error: ' . $exception->getMessage());
     }
 }
 

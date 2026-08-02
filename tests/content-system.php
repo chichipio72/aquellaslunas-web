@@ -393,7 +393,25 @@ $homeCards = (string) ob_get_clean();
 contentSystemAssert(str_contains($homeCards, 'data-content-trivia'), 'La portada no renderizó la trivia interactiva.');
 contentSystemAssert(substr_count($homeCards, 'data-correct="true"') === 1, 'La trivia no identificó exactamente una respuesta correcta después de mezclar.');
 contentSystemAssert(!str_contains($homeCards, 'Conocer la respuesta'), 'Persistió el enlace anterior de la trivia.');
-contentSystemAssert(!str_contains($homeCards, 'Leer más'), '“Sabías que…” conservó un enlace sin destino después de retirar referencias.');
+contentSystemAssert(
+    preg_match('/<div class="interactive-feedback"[^>]*hidden>.*Leer más sobre este tema/s', $homeCards) === 1,
+    'El enlace de trivia no quedó dentro del feedback inicialmente oculto.'
+);
+contentSystemAssert(str_contains($homeCards, '>Ver artículo <'), '“Sabías que…” no enlazó su artículo visible de origen.');
+contentSystemAssert(substr_count($homeCards, 'class="content-card__read-link"') === 2, 'Las tarjetas no renderizaron exactamente sus dos enlaces relacionados.');
+
+$entryUrlCatalog = ['articles' => [
+    'visible-parent' => ['valid' => true, 'visible' => true],
+    'hidden-parent' => ['valid' => true, 'visible' => false],
+    'invalid-parent' => ['valid' => false, 'visible' => true],
+]];
+contentSystemAssert(
+    astronomyContentEntryArticleUrl($entryUrlCatalog, ['source_slug' => 'visible-parent']) === astronomyContentArticleUrl('visible-parent'),
+    'No se generó la URL del artículo padre público.'
+);
+contentSystemAssert(astronomyContentEntryArticleUrl($entryUrlCatalog, ['source_slug' => 'hidden-parent']) === null, 'Se enlazó un artículo padre oculto.');
+contentSystemAssert(astronomyContentEntryArticleUrl($entryUrlCatalog, ['source_slug' => 'invalid-parent']) === null, 'Se enlazó un artículo padre inválido.');
+contentSystemAssert(astronomyContentEntryArticleUrl($entryUrlCatalog, ['source_slug' => 'missing-parent']) === null, 'Se enlazó un artículo padre inexistente.');
 
 putenv('APP_ENV=production');
 putenv('CONTENT_ENABLED_IN_PRODUCTION=false');

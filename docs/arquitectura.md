@@ -114,6 +114,16 @@ El único editor operativo vive en `/admin/contenidos/`, exige autenticación
 administrativa y persiste exclusivamente en MySQL. El editor local antiguo fue
 retirado; el sitio público y `/admin/` no dependen de herramientas locales.
 
+## Web Push MVP
+
+El piloto Web Push es exclusivamente administrativo. La portada no muestra controles de suscripción. `/admin/notificaciones-prueba.php` solicita permiso sólo después de una acción explícita, registra `service-worker.js` con alcance `/astro/`, reutiliza una suscripción existente y la envía como JSON a `web-push/subscribe.php`. `web-push/unsubscribe.php` marca la fila inactiva antes de retirar la suscripción del navegador. El service worker sólo atiende `push` y `notificationclick`: no contiene caché, precache ni comportamiento offline.
+
+Mientras dure el piloto, el menú público puede incluir **Administración** → `admin/` para permitir el ingreso desde una PWA standalone. Su visibilidad se controla, como la de las demás entradas del menú principal, desde **Visibilidad de secciones**; el valor predeterminado es visible. Ocultarla no deshabilita la ruta, que sigue reutilizando el login, la sesión y el CSRF administrativos existentes y no concede acceso por sí misma.
+
+El endpoint valida método, tipo y tamaño de cuerpo, origen cuando el navegador lo informa, endpoint HTTPS y claves Base64 URL. `includes/web-push.php` persiste mediante una sentencia preparada en `WEB_DB`; el endpoint es único y un alta repetida reactiva y actualiza la misma fila. No almacena ubicación, preferencias ni identidad personal; `user_agent` es diagnóstico opcional.
+
+El panel envía desde PHP en el hosting mediante `minishlink/web-push` 10.1 y el autoloader de Composer. `symfony/polyfill-mbstring` cubre la ausencia conocida de `mbstring`; producción sigue necesitando PHP 8.2+, cURL, OpenSSL con P-256 e iconv. `vendor/` se genera localmente desde `composer.lock` y sólo se incluye en el despliegue al usar `--include-vendor`. La clave privada VAPID se lee sólo desde la configuración externa, nunca se entrega al navegador. El script Python de la mini PC se conserva como alternativa manual. Ambos emisores actualizan éxito/error y desactivan respuestas 404/410. No existen cron, lógica astronómica, anticipación ni múltiples preferencias.
+
 El editor administrativo valida y guarda el contenido persistido en tablas
 editoriales. Su núcleo se mantiene separado de la vista para probar normalización,
 carga desde MySQL y diagnósticos de consistencia.
@@ -303,7 +313,7 @@ La confirmación bloquea pedido y pago dentro de una transacción. Exige referen
 
 ## Administración privada
 
-`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. El panel ofrece acceso a la galería/tienda, al Laboratorio Astronómico y al editor de Contenidos (`/admin/contenidos/`). `includes/store-admin-navigation.php` comparte entre módulos la navegación Inicio, Contenidos, Galería, Laboratorio y el formulario de cierre de sesión.
+`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. `includes/store-admin-navigation.php` comparte un menú desplegable con Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio; el cierre de sesión permanece como acción separada.
 
 `includes/store-admin-auth.php` conserva la autenticación histórica: cookie de sesión `aquellas_lunas_admin`, estado `store_admin_authenticated`, cookie HttpOnly/SameSite=Lax, validación mediante `password_verify()`, regeneración del ID, CSRF y destrucción completa. `admin/login.php` dirige al panel general después de autenticar y `admin/logout.php` mantiene el cierre por POST. Todas las respuestas administrativas usan `no-store` y `X-Robots-Tag: noindex`.
 
@@ -335,11 +345,11 @@ La ruta canónica de contenidos es `/admin/contenidos/`. La navegación calcula 
 
 `includes/store-admin-photos.php` consulta todas las fotos mediante la conexión PDO compartida y modifica con sentencias preparadas sólo disponibilidad, precio y los campos editoriales `titulo`, `descripcion` y `palabras_clave`. Estos últimos son opcionales, se recortan, validan a 255/5000/2000 caracteres y se guardan como texto o `NULL`. No interpreta HTML ni actualiza EXIF, `metadatos_json`, monedas o previews. La asignación múltiple de precios sigue siendo transaccional; el portal no muestra hashes, originales o nombres de archivo, no borra y no toca `pedido_fotos`.
 
-El editor de Contenidos en `/admin/contenidos/` persiste en MySQL con transacciones únicas sobre `contenido_articulos`, `contenido_articulos_palabras_clave`, `contenido_articulos_relaciones`, `contenido_trivias`, `contenido_trivia_opciones` y `contenido_sabias_que`. El importador histórico `scripts/migrations/import-content-to-web-db.php` se conserva sólo como referencia de migración inicial y no forma parte del flujo operativo actual.
+El editor de Contenidos en `/admin/contenidos/` persiste en MySQL con transacciones únicas sobre `contenido_articulos`, `contenido_articulos_palabras_clave`, `contenido_articulos_relaciones`, `contenido_trivias`, `contenido_trivia_opciones` y `contenido_sabias_que`. Su importador editorial JSON valida un paquete completo y crea únicamente slugs nuevos. El script `scripts/migrations/import-content-to-web-db.php` se conserva sólo como referencia de la migración inicial desde PHP.
 
-### Modo Administrador
+### Herramientas autorizadas por sesión administrativa
 
-La sesión administrativa habilitará progresivamente capacidades adicionales sobre el sitio público sólo para usuarios autenticados en admin (por ejemplo enlaces de edición, accesos rápidos, depuración y mantenimiento), sin depender de `APP_ENV=local`.
+En producción, la sesión administrativa ya habilita simulación temporal, timings y diagnóstico editorial sólo para ese navegador. En local las capacidades técnicas dependen de `APP_ENV=local` y de sus interruptores específicos. La sesión pública `aquellas_lunas_local` conserva el estado de simulación/debug sin contener la autenticación.
 
 ### Regla de sesiones en admin
 
@@ -514,7 +524,7 @@ El selector habilita `tapHold` de Leaflet con tolerancia de 10 px. `AstronomyMap
 
 El aviso inicial es no bloqueante y usa la clave `aquellas-lunas-mobile-swipe-hint-seen-v1` en `localStorage`. `prefers-reduced-motion` elimina la transición previa a navegar.
 
-El panel fijo requiere `ASTRONOMY_SHOW_TIMINGS=true` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa coordenadas y deltas efectivos, fuente, cantidad de movimientos, `touch-action`, exclusión, resultado y destino. No navega automáticamente: conserva `lastAcceptedDestination` y el botón **Ir al destino detectado** abre exactamente esa URL. El panel y sus controles usan `data-swipe-navigation-ignore`. Timings sin esa bandera conserva reloj y métricas generales, pero el swipe navega normalmente.
+El panel fijo requiere autorización de `canUseSiteDebugTools()` y `MOBILE_SWIPE_NAVIGATION_DEBUG_ENABLED=true`. Informa coordenadas y deltas efectivos, fuente, cantidad de movimientos, `touch-action`, exclusión, resultado y destino. No navega automáticamente: conserva `lastAcceptedDestination` y el botón **Ir al destino detectado** abre exactamente esa URL. El panel y sus controles usan `data-swipe-navigation-ignore`. Sin esa bandera el swipe navega normalmente.
 
 Las regresiones de cancelación, continuidad Touch y persistencia del botón están en `tests/mobile-swipe-navigation.test.html` y `.js`; `tests/` se excluye del despliegue.
 

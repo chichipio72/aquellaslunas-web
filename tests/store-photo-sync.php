@@ -45,39 +45,72 @@ try {
     $createdFiles = [
         $temporaryPath . '/valid.JPG',
         $temporaryPath . '/same-content.jpeg',
+        $temporaryPath . '/new.JPG',
+        $temporaryPath . '/historical.JPG',
         $temporaryPath . '/invalid.JPEG',
         $temporaryPath . '/ignored.txt',
     ];
     storeSyncAssert(copy($sourceFiles[0]->getPathname(), $createdFiles[0]), 'No se pudo copiar el JPG de prueba.');
     storeSyncAssert(file_put_contents($createdFiles[0], random_bytes(16), FILE_APPEND) !== false, 'No se pudo hacer único el JPG de prueba.');
     storeSyncAssert(copy($createdFiles[0], $createdFiles[1]), 'No se pudo copiar el JPG duplicado.');
-    storeSyncAssert(file_put_contents($createdFiles[2], 'not a jpeg') !== false, 'No se pudo crear el JPG inválido.');
-    storeSyncAssert(file_put_contents($createdFiles[3], 'ignored') !== false, 'No se pudo crear el archivo omitido.');
+    storeSyncAssert(copy($createdFiles[0], $createdFiles[2]), 'No se pudo copiar el JPG nuevo.');
+    storeSyncAssert(file_put_contents($createdFiles[2], random_bytes(16), FILE_APPEND) !== false, 'No se pudo hacer único el segundo JPG.');
+    storeSyncAssert(copy($createdFiles[0], $createdFiles[3]), 'No se pudo copiar el JPG histórico.');
+    storeSyncAssert(file_put_contents($createdFiles[3], random_bytes(16), FILE_APPEND) !== false, 'No se pudo hacer único el JPG histórico.');
+    storeSyncAssert(file_put_contents($createdFiles[4], 'not a jpeg') !== false, 'No se pudo crear el JPG inválido.');
+    storeSyncAssert(file_put_contents($createdFiles[5], 'ignored') !== false, 'No se pudo crear el archivo omitido.');
 
     $connection = getStoreDatabaseConnection();
     $before = (int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn();
     $orderPhotosBefore = (int) $connection->query('SELECT COUNT(*) FROM pedido_fotos')->fetchColumn();
     $reportedErrors = 0;
+    $reportedErrorDetails = [];
     $connection->beginTransaction();
+    $historicalPhotoId = hash('sha256', 'historical-id-' . $temporaryPath);
+    $historicalInsert = $connection->prepare(
+        'INSERT INTO fotos (foto_id, nombre_archivo, archivo_original, ancho_px, alto_px, precio, disponible) '
+        . 'VALUES (:foto_id, :nombre_archivo, :archivo_original, 1, 1, 123.45, 1)'
+    );
+    $historicalInsert->execute([
+        'foto_id' => $historicalPhotoId,
+        'nombre_archivo' => 'historical.JPG',
+        'archivo_original' => 'historical.JPG',
+    ]);
+    $afterHistoricalInsert = (int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn();
     $insertSummary = synchronizeStorePhotos(
         $connection,
         $temporaryPath,
         '123.45',
         false,
-        static function () use (&$reportedErrors): void {
+        static function (string $detail) use (&$reportedErrors, &$reportedErrorDetails): void {
             $reportedErrors++;
+            $reportedErrorDetails[] = $detail;
         }
     );
     storeSyncAssert($insertSummary === [
-        'encontrados' => 5,
-        'nuevos' => 1,
-        'existentes' => 1,
+        'encontrados' => 7,
+        'nuevos' => 2,
+        'existentes' => 2,
         'omitidos' => 2,
         'errores' => 1,
-    ], 'La sincronización transaccional no produjo el resumen esperado.');
+    ], 'La sincronización transaccional no produjo el resumen esperado: ' . json_encode($insertSummary));
+    $afterSynchronization = (int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn();
     storeSyncAssert(
-        (int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn() === $before + 1,
-        'El INSERT de prueba no se ejecutó.'
+        $afterSynchronization === $afterHistoricalInsert + 2,
+        'La sincronización no omitió el histórico o no insertó las fotografías nuevas: antes=' . $afterHistoricalInsert . ' después=' . $afterSynchronization
+    );
+    $historicalSaved = $connection->prepare('SELECT foto_id FROM fotos WHERE archivo_original = :archivo_original LIMIT 1');
+    $historicalSaved->execute(['archivo_original' => 'historical.JPG']);
+    storeSyncAssert(
+        $historicalSaved->fetchColumn() === $historicalPhotoId,
+        'La sincronización modificó el foto_id histórico.'
+    );
+    storeSyncAssert(
+        count($reportedErrorDetails) === 1
+            && str_contains($reportedErrorDetails[0], 'invalid.JPEG')
+            && str_contains($reportedErrorDetails[0], 'RuntimeException')
+            && str_contains($reportedErrorDetails[0], 'formato permitido'),
+        'El callback dejó de recibir el detalle de la excepción.'
     );
     $connection->rollBack();
 
@@ -93,8 +126,8 @@ try {
     );
     $after = (int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn();
 
-    storeSyncAssert($summary['encontrados'] === 5, 'El total encontrado no coincide.');
-    storeSyncAssert($summary['nuevos'] === 1 && $summary['existentes'] === 1, 'El contenido duplicado no se detectó por foto_id.');
+    storeSyncAssert($summary['encontrados'] === 7, 'El total encontrado no coincide.');
+    storeSyncAssert($summary['nuevos'] === 3 && $summary['existentes'] === 1, 'El contenido duplicado no se detectó por foto_id.');
     storeSyncAssert($summary['omitidos'] === 2, 'La carpeta o el archivo no compatible no se omitieron.');
     storeSyncAssert($summary['errores'] === 1 && $reportedErrors === 1, 'La falla aislada no se contabilizó.');
     storeSyncAssert($before === $after, 'El modo dry-run modificó la tabla fotos.');
@@ -104,6 +137,14 @@ try {
     );
     storeSyncAssert(storePhotoSupportsFile(new SplFileInfo($createdFiles[0])), 'La extensión JPG mayúscula no fue aceptada.');
     storeSyncAssert(storePhotoSupportsFile(new SplFileInfo($createdFiles[1])), 'La extensión JPEG no fue aceptada.');
+    $pngPath = $temporaryPath . '/supported.png';
+    $webpPath = $temporaryPath . '/supported.webp';
+    file_put_contents($pngPath, 'placeholder');
+    file_put_contents($webpPath, 'placeholder');
+    $createdFiles[] = $pngPath;
+    $createdFiles[] = $webpPath;
+    storeSyncAssert(storePhotoSupportsFile(new SplFileInfo($pngPath)), 'La extensión PNG no fue aceptada.');
+    storeSyncAssert(storePhotoSupportsFile(new SplFileInfo($webpPath)), 'La extensión WEBP no fue aceptada.');
 
     fwrite(STDOUT, "store photo sync tests: ok\n");
 } finally {

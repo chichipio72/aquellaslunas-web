@@ -1,5 +1,23 @@
 <?php
 
+function storePreviewVariants(): array
+{
+    return [
+        'tienda' => [
+            'column' => 'archivo_preview_tienda',
+            'max_size' => loadStorePreviewTiendaMaxSize(),
+            'quality' => loadStorePreviewTiendaJpegQuality(),
+            'watermark' => true,
+        ],
+        'contenido' => [
+            'column' => 'archivo_preview_contenido',
+            'max_size' => loadStorePreviewContenidoMaxSize(),
+            'quality' => loadStorePreviewContenidoJpegQuality(),
+            'watermark' => false,
+        ],
+    ];
+}
+
 function storePendingPreviewPhotos(PDO $connection, bool $force = false): array
 {
     $where = $force
@@ -158,12 +176,21 @@ function storePreviewIsValidJpeg(string $path): bool
 
 function storePreviewCreateImage(string $originalPath, int $maxSize, bool $watermark): GdImage
 {
-    $source = @imagecreatefromjpeg($originalPath);
+    $details = @getimagesize($originalPath);
+    $imageType = is_array($details) ? ($details[2] ?? null) : null;
+    $source = match ($imageType) {
+        IMAGETYPE_JPEG => @imagecreatefromjpeg($originalPath),
+        IMAGETYPE_PNG => function_exists('imagecreatefrompng') ? @imagecreatefrompng($originalPath) : false,
+        IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($originalPath) : false,
+        default => false,
+    };
     if (!$source instanceof GdImage) {
-        throw new RuntimeException('No se pudo abrir el JPEG original.');
+        throw new RuntimeException('No se pudo abrir la imagen original.');
     }
     try {
-        $source = storePreviewApplyOrientation($source, storePreviewExifOrientation($originalPath));
+        if ($imageType === IMAGETYPE_JPEG) {
+            $source = storePreviewApplyOrientation($source, storePreviewExifOrientation($originalPath));
+        }
         $source = storePreviewResize($source, $maxSize);
         if ($watermark) {
             storePreviewApplyStoreWatermark($source);

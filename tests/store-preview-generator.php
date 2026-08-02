@@ -119,6 +119,15 @@ try {
     $smallImage = storePreviewResize(imagecreatetruecolor(100, 50), 800);
     storePreviewAssert(imagesx($smallImage) === 100 && imagesy($smallImage) === 50, 'Se amplió una imagen pequeña.');
     imagedestroy($smallImage);
+    foreach (['png' => 'imagepng', 'webp' => 'imagewebp'] as $extension => $writer) {
+        $sourcePath = $temporaryRoot . '/source.' . $extension;
+        $sourceImage = imagecreatetruecolor(60, 30);
+        $writer($sourceImage, $sourcePath);
+        imagedestroy($sourceImage);
+        $derived = storePreviewCreateImage($sourcePath, 40, false);
+        storePreviewAssert(imagesx($derived) === 40 && imagesy($derived) === 20, strtoupper($extension) . ' no generó un derivado JPEG redimensionable.');
+        imagedestroy($derived);
+    }
 
     $connection->rollBack();
     storePreviewAssert((int) $connection->query('SELECT COUNT(*) FROM fotos')->fetchColumn() === $photosBefore, 'La prueba dejó filas en fotos.');

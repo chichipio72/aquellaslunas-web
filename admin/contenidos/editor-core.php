@@ -7,13 +7,13 @@ const CONTENT_EDITOR_CSRF_KEY = 'content_editor_csrf';
 const CONTENT_PACKAGE_FORMAT_VERSION = 1;
 
 /**
- * @return array<int, array{slug: string, titulo: string, resumen: string, visible: bool, actualizado_en: string, trivias_count: int, sabias_que_count: int}>
+ * @return array<int, array{slug: string, titulo: string, resumen: string, visible: bool, has_main_image: bool, actualizado_en: string, trivias_count: int, sabias_que_count: int}>
  */
 function contentEditorDbListArticles(PDO $connection): array
 {
     $statement = $connection->query(
         'SELECT '
-        . 'a.slug, a.titulo, a.resumen, a.visible, '
+        . 'a.slug, a.titulo, a.resumen, a.visible, a.imagen_principal, '
         . 'DATE_FORMAT(a.actualizado_en, "%Y-%m-%d %H:%i:%s") AS actualizado_en, '
         . 'COALESCE(t.cantidad, 0) AS trivias_count, '
         . 'COALESCE(s.cantidad, 0) AS sabias_que_count '
@@ -29,12 +29,23 @@ function contentEditorDbListArticles(PDO $connection): array
             'titulo' => (string) $row['titulo'],
             'resumen' => (string) $row['resumen'],
             'visible' => ((int) $row['visible']) === 1,
+            'has_main_image' => trim((string) ($row['imagen_principal'] ?? '')) !== '',
             'actualizado_en' => (string) $row['actualizado_en'],
             'trivias_count' => (int) $row['trivias_count'],
             'sabias_que_count' => (int) $row['sabias_que_count'],
         ];
     }
     return $articles;
+}
+
+function contentEditorDbSetArticleVisibility(PDO $connection, string $slug, bool $visible): bool
+{
+    if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1) {
+        return false;
+    }
+    $statement = $connection->prepare('UPDATE contenido_articulos SET visible = :visible WHERE slug = :slug');
+    $statement->execute(['visible' => $visible ? 1 : 0, 'slug' => $slug]);
+    return $statement->rowCount() === 1;
 }
 
 /**
@@ -297,6 +308,8 @@ function contentEditorImageGallery(?string $imageDirectory = null): array
             'url' => ASTRONOMY_CONTENT_IMAGE_URL_PREFIX . rawurlencode($filename),
             'width' => is_array($size) ? (int) $size[0] : 0,
             'height' => is_array($size) ? (int) $size[1] : 0,
+            'hero_compatible' => is_array($size) && astronomyContentImageHasHeroAspectRatio((int) $size[0], (int) $size[1]),
+            'vertical' => is_array($size) && (int) $size[1] > (int) $size[0],
             'format_label' => is_array($size) && astronomyContentImageHasHeroAspectRatio((int) $size[0], (int) $size[1])
                 ? '16:9'
                 : (is_array($size) && $size[0] > $size[1]
@@ -820,8 +833,8 @@ function contentEditorPackageExample(): array
             ],
         ],
         'sabias_que' => [
-            ['codigo' => 'ejemplo-sabias-1', 'visible' => true, 'frase' => 'Primer dato curioso de ejemplo.', 'detalle' => 'Detalle completo del primer Sabías que.', 'imagen' => null],
-            ['codigo' => 'ejemplo-sabias-2', 'visible' => true, 'frase' => 'Segundo dato curioso de ejemplo.', 'detalle' => 'Detalle completo del segundo Sabías que.', 'imagen' => null],
+            ['codigo' => 'ejemplo-sabias-1', 'visible' => true, 'frase' => '¿Sabías que la Luna se aleja lentamente de la Tierra?', 'detalle' => 'Detalle completo del dato curioso.', 'imagen' => null],
+            ['codigo' => 'ejemplo-sabias-2', 'visible' => true, 'frase' => '¿Sabías que siempre vemos casi la misma cara de la Luna?', 'detalle' => 'Detalle completo del segundo dato curioso.', 'imagen' => null],
         ],
     ];
 }

@@ -11,9 +11,10 @@ RUN apt-get update \
         libxml2-dev \
         libpng-dev \
         libjpeg62-turbo-dev \
+        libwebp-dev \
         libzip-dev \
         unzip \
-    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) curl mbstring intl mysqli pdo pdo_mysql exif gd \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*

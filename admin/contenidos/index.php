@@ -63,7 +63,7 @@ function renderEditorImageSelector(string $name, ?string $selected, string $labe
     }
     $current = $selected !== null && isset($available[$selected]) ? $available[$selected] : null;
     ?>
-    <div class="editor-image-field" data-image-selector>
+    <div class="editor-image-field" data-image-selector data-image-filter="vertical">
         <span class="editor-image-field__label"><?= editorHtml($label) ?></span>
         <input type="hidden" name="<?= editorHtml($name) ?>" value="<?= editorHtml($current['filename'] ?? '') ?>" data-image-value>
         <div class="editor-image-current">
@@ -183,6 +183,20 @@ try {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mode = (string) ($_POST['mode'] ?? 'edit');
+    if ($mode === 'visibility_toggle') {
+        $targetSlug = trim((string) ($_POST['slug'] ?? ''));
+        $targetVisible = ($_POST['visible'] ?? '') === '1';
+        if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+            $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
+        } elseif ($dbConnection === null) {
+            $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para cambiar la visibilidad.');
+        } elseif (!contentEditorDbSetArticleVisibility($dbConnection, $targetSlug, $targetVisible)) {
+            $errors[] = astronomyContentError('articulo', 'No se encontró el artículo solicitado para cambiar su visibilidad.');
+        } else {
+            header('Location: index.php?visibility=' . ($targetVisible ? 'visible' : 'hidden'), true, 303);
+            exit;
+        }
+    }
     if ($mode === 'package_import') {
         $action = 'import';
         $importJson = (string) ($_POST['package_json'] ?? '');
@@ -264,6 +278,10 @@ if (($_GET['saved'] ?? '') === '1') {
     $message = 'Cambios guardados correctamente en MySQL.';
 } elseif (($_GET['imported'] ?? '') === '1') {
     $message = 'Paquete editorial importado completamente en MySQL.';
+} elseif (($_GET['visibility'] ?? '') === 'visible') {
+    $message = 'El artículo ahora es visible públicamente.';
+} elseif (($_GET['visibility'] ?? '') === 'hidden') {
+    $message = 'El artículo ahora está oculto públicamente.';
 }
 
 $editing = ($action === 'edit' && $slug !== '') || $action === 'new';
@@ -290,6 +308,24 @@ $tabErrorCounts = editorTabErrorCounts($errors);
 <?php if ($message !== ''): ?><section class="editor-notice" role="status"><strong><?= editorHtml($message) ?></strong></section><?php endif; ?>
 <?php if ($errors !== []): ?><section class="editor-errors" role="alert"><h2>No se pudo completar la operación</h2><ul><?php foreach ($errors as $error): ?><li><code><?= editorHtml($error['field'] ?? 'mysql') ?></code>: <?= editorHtml($error['message'] ?? 'Error') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
 <?php if ($dbGlobalWarnings !== []): ?><section class="editor-warnings" role="status"><h2>Advertencias globales de MySQL</h2><ul><?php foreach ($dbGlobalWarnings as $warning): ?><li><code><?= editorHtml($warning['field'] ?? 'mysql') ?></code>: <?= editorHtml($warning['message'] ?? 'Advertencia') ?></li><?php endforeach; ?></ul></section><?php endif; ?>
+<?php if ($editing && isLocalEnvironment()): ?>
+    <section class="editor-photo-upload" data-photo-upload data-upload-url="upload-photos.php">
+        <div class="editor-photo-upload__heading">
+            <div><p class="eyebrow">HERRAMIENTA LOCAL</p><h2>Agregar fotografías</h2></div>
+            <p>Los originales quedan en almacenamiento privado. La tienda y este selector usan solamente derivados.</p>
+        </div>
+        <div class="editor-photo-dropzone" data-photo-dropzone tabindex="0" role="button" aria-describedby="photo-upload-help">
+            <strong>Arrastrá imágenes aquí</strong><span>o</span>
+            <button class="editor-button editor-button--quiet" type="button" data-photo-select>Seleccionar archivos</button>
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple data-photo-input hidden>
+        </div>
+        <p id="photo-upload-help" class="editor-photo-upload__help">JPG, JPEG, PNG o WEBP · hasta 20 archivos de 25 MB cada uno.</p>
+        <input type="hidden" value="<?= editorHtml(contentEditorCsrfToken()) ?>" data-photo-csrf>
+        <progress class="editor-photo-progress" max="100" value="0" data-photo-progress hidden></progress>
+        <p class="editor-photo-upload__status" data-photo-status role="status" aria-live="polite"></p>
+        <ul class="editor-photo-results" data-photo-results aria-label="Resultado de la carga"></ul>
+    </section>
+<?php endif; ?>
 <?php if (!$editing && !$importing): ?>
     <div class="editor-heading">
         <div><p class="eyebrow">GESTIÓN EDITORIAL</p><h2>Contenidos desde MySQL</h2></div>
@@ -300,7 +336,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
     <?php else: ?>
     <div class="editor-table-wrap">
         <table class="editor-table">
-            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th>Actualizado</th><th></th></tr></thead>
+            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Imagen principal</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th>Actualizado</th><th></th></tr></thead>
             <tbody>
             <?php foreach ($dbArticles as $article): ?>
                 <?php
@@ -320,14 +356,23 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                             <small class="editor-title-note">No disponible para lectura</small>
                         <?php endif; ?>
                     </td>
-                    <td><?= $article['visible'] ? 'Visible' : 'Oculto' ?></td>
+                    <td>
+                        <form class="editor-visibility-form" method="post">
+                            <input type="hidden" name="csrf_token" value="<?= editorHtml(contentEditorCsrfToken()) ?>">
+                            <input type="hidden" name="mode" value="visibility_toggle">
+                            <input type="hidden" name="slug" value="<?= editorHtml($article['slug']) ?>">
+                            <input type="hidden" name="visible" value="<?= $article['visible'] ? '0' : '1' ?>">
+                            <button class="editor-visibility-toggle<?= $article['visible'] ? ' is-visible' : ' is-hidden' ?>" type="submit" aria-label="<?= $article['visible'] ? 'Ocultar' : 'Hacer visible' ?> <?= editorHtml($articleTitle) ?>"><?= $article['visible'] ? 'Visible' : 'Oculto' ?></button>
+                        </form>
+                    </td>
+                    <td><span class="editor-image-status<?= $article['has_main_image'] ? ' has-image' : '' ?>"><?= $article['has_main_image'] ? 'Sí' : 'No' ?></span></td>
                     <td><span class="editor-status editor-status--<?= $state ?>"><?php if ($state === 'warning'): ?>Con advertencias · <?= count($articleWarnings) ?> advertencia<?= count($articleWarnings) === 1 ? '' : 's' ?><?php else: ?>Válido<?php endif; ?></span></td>
                     <td><?= (int) $article['trivias_count'] ?></td>
                     <td><?= (int) $article['sabias_que_count'] ?></td>
                     <td><?= editorHtml((string) $article['actualizado_en']) ?></td>
-                    <td><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Ver</a></td>
+                    <td><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Editar</a></td>
                 </tr>
-                <?php if ($articleWarnings !== []): ?><tr class="editor-diagnostic-row"><td colspan="8"><ul><?php foreach ($articleWarnings as $warning): ?><li><code><?= editorHtml($warning['field']) ?></code>: <?= editorHtml($warning['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
+                <?php if ($articleWarnings !== []): ?><tr class="editor-diagnostic-row"><td colspan="9"><ul><?php foreach ($articleWarnings as $warning): ?><li><code><?= editorHtml($warning['field']) ?></code>: <?= editorHtml($warning['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
@@ -415,7 +460,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
             ?>
             <section class="editor-featured-image-panel" aria-labelledby="editor-featured-image-title">
                 <h3 id="editor-featured-image-title">Imagen principal</h3>
-                <div class="editor-featured-image-panel__layout" data-image-selector>
+                <div class="editor-featured-image-panel__layout" data-image-selector data-image-filter="hero">
                     <div class="editor-featured-original">
                         <span class="editor-image-field__label">Imagen original</span>
                         <div class="editor-image-current">
@@ -471,7 +516,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
             <details class="editor-image-block-builder" data-image-block-builder>
                 <summary>Insertar bloque con imagen</summary>
                 <div class="editor-image-block-builder__fields">
-                    <div class="editor-image-field" data-image-selector>
+                    <div class="editor-image-field" data-image-selector data-image-filter="vertical">
                         <span class="editor-image-field__label">Imagen</span>
                         <input type="hidden" value="" data-image-value>
                         <div class="editor-image-current"><img alt="" loading="lazy" data-image-preview hidden><span data-image-empty>Sin imagen</span><code data-image-name></code></div>
@@ -535,20 +580,18 @@ $tabErrorCounts = editorTabErrorCounts($errors);
             <h2 id="editor-image-dialog-title">Elegir imagen</h2>
             <button class="editor-button editor-button--quiet" type="button" data-image-close>Cerrar</button>
         </div>
-        <?php if ($editorImageGallery === []): ?>
-            <p>No hay imágenes válidas disponibles.</p>
-        <?php else: ?>
-            <div class="editor-image-gallery">
+        <p data-image-gallery-empty<?= $editorImageGallery !== [] ? ' hidden' : '' ?>>No hay imágenes válidas disponibles.</p>
+        <p data-image-filter-empty hidden>No hay imágenes con una proporción adecuada para este uso.</p>
+        <div class="editor-image-gallery" data-image-gallery>
             <?php foreach ($editorImageGallery as $image): ?>
-                <button class="editor-image-option" type="button" data-image-option="<?= editorHtml($image['filename']) ?>" data-image-url="../../<?= editorHtml(versionedAssetUrl($image['url'])) ?>" data-image-width="<?= (int) $image['width'] ?>" data-image-height="<?= (int) $image['height'] ?>" aria-pressed="false">
+                <button class="editor-image-option" type="button" data-image-option="<?= editorHtml($image['filename']) ?>" data-image-url="../../<?= editorHtml(versionedAssetUrl($image['url'])) ?>" data-image-width="<?= (int) $image['width'] ?>" data-image-height="<?= (int) $image['height'] ?>" data-image-hero="<?= $image['hero_compatible'] ? 'true' : 'false' ?>" data-image-vertical="<?= $image['vertical'] ? 'true' : 'false' ?>" aria-pressed="false">
                     <img src="../../<?= editorHtml(versionedAssetUrl($image['url'])) ?>" alt="" loading="lazy">
                     <code><?= editorHtml($image['filename']) ?></code>
                     <span class="editor-image-option__format"><?= editorHtml($image['format_label']) ?></span>
                     <span data-image-selected-label hidden>Seleccionada</span>
                 </button>
             <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+        </div>
     </dialog>
     <dialog class="editor-image-dialog editor-confirm-dialog" data-confirm-dialog aria-labelledby="editor-confirm-title">
         <h2 id="editor-confirm-title">Confirmar eliminación</h2>

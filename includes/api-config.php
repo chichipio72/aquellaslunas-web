@@ -215,6 +215,62 @@ function loadWebDatabaseConfig(?string $productionConfigPath = null): array
     return $databaseConfig;
 }
 
+function loadWebPushPublicConfig(?string $productionConfigPath = null): array
+{
+    $productionConfig = null;
+    $definitions = [
+        'public_key' => ['environment' => 'WEB_PUSH_VAPID_PUBLIC_KEY', 'production' => 'web_push_vapid_public_key'],
+        'subject' => ['environment' => 'WEB_PUSH_VAPID_SUBJECT', 'production' => 'web_push_vapid_subject'],
+    ];
+    $config = [];
+
+    foreach ($definitions as $key => $definition) {
+        $environmentValue = getenv($definition['environment']);
+        if (is_string($environmentValue) && trim($environmentValue) !== '') {
+            $rawValue = trim($environmentValue);
+        } else {
+            $productionConfig ??= loadAstronomyProductionConfig($productionConfigPath);
+            $rawValue = $productionConfig[$definition['production']] ?? '';
+        }
+        if (!is_string($rawValue) || trim($rawValue) === '') {
+            throw new RuntimeException('La configuración de notificaciones no está disponible.');
+        }
+        $config[$key] = trim($rawValue);
+    }
+
+    if (
+        preg_match('/^[A-Za-z0-9_-]{80,120}$/', $config['public_key']) !== 1
+        || preg_match('/^(?:mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/', $config['subject']) !== 1
+    ) {
+        throw new RuntimeException('La configuración de notificaciones no está disponible.');
+    }
+
+    return $config;
+}
+
+function loadWebPushServerConfig(?string $productionConfigPath = null): array
+{
+    $publicConfig = loadWebPushPublicConfig($productionConfigPath);
+    $environmentValue = getenv('WEB_PUSH_VAPID_PRIVATE_KEY');
+    if (is_string($environmentValue) && trim($environmentValue) !== '') {
+        $privateKey = trim($environmentValue);
+    } else {
+        $productionConfig = loadAstronomyProductionConfig($productionConfigPath);
+        $rawValue = $productionConfig['web_push_vapid_private_key'] ?? '';
+        $privateKey = is_string($rawValue) ? trim($rawValue) : '';
+    }
+    if (preg_match('/^[A-Za-z0-9_-]{40,60}$/', $privateKey) !== 1) {
+        throw new RuntimeException('La configuración privada de notificaciones no está disponible.');
+    }
+
+    $decoded = base64_decode(strtr($privateKey, '-_', '+/') . str_repeat('=', (4 - strlen($privateKey) % 4) % 4), true);
+    if (!is_string($decoded) || strlen($decoded) !== 32 || trim($decoded, "\0") === '') {
+        throw new RuntimeException('La configuración privada de notificaciones no está disponible.');
+    }
+
+    return $publicConfig + ['private_key' => $privateKey];
+}
+
 function loadStoreAdminConfig(?string $productionConfigPath = null): array
 {
     $productionConfig = null;

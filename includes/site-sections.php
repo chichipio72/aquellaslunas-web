@@ -21,6 +21,7 @@ function astronomySiteSections(): array
         'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 70, 'menu_enabled' => astronomySiteMenuEntryEnabled('location'), 'swipe_enabled' => false],
         'capabilities' => ['id' => 'capabilities', 'label' => 'Qué ofrece Aquellas Lunas', 'url' => 'que-podes-hacer.php', 'order' => 75, 'menu_enabled' => astronomySiteMenuEntryEnabled('capabilities'), 'swipe_enabled' => false],
         'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 80, 'menu_enabled' => astronomySiteMenuEntryEnabled('about'), 'swipe_enabled' => false],
+        'administration' => ['id' => 'administration', 'label' => 'Administración', 'url' => 'admin/', 'order' => 90, 'menu_enabled' => astronomySiteMenuEntryEnabled('administration'), 'swipe_enabled' => false],
     ];
     uasort($sections, static fn(array $first, array $second): int => $first['order'] <=> $second['order']);
     return $sections;

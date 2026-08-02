@@ -29,6 +29,33 @@ grep -q 'href="../configuracion-sitio/"' "$work_dir/auth"
 grep -q 'href="../fotos.php"' "$work_dir/auth"
 grep -q 'href="../laboratorio-astronomico.php"' "$work_dir/auth"
 ! grep -q 'contenidos/contenidos/' "$work_dir/auth"
+grep -q 'class="editor-title-link" href="../../contenido.php?slug=' "$work_dir/auth"
+grep -q 'name="mode" value="visibility_toggle"' "$work_dir/auth"
+grep -q 'class="editor-visibility-toggle' "$work_dir/auth"
+grep -q '<th>Imagen principal</th>' "$work_dir/auth"
+grep -q 'class="editor-image-status' "$work_dir/auth"
+grep -q '>Editar</a>' "$work_dir/auth"
+! grep -q '>Ver</a>' "$work_dir/auth"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/edit-images" -w '%{http_code}' "$base_url/admin/contenidos/index.php?action=edit&slug=pascua")"
+test "$status" = "200"
+grep -q 'data-image-selector data-image-filter="hero"' "$work_dir/edit-images"
+grep -q 'data-image-selector data-image-filter="vertical"' "$work_dir/edit-images"
+grep -q 'data-image-hero="\(true\|false\)"' "$work_dir/edit-images"
+grep -q 'data-image-vertical="\(true\|false\)"' "$work_dir/edit-images"
+grep -q 'data-image-filter-empty hidden' "$work_dir/edit-images"
+grep -q "option.dataset.imageHero === 'true'" /var/www/html/admin/contenidos/editor.js
+grep -q "option.dataset.imageVertical === 'true'" /var/www/html/admin/contenidos/editor.js
+grep -Fq '.editor-image-option[hidden] { display: none; }' /var/www/html/admin/contenidos/editor.css
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/visibility-csrf-invalid" -w '%{http_code}' -X POST \
+  --data-urlencode 'mode=visibility_toggle' \
+  --data-urlencode 'csrf_token=invalid' \
+  --data-urlencode 'slug=pascua' \
+  --data-urlencode 'visible=0' \
+  "$base_url/admin/contenidos/index.php")"
+test "$status" = "200"
+grep -q 'token CSRF no es válido' "$work_dir/visibility-csrf-invalid"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/import" -D "$work_dir/import-headers" -w '%{http_code}' "$base_url/admin/contenidos/index.php?action=import")"
 test "$status" = "200"

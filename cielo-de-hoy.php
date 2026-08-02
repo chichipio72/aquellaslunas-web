@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
@@ -178,8 +179,8 @@ try {
     $daily = todayApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $requestedDate, 'include_light_periods' => 'true'] + $common), 'today daily', 18, $usingCustomLocation);
     $nextDaily = todayApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $parsedDate->modify('+1 day')->format('Y-m-d')] + $common), 'today next daily', 15, $usingCustomLocation);
     $directions = todayApiRequest($apiBaseUrl . '/v1/astronomy/directions?' . http_build_query(['date' => $requestedDate, 'time' => '12:00:00'] + $common), 'today directions', 15, $usingCustomLocation);
-    $eventsData = todayApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $requestedDate, 'days' => 1, 'types' => $eventTypes] + $common), 'today events', 35, $usingCustomLocation);
-    $phasesData = todayApiRequest($apiBaseUrl . '/v1/astronomy/events?' . http_build_query(['start_date' => $parsedDate->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common), 'today phases', 35, $usingCustomLocation);
+    $eventsData = astronomyEvents(['start_date' => $requestedDate, 'days' => 1, 'types' => $eventTypes] + $common, 'today events', 35);
+    $phasesData = astronomyEvents(['start_date' => $parsedDate->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common, 'today phases', 35);
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas today configuration error: ' . $exception->getMessage());
 }

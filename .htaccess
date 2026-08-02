@@ -11,4 +11,5 @@ RewriteRule ^assets/images/tienda/previews/contenido/ - [F,L,NC]
 
 RewriteRule ^includes(?:/|$) - [F,L,NC]
 RewriteRule ^scripts(?:/|$) - [F,L,NC]
+RewriteRule ^storage(?:/|$) - [F,L,NC]
 RewriteRule ^tests/.*\.(?:php|sh)$ - [F,L,NC]

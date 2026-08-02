@@ -1,0 +1,19 @@
+{
+  "name": "aquellas-lunas/web",
+  "description": "Sitio web Aquellas Lunas",
+  "license": "proprietary",
+  "type": "project",
+  "require": {
+    "minishlink/web-push": "^10.1",
+    "symfony/polyfill-mbstring": "^1.33"
+  },
+  "autoload": {
+    "psr-4": {
+      "AstronomyEngine\\": "astronomy-engine/src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}

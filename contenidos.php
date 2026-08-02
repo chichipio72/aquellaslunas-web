@@ -21,7 +21,9 @@ if (!$contentEnabled && !$adminPreview) {
 }
 
 $catalog = astronomyLoadContentCatalog();
-$articles = astronomyContentVisibleArticles($catalog);
+$rawSearchQuery = $_GET['q'] ?? '';
+$searchQuery = is_string($rawSearchQuery) ? astronomyContentSearchLimitQuery($rawSearchQuery) : '';
+$articles = astronomyContentSearchArticles(astronomyContentVisibleArticles($catalog), $searchQuery);
 $location = astronomyLocationContext();
 $now = get_current_datetime($location['timezone']);
 $pageSeo = aquellasLunasSeoPage(
@@ -56,6 +58,14 @@ $pageSeo['robots'] = 'noindex, nofollow';
             <p>Artículos para comprender y disfrutar la Luna y el cielo.</p>
             <?php if (!$contentEnabled && $adminPreview): ?><p class="status-info">La sección pública de contenidos está deshabilitada en la configuración del sitio.</p><?php endif; ?>
         </header>
+        <form class="content-search" method="get" action="contenidos.php" role="search">
+            <label for="content-search-query">Buscar en contenidos</label>
+            <div class="content-search__controls">
+                <input id="content-search-query" name="q" type="search" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') ?>" maxlength="120" placeholder="Buscar en contenidos..." autocomplete="off">
+                <button type="submit">Buscar</button>
+                <?php if ($searchQuery !== ''): ?><a href="contenidos.php">Limpiar</a><?php endif; ?>
+            </div>
+        </form>
         <section class="content-index" aria-label="Artículos">
             <?php foreach ($articles as $article): ?>
                 <?php $articleUrl = astronomyContentArticleUrl($article['slug']); ?>
@@ -75,7 +85,8 @@ $pageSeo['robots'] = 'noindex, nofollow';
                     </div>
                 </article>
             <?php endforeach; ?>
-            <?php if ($articles === [] && !astronomyContentDebugEnabled()): ?><p>No hay artículos disponibles por el momento.</p><?php endif; ?>
+            <?php if ($articles === [] && $searchQuery !== '' && !astronomyContentDebugEnabled()): ?><div class="card content-search-empty"><p>No encontramos contenidos relacionados con “<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') ?>”.</p></div><?php endif; ?>
+            <?php if ($articles === [] && $searchQuery === '' && !astronomyContentDebugEnabled()): ?><div class="card content-search-empty"><p>No hay artículos disponibles por el momento.</p></div><?php endif; ?>
             <?php if (astronomyContentDebugEnabled()): ?><?php foreach ($catalog['diagnostics'] as $diagnostic): ?><?php renderAstronomyContentDiagnostic($diagnostic); ?><?php endforeach; ?><?php endif; ?>
             <?php if (astronomyContentDebugEnabled()): ?><?php foreach ($catalog['warnings'] as $warning): ?><?php renderAstronomyContentWarning($warning); ?><?php endforeach; ?><?php endif; ?>
         </section>

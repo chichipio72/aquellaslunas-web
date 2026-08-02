@@ -18,6 +18,8 @@ Sin una fila en MySQL se usa el default del catálogo. Si MySQL no está
 disponible, el sitio conserva esos mismos defaults. El administrador nunca
 ingresa PHP, SQL, JavaScript ni expresiones lógicas.
 
+La página de reglas incluye una búsqueda exclusivamente cliente sobre nombres visibles, valores efectivos, defaults y placeholders. Normaliza mayúsculas y tildes, abre las secciones coincidentes y no consulta MySQL ni usa claves técnicas.
+
 ## Responsabilidades
 
 ### Datos y cálculos técnicos

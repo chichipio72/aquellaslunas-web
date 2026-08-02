@@ -35,8 +35,10 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
         'contents' => ['label' => 'Contenidos', 'href' => 'contenidos/'],
         'site_configuration' => ['label' => 'Visibilidad de secciones', 'href' => 'configuracion-sitio/'],
         'presentation' => ['label' => 'Visibilidad de eventos', 'href' => 'presentacion/'],
+        'astronomy_sources' => ['label' => 'Fuentes astronómicas', 'href' => 'fuentes-astronomicas/'],
         'gallery' => ['label' => 'Galería', 'href' => 'fotos.php'],
         'laboratory' => ['label' => 'Laboratorio', 'href' => 'laboratorio-astronomico.php'],
+        'notifications' => ['label' => 'Notificaciones de prueba', 'href' => 'notificaciones-prueba.php'],
     ];
     if (!array_key_exists($activeSection, $sections)) {
         throw new InvalidArgumentException('La sección administrativa activa no es válida.');
@@ -48,6 +50,7 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
             <h1><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h1>
         </div>
         <nav class="store-admin-navigation" aria-label="Administración" data-store-admin-navigation>
+            <a class="store-admin-navigation__public-link" href="<?= htmlspecialchars($rootPrefix . '../', ENT_QUOTES, 'UTF-8') ?>">Ver sitio público</a>
             <div class="store-admin-navigation__menu">
                 <button type="button" class="store-admin-navigation__menu-button" aria-expanded="false" aria-haspopup="true" aria-controls="store-admin-navigation-menu" data-store-admin-menu-button>
                     <span>Menú</span><strong><?= htmlspecialchars($sections[$activeSection]['label'], ENT_QUOTES, 'UTF-8') ?></strong><span class="store-admin-navigation__chevron" aria-hidden="true"></span>

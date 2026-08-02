@@ -18,6 +18,97 @@
     });
   }
 
+  const uploadPanel = document.querySelector('[data-photo-upload]');
+  if (uploadPanel) {
+    const input = uploadPanel.querySelector('[data-photo-input]');
+    const dropzone = uploadPanel.querySelector('[data-photo-dropzone]');
+    const progress = uploadPanel.querySelector('[data-photo-progress]');
+    const status = uploadPanel.querySelector('[data-photo-status]');
+    const results = uploadPanel.querySelector('[data-photo-results]');
+    const escapeText = (value) => String(value ?? '');
+    const addGalleryImage = (image) => {
+      const gallery = document.querySelector('[data-image-gallery]');
+      if (!gallery || gallery.querySelector(`[data-image-option="${CSS.escape(image.filename)}"]`)) return;
+      const option = document.createElement('button');
+      option.className = 'editor-image-option';
+      option.type = 'button';
+      option.dataset.imageOption = image.filename;
+      option.dataset.imageUrl = `../../${image.url}?v=${Date.now()}`;
+      option.dataset.imageWidth = image.width;
+      option.dataset.imageHeight = image.height;
+      option.dataset.imageHero = image.hero_compatible ? 'true' : 'false';
+      option.dataset.imageVertical = image.vertical ? 'true' : 'false';
+      option.setAttribute('aria-pressed', 'false');
+      const preview = document.createElement('img');
+      preview.src = option.dataset.imageUrl;
+      preview.alt = '';
+      preview.loading = 'lazy';
+      const filename = document.createElement('code');
+      filename.textContent = image.filename;
+      const format = document.createElement('span');
+      format.className = 'editor-image-option__format';
+      format.textContent = image.format_label;
+      const selected = document.createElement('span');
+      selected.dataset.imageSelectedLabel = '';
+      selected.hidden = true;
+      selected.textContent = 'Seleccionada';
+      option.append(preview, filename, format, selected);
+      gallery.append(option);
+      document.querySelector('[data-image-gallery-empty]')?.setAttribute('hidden', '');
+    };
+    const upload = (files) => {
+      if (!files?.length) return;
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append('photos[]', file));
+      formData.append('csrf_token', uploadPanel.querySelector('[data-photo-csrf]').value);
+      results.replaceChildren();
+      status.textContent = `Subiendo y procesando ${files.length} ${files.length === 1 ? 'fotografía' : 'fotografías'}…`;
+      progress.hidden = false;
+      progress.removeAttribute('value');
+      input.disabled = true;
+      const request = new XMLHttpRequest();
+      request.open('POST', uploadPanel.dataset.uploadUrl);
+      request.responseType = 'json';
+      request.upload.addEventListener('progress', (event) => {
+        if (!event.lengthComputable) return;
+        progress.value = Math.round((event.loaded / event.total) * 90);
+      });
+      request.addEventListener('loadend', () => {
+        input.disabled = false;
+        input.value = '';
+        progress.value = 100;
+        const response = request.response && typeof request.response === 'object' ? request.response : {};
+        (response.results || []).forEach((item) => {
+          const row = document.createElement('li');
+          row.className = `editor-photo-result editor-photo-result--${item.status}`;
+          const name = document.createElement('strong');
+          name.textContent = escapeText(item.name);
+          row.append(name, document.createTextNode(` — ${escapeText(item.message)}`));
+          results.append(row);
+        });
+        (response.gallery || []).forEach(addGalleryImage);
+        const failures = (response.results || []).filter((item) => item.status === 'error').length;
+        status.textContent = request.status >= 200 && request.status < 300
+          ? `Proceso terminado${failures ? ` con ${failures} error${failures === 1 ? '' : 'es'}` : ''}. El selector de imágenes está actualizado.`
+          : escapeText(response.error || 'No se pudo completar la carga.');
+        window.setTimeout(() => { progress.hidden = true; }, 700);
+      });
+      request.send(formData);
+    };
+    uploadPanel.querySelector('[data-photo-select]')?.addEventListener('click', () => input.click());
+    input?.addEventListener('change', () => upload(input.files));
+    dropzone?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); input.click(); }
+    });
+    ['dragenter', 'dragover'].forEach((name) => dropzone?.addEventListener(name, (event) => {
+      event.preventDefault(); dropzone.classList.add('is-dragging');
+    }));
+    ['dragleave', 'drop'].forEach((name) => dropzone?.addEventListener(name, (event) => {
+      event.preventDefault(); dropzone.classList.remove('is-dragging');
+    }));
+    dropzone?.addEventListener('drop', (event) => upload(event.dataTransfer.files));
+  }
+
   const form = document.querySelector('[data-content-editor]');
   if (!form) return;
 
@@ -39,7 +130,7 @@
     return `${prefix}-${String(number).padStart(2, '0')}`;
   };
   const imageFieldMarkup = (name) => `
-    <div class="editor-image-field" data-image-selector>
+    <div class="editor-image-field" data-image-selector data-image-filter="vertical">
       <span class="editor-image-field__label">Imagen opcional</span>
       <input type="hidden" name="${name}" value="" data-image-value>
       <div class="editor-image-current"><img alt="" loading="lazy" data-image-preview hidden><span data-image-empty>Sin imagen</span><code data-image-name></code></div>
@@ -275,14 +366,21 @@
     if (chooseImage && dialog) {
       const selector = chooseImage.closest('[data-image-selector]');
       const selected = selector.querySelector('[data-image-value]').value;
+      const filter = selector.dataset.imageFilter === 'hero' ? 'hero' : 'vertical';
+      let availableCount = 0;
       dialog.imageTarget = selector;
       dialog.querySelectorAll('[data-image-option]').forEach((option) => {
+        const available = filter === 'hero' ? option.dataset.imageHero === 'true' : option.dataset.imageVertical === 'true';
+        option.hidden = !available;
+        if (available) availableCount += 1;
         const active = option.dataset.imageOption === selected;
         option.setAttribute('aria-pressed', String(active));
         option.querySelector('[data-image-selected-label]').hidden = !active;
       });
+      const filterEmpty = dialog.querySelector('[data-image-filter-empty]');
+      if (filterEmpty) filterEmpty.hidden = availableCount !== 0 || dialog.querySelectorAll('[data-image-option]').length === 0;
       dialog.showModal();
-      (dialog.querySelector('[aria-pressed="true"]') || dialog.querySelector('[data-image-option]') || dialog.querySelector('[data-image-close]')).focus();
+      (dialog.querySelector('[data-image-option]:not([hidden])[aria-pressed="true"]') || dialog.querySelector('[data-image-option]:not([hidden])') || dialog.querySelector('[data-image-close]')).focus();
       return;
     }
     if (event.target.closest('[data-image-close]') && dialog) { dialog.close(); return; }

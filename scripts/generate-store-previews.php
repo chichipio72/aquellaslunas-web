@@ -21,20 +21,7 @@ $force = in_array('--force', $arguments, true);
 try {
     $storeConfig = loadStoreConfig();
     $connection = getStoreDatabaseConnection();
-    $variants = [
-        'tienda' => [
-            'column' => 'archivo_preview_tienda',
-            'max_size' => loadStorePreviewTiendaMaxSize(),
-            'quality' => loadStorePreviewTiendaJpegQuality(),
-            'watermark' => true,
-        ],
-        'contenido' => [
-            'column' => 'archivo_preview_contenido',
-            'max_size' => loadStorePreviewContenidoMaxSize(),
-            'quality' => loadStorePreviewContenidoJpegQuality(),
-            'watermark' => false,
-        ],
-    ];
+    $variants = storePreviewVariants();
     $summary = generatePendingStorePreviews(
         $connection,
         storePendingPreviewPhotos($connection, $force),
