@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/store-admin-auth.php';
 require_once __DIR__ . '/../../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../../includes/site-configuration.php';
 require_once __DIR__ . '/../../includes/asset-url.php';
+require_once __DIR__ . '/../../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -67,10 +68,11 @@ $groups = astronomySiteConfigGroupEntries($values);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Configuración del sitio · Aquellas Lunas</title>
+    <?php renderFaviconLinks('../../'); ?>
     <link rel="stylesheet" href="<?= siteConfigHtml('../../' . versionedAssetUrl('assets/css/styles.css')) ?>">
 </head>
 <body class="store-admin">
-    <?php renderStoreAdminNavigation('site_configuration', 'Configuración del sitio'); ?>
+    <?php renderStoreAdminNavigation('site_configuration', 'Visibilidad de secciones'); ?>
     <main class="store-admin-main">
         <section class="card" style="max-width: 1100px; margin: 0 auto;">
             <h2>Visibilidad pública</h2>

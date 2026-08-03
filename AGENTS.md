@@ -397,11 +397,39 @@ El MVP Web Push conserva estas separaciones:
 
 ---
 
-## 21. Fuentes de eventos astronómicos
+## 21. Fuente de datos astronómicos portable
+
+Las funcionalidades astronómicas web migradas utilizan `includes/astronomy-data.php` como punto de entrada. `daily`, `range`, `directions`, `moon/instant`, `altitude-profile` y `tonight` permiten elegir `api` o `php`: la elegida es primaria y la otra queda como fallback técnico. La selección se persiste con claves `astronomy.data_source.<funcionalidad>`.
+
+Las clases `AstronomyEngine\` se cargan mediante el autoloader PSR-4 manual registrado en `includes/api-client.php`, apuntando a `astronomy-engine/src/`. Esta carga no depende de regenerar Composer ni de desplegar `vendor/`.
+
+La API Python y el motor portable se alternan sólo desde esa capa común. No agregar llamadas directas desde páginas o proxies PHP para esas funcionalidades.
+
+Los eventos mantienen además su selección de fuente independiente en `includes/astronomy-events.php`. Los eclipses PHP ya están validados e integrados mediante la fachada portable; no reimplementar sus cálculos en la web.
+
+La imagen lunar principal permite elegir la colección precalculada de
+`assets/images/moon-phases-large/` o la API. La alternativa actúa como fallback
+y el PNG pequeño queda siempre como último recurso. La orientación aparente se aplica en frontend con el ángulo de
+`MoonBrightLimbCalculator` y CSS, manteniendo el contenedor centrado y con
+`overflow: visible`. No introducir render PNG con GD en runtime; la API de
+imagen y el PNG estático pequeño quedan como fallbacks.
+
+---
+
+## 22. Fuentes de eventos astronómicos
 
 - las páginas deben solicitar eventos mediante `includes/astronomy-events.php`, sin elegir ni fusionar fuentes;
 - la fuente se resuelve por `event_group` con precedencia configuración administrativa persistida → variable de entorno específica → `api`;
-- `moon_phase`, `lunar_apsis`, `lunar_orbit`, `lunar_libration` y `lunar_conjunction` admiten `api`, `database`, `php`, `auto` y `compare`; `eclipse` conserva únicamente `api` hasta implementar y validar sus adaptadores;
-- al seleccionar `api`, una falla técnica aplica API → MariaDB → PHP en los grupos con tres fuentes; `eclipse` aplica sólo API → MariaDB; una respuesta válida vacía nunca dispara fallback;
+- `moon_phase`, `lunar_apsis`, `lunar_orbit`, `lunar_libration`, `lunar_conjunction` y `eclipse` admiten `api`, `database`, `php`, `auto` y `compare`;
+- al seleccionar `api`, una falla técnica aplica API → MariaDB → PHP en los grupos con tres fuentes; una respuesta válida vacía nunca dispara fallback;
 - la selección administrativa vive en `admin_configuracion_sitio`, nunca en `astronomical_events`;
 - ninguna integración debe eliminar los adaptadores existentes ni escribir o corregir automáticamente una fuente desde `compare`.
+
+Las consultas PHP lunares deben propagar los grupos solicitados hasta
+`LunarEventCalculator::calculate()`. No invocar el cálculo completo para luego
+descartar fases, ápsides, nodos, libraciones o conjunciones no pedidas. La clave
+de caché debe distinguir la combinación exacta de grupos.
+
+La cobertura contractual de `astronomical_events` es 1900–2050. En `auto`, MariaDB se usa sólo cuando cubre por completo el intervalo pedido y PHP resuelve lo que quede fuera. Para eclipses recuperados de MariaDB, la geometría global persistida se conserva y las circunstancias locales faltantes se completan con los calculadores PHP validados.
+
+`satellite-lunar-transits` no forma parte de esta migración; no trasladarlo a estas fachadas sin una tarea específica.

@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-data.php';
 
 header('Content-Type: application/json; charset=utf-8');
 sendDynamicNoCacheHeaders();
@@ -49,33 +49,23 @@ try {
 }
 
 try {
-    $apiConfig = loadAstronomyApiConfig();
     $intervalMinutes = loadAltitudeProfileIntervalMinutes();
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas altitude profile configuration error: ' . $exception->getMessage());
     altitudeProfileError(503, 'No se pudo cargar el recorrido.');
 }
 
-$parameters = [
-    'target' => $target,
-    'date' => $date,
-    'latitude' => $latitude,
-    'longitude' => $longitude,
-    'timezone' => $timezone,
-    'interval_minutes' => $intervalMinutes,
-];
-$result = astronomyApiRequest(
-    $apiConfig['base_url'] . '/v1/astronomy/altitude-profile?' . http_build_query($parameters),
-    'altitude profile ' . $target,
-    12
-);
-if ($result['body'] === false || $result['http_code'] !== 200) {
-    astronomyApiRecordValidation('altitude profile ' . $target, null, false);
-    altitudeProfileError(503, 'No se pudo cargar el recorrido.');
-}
-$decoded = json_decode($result['body'], true);
-if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
-    astronomyApiRecordValidation('altitude profile ' . $target, false, false);
+try {
+    $decoded = astronomyDataAltitudeProfile(
+        compact('latitude', 'longitude', 'timezone'),
+        $date,
+        $target,
+        $intervalMinutes,
+        'altitude profile ' . $target,
+        12
+    );
+} catch (Throwable $exception) {
+    error_log('Aquellas Lunas altitude profile error: ' . $exception->getMessage());
     altitudeProfileError(503, 'No se pudo cargar el recorrido.');
 }
 

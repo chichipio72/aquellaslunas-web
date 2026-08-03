@@ -1530,9 +1530,101 @@ body :is(
   font-weight: 500;
 }
 
+.api-diagnostics__page-time {
+  margin: 0 0 0.45rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.api-diagnostics__page-profile {
+  margin: 0 0 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(170, 178, 197, 0.1);
+  border-radius: 6px;
+  background: rgba(8, 12, 24, 0.28);
+}
+
+.api-diagnostics__page-profile h3 {
+  margin: 0 0 0.3rem;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.api-diagnostics__page-profile dl,
+.api-diagnostics__page-profile dl div {
+  margin: 0;
+}
+
+.api-diagnostics__page-profile dl div {
+  display: grid;
+  grid-template-columns: minmax(150px, 230px) auto;
+  gap: 0.6rem;
+}
+
+.api-diagnostics__page-profile dt,
+.api-diagnostics__page-profile dd {
+  margin: 0;
+}
+
+.api-diagnostics__page-profile dd {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.api-diagnostics__page-profile-detail dt {
+  padding-left: 0.6rem;
+}
+
 .api-diagnostics ul {
   margin: 0;
-  padding-left: 1.1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.api-diagnostics li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.api-diagnostics li + li {
+  margin-top: 0.22rem;
+}
+
+.api-diagnostics__bar {
+  position: relative;
+  flex: 0 0 110px;
+  width: 110px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(170, 178, 197, 0.12);
+  margin-top: 0.3em;
+}
+
+.api-diagnostics__fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+}
+
+.api-diagnostics__fill--fast {
+  background: #55b987;
+}
+
+.api-diagnostics__fill--medium {
+  background: #d1b954;
+}
+
+.api-diagnostics__fill--slow {
+  background: #c96565;
+}
+
+.api-diagnostics__text {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .api-diagnostics strong {
@@ -4477,6 +4569,24 @@ body.store-admin .store-admin-main {
 .push-admin__send-form button { justify-self: start; }
 
 .astronomy-sources-form { display: grid; gap: 1rem; }
+.astronomy-sources-section { display: grid; gap: .8rem; }
+.astronomy-sources-section + .astronomy-sources-section { margin-top: .4rem; }
+.astronomy-sources-section__heading h3,
+.astronomy-sources-global-actions h3 { margin: 0; color: #f2f5ff; }
+.astronomy-sources-section__heading p,
+.astronomy-sources-global-actions p { margin: .3rem 0 0; color: var(--muted); }
+.astronomy-sources-global-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: .75rem 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgba(154, 180, 255, .2);
+  border-radius: .8rem;
+  background: rgba(50, 70, 120, .12);
+}
+.astronomy-sources-global-buttons { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: flex-end; }
+.astronomy-sources-global-status { grid-column: 1 / -1; font-size: .9rem; }
 .astronomy-sources-grid { display: grid; gap: .7rem; }
 .astronomy-sources-row {
   display: grid;
@@ -4488,7 +4598,8 @@ body.store-admin .store-admin-main {
   border-radius: .65rem;
   background: rgba(5, 10, 21, .38);
 }
-.astronomy-sources-row label { color: #f2f5ff; font-weight: 750; }
+.astronomy-sources-row label { display: block; color: #f2f5ff; font-weight: 750; }
+.astronomy-sources-row small { display: block; margin-top: .25rem; color: var(--muted); line-height: 1.4; }
 .astronomy-sources-row select {
   width: 100%;
   min-height: 2.65rem;
@@ -4500,6 +4611,7 @@ body.store-admin .store-admin-main {
   font: inherit;
 }
 .astronomy-sources-row select:focus-visible { border-color: #9ab4ff; outline: 2px solid rgba(154, 180, 255, .2); outline-offset: 1px; }
+.astronomy-sources-row select:disabled { color: #c5cbda; border-color: rgba(170, 178, 197, .12); opacity: .78; cursor: not-allowed; }
 .astronomy-sources-help { color: var(--muted); }
 .astronomy-sources-help dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem .75rem; }
 .astronomy-sources-help dt { color: #f2f5ff; font-weight: 750; }
@@ -4507,6 +4619,9 @@ body.store-admin .store-admin-main {
 .astronomy-sources-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
 
 @media (max-width: 640px) {
+  .astronomy-sources-global-actions { grid-template-columns: 1fr; }
+  .astronomy-sources-global-buttons { justify-content: stretch; }
+  .astronomy-sources-global-buttons .button { flex: 1 1 9rem; }
   .astronomy-sources-row { grid-template-columns: 1fr; gap: .5rem; }
   .astronomy-sources-help dl { grid-template-columns: 1fr; }
 }

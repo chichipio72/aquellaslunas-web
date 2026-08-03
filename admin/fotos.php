@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/store-admin-auth.php';
 require_once __DIR__ . '/../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../includes/store-database.php';
 require_once __DIR__ . '/../includes/store-admin-photos.php';
+require_once __DIR__ . '/../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -69,9 +70,9 @@ try {
 }
 ?>
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow,noarchive"><title>Fotos · Administración</title>
+<meta name="robots" content="noindex,nofollow,noarchive"><title>Fotos · Administración</title><?php renderFaviconLinks('../'); ?>
 <link rel="stylesheet" href="<?= htmlspecialchars('../' . versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>"></head>
-<body class="store-admin"><?php renderStoreAdminNavigation('gallery', 'Galería y tienda'); ?>
+<body class="store-admin"><?php renderStoreAdminNavigation('gallery', 'Galería'); ?>
 <main class="store-admin-main">
 <?php if ($message): ?><p class="store-admin-success" role="status"><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($error): ?><p class="store-admin-alert" role="alert">No se pudo completar la operación.</p><?php endif; ?>

@@ -6,9 +6,9 @@
 `tile.openstreetmap.org` y búsqueda/geocodificación desde
 `nominatim.openstreetmap.org`. No requiere claves. CSP, proxy y firewall deben permitir
 esos dominios. Sin JavaScript, PHP mantiene la última ubicación válida o Buenos Aires.
-`planificador.php` reutiliza esas dependencias. La API desplegada debe incluir
-`GET /v1/astronomy/directions` y `GET /v1/astronomy/events`; una versión anterior
-produce un error público 503 sin filtrar la URL interna. El proxy
+`planificador.php` reutiliza esas dependencias. Si se habilita la API opcional,
+debe conservar endpoints compatibles para actuar como fuente o fallback; las
+funcionalidades migradas no dependen operativamente de ese servicio. El proxy
 `astronomy-featured-dates.php` usa caché privada de una hora.
 
 ## Destino
@@ -197,6 +197,15 @@ El modo prueba se conecta y compara los árboles, pero no transfiere archivos.
 ./scripts/desplegar.sh --include-vendor
 ```
 
+La exclusión significa únicamente que no se suben archivos nuevos o
+modificados de `vendor/`. El despliegue no usa borrado remoto, por lo que los
+archivos que ya existan en esa ruta del destino se conservan intactos.
+
+El motor `astronomy-engine/` sí forma parte del despliegue normal. Su namespace
+se carga desde `includes/api-client.php` mediante un autoloader PSR-4 manual;
+por lo tanto no requiere incluir `vendor/`. La opción `--include-vendor` queda
+reservada para las dependencias Composer de otras funciones, como Web Push.
+
 ## Despliegue real
 
 ```bash
@@ -235,6 +244,7 @@ Sí se transfieren:
 - `assets/css/` y `assets/js/`;
 - previews públicas bajo `assets/images/tienda/previews/`;
 - las 404 imágenes de `assets/images/moon-phases/`;
+- las 404 imágenes grandes de `assets/images/moon-phases-large/` usadas por `moon/image`;
 - los mapas disponibles de `assets/images/eclipses/`, aunque estén ignorados por Git;
 - `.htaccess`, que bloquea por HTTP `includes/`, `scripts/` y las pruebas PHP/shell sin impedir el HTML de prueba táctil local.
 

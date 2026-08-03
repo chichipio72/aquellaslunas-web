@@ -25,6 +25,7 @@ valor, `appEnvironment()` devuelve `production`.
 | `ASTRONOMY_EVENT_SOURCE_LUNAR_ORBIT` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para nodos lunares |
 | `ASTRONOMY_EVENT_SOURCE_LUNAR_LIBRATION` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para libraciones |
 | `ASTRONOMY_EVENT_SOURCE_LUNAR_CONJUNCTION` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para conjunciones lunares |
+| `ASTRONOMY_EVENT_SOURCE_ECLIPSE` | — | `api` | `api`, `database`, `php`, `auto` o `compare` | fallback administrativo para eclipses solares y lunares |
 | `ASTRONOMY_REVERSE_GEOCODER_URL` | — | URL de Nominatim | URL HTTPS | geocodificación inversa server-side |
 | `ASTRONOMY_REVERSE_GEOCODER_USER_AGENT` | — | identificación de Aquellas Lunas | texto | `User-Agent` para Nominatim |
 | `LOCAL_TIME_SIMULATION_ENABLED` | `local_time_simulation_enabled` | `false` | booleano mediante `filter_var` | control y sesión local de simulación temporal |
@@ -68,7 +69,12 @@ valor, `appEnvironment()` devuelve `production`.
 | `MERCADO_PAGO_FAILURE_URL` | `mercado_pago_failure_url` | sin valor | URL HTTPS | retorno fallido futuro |
 | `MERCADO_PAGO_NOTIFICATION_URL` | `mercado_pago_notification_url` | sin valor | URL HTTPS | receptor público de pagos |
 
-Cuando un grupo está configurado en `api`, una falla técnica de FastAPI activa la cadena interna API → MariaDB → PHP para los grupos que disponen de esas tres fuentes. `eclipse` usa únicamente API → MariaDB. Una respuesta API válida sin eventos no activa fallback. Las opciones `database`, `php`, `auto` y `compare` conservan su semántica propia.
+Cuando un grupo está configurado en `api`, una falla técnica de FastAPI activa la cadena interna API → MariaDB → PHP. Esto incluye `eclipse`. Una respuesta API válida sin eventos no activa fallback. `database` consulta sólo MariaDB; `php`, sólo el motor portable; `auto` usa MariaDB cuando el intervalo completo cae dentro de 1900–2050 y PHP fuera de esa cobertura; `compare` devuelve MariaDB como resultado principal y calcula PHP sólo para diagnóstico. En eclipses de MariaDB, las circunstancias globales persistidas se enriquecen con circunstancias locales PHP para el observador.
+
+Los cálculos generales se guardan en `admin_configuracion_sitio` con claves
+`astronomy.data_source.daily`, `.range`, `.directions`, `.moon_instant`,
+`.altitude_profile` y `.tonight`; aceptan `api` o `php`, y la no elegida queda
+como fallback. `astronomy.data_source.moon_image` acepta `static` o `api`.
 
 `MERCADO_PAGO_NOTIFICATION_URL` documenta y valida la URL registrada centralmente en **Tus integraciones → Webhooks**. No se incluye como `notification_url` al crear preferencias, para no reemplazar el canal firmado configurado en el panel.
 

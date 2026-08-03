@@ -129,52 +129,22 @@ if ($days > 90) {
 }
 
 require_once __DIR__ . '/includes/moon-images.php';
+require_once __DIR__ . '/includes/astronomy-data.php';
 
-$apiBaseUrl = null;
 $apiData = null;
 $apiErrorMessage = null;
 
 try {
-    $apiConfig = loadAstronomyApiConfig();
-    $apiBaseUrl = $apiConfig['base_url'];
-    error_log('Aquellas Lunas API configuration source: ' . $apiConfig['source']);
+    $apiData = astronomyDataRange(
+        ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName],
+        $startDate,
+        $days,
+        'range',
+        12
+    );
 } catch (RuntimeException $exception) {
     $apiErrorMessage = 'No se pudieron cargar los datos en este momento.';
-    error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
-}
-
-if ($apiBaseUrl !== null) {
-    $apiUrl = $apiBaseUrl . '/v1/astronomy/range';
-    $query = http_build_query([
-        'start_date' => $startDate,
-        'days' => $days,
-        'latitude' => $latitude,
-        'longitude' => $longitude,
-        'timezone' => $timezoneName,
-    ]);
-
-    $requestResult = astronomyApiRequest($apiUrl . '?' . $query, 'range', 12);
-    if ($locationMode !== 'default' && astronomyApiRejectedLocationParameters($requestResult)) {
-        astronomyRecoverDefaultLocationFromApi($requestResult);
-    }
-    $response = $requestResult['body'];
-    $httpCode = $requestResult['http_code'];
-
-    if ($response !== false && $httpCode === 200) {
-        $decoded = json_decode($response, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            $apiData = $decoded;
-            astronomyApiRecordValidation('range', true, true);
-        } else {
-            $apiErrorMessage = 'No se pudieron cargar los datos en este momento.';
-            error_log('Aquellas Lunas API invalid response: ' . json_last_error_msg());
-            astronomyApiRecordValidation('range', false, false);
-        }
-    } else {
-        $apiErrorMessage = 'No se pudieron cargar los datos en este momento.';
-        error_log('Aquellas Lunas API request failed with HTTP status ' . $httpCode . '.');
-        astronomyApiRecordValidation('range', null, false);
-    }
+    error_log('Aquellas Lunas range error: ' . $exception->getMessage());
 }
 
 $rows = [];

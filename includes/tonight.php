@@ -3,43 +3,26 @@
 require_once __DIR__ . '/editorial-configuration.php';
 require_once __DIR__ . '/event-type-configuration.php';
 
-require_once __DIR__ . '/api-client.php';
+require_once __DIR__ . '/astronomy-data.php';
 
 function astronomyTonightRequest(
-    string $apiBaseUrl,
+    ?string $apiBaseUrl,
     array $location,
     string $date,
     string $detail,
     string $label,
     int $timeout = 12
 ): ?array {
-    $query = http_build_query([
-        'latitude' => $location['latitude'],
-        'longitude' => $location['longitude'],
-        'timezone' => $location['timezone'],
-        'date' => $date,
-        'detail' => $detail,
-    ]);
-    $result = astronomyApiRequest(rtrim($apiBaseUrl, '/') . '/v1/astronomy/tonight?' . $query, $label, $timeout);
-    if (($location['mode'] ?? 'default') !== 'default' && astronomyApiRejectedLocationParameters($result)) {
-        astronomyRecoverDefaultLocationFromApi($result);
-    }
-    if ($result['body'] === false || $result['http_code'] !== 200) {
-        astronomyApiRecordValidation($label, null, false);
+    try {
+        $decoded = astronomyDataTonight($location, $date, $detail, $label, $timeout);
+    } catch (Throwable $exception) {
+        error_log('Aquellas Lunas tonight error: ' . $exception->getMessage());
         return null;
     }
-    $decoded = json_decode($result['body'], true);
-    if (
-        json_last_error() !== JSON_ERROR_NONE
-        || !is_array($decoded)
-        || !is_array($decoded['night'] ?? null)
-        || !is_array($decoded['planets'] ?? null)
-    ) {
-        astronomyApiRecordValidation($label, false, false);
-        error_log('Aquellas Lunas API ' . $label . ' invalid response: ' . json_last_error_msg());
+    if (!is_array($decoded['night'] ?? null) || !is_array($decoded['planets'] ?? null)) {
+        error_log('Aquellas Lunas tonight invalid response.');
         return null;
     }
-    astronomyApiRecordValidation($label, true, true);
     return $decoded;
 }
 

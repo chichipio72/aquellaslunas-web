@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-data.php';
 require_once __DIR__ . '/includes/location-preferences.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -39,24 +39,9 @@ if ($latitude === null || $longitude === null || $timezone === null) {
 $normalizedTime = strlen($time) === 5 ? $time . ':00' : $time;
 
 try {
-    $apiConfig = loadAstronomyApiConfig();
-} catch (RuntimeException $exception) {
-    error_log('Aquellas Lunas directions configuration error: ' . $exception->getMessage());
-    directionsError(503, 'No se pudieron cargar las direcciones.');
-}
-$parameters = compact('date', 'latitude', 'longitude', 'timezone') + ['time' => $normalizedTime];
-$result = astronomyApiRequest(
-    $apiConfig['base_url'] . '/v1/astronomy/directions?' . http_build_query($parameters),
-    'directions',
-    15
-);
-if ($result['body'] === false || $result['http_code'] !== 200) {
-    astronomyApiRecordValidation('directions', null, false);
-    directionsError(503, 'No se pudieron cargar las direcciones.');
-}
-$decoded = json_decode($result['body'], true);
-if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
-    astronomyApiRecordValidation('directions', false, false);
+    $decoded = astronomyDataDirections(compact('latitude', 'longitude', 'timezone'), $date, $normalizedTime, 'directions', 15);
+} catch (Throwable $exception) {
+    error_log('Aquellas Lunas directions error: ' . $exception->getMessage());
     directionsError(503, 'No se pudieron cargar las direcciones.');
 }
 

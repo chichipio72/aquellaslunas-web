@@ -2,10 +2,10 @@
 
 ## 1. Unidad portable
 
-El directorio que constituye la unidad portable es:
+El directorio integrado que constituye la unidad portable es:
 
 ```text
-/srv/pruebas/astronomia-php-lab/astronomy-engine/
+/srv/proyectos/astronomia/web/astronomy-engine/
 ```
 
 Debe copiarse completo, conservando `composer.json`, `README.md`, este documento,
@@ -21,11 +21,11 @@ PSR-4:
 }
 ```
 
-El paquete tiene su propio `composer.json`. Composer es el mecanismo de carga
-recomendado, pero no hay paquetes de terceros ni un directorio `vendor`
-propio. En una aplicación existente puede instalarse el paquete o incorporar
-la asignación PSR-4 equivalente en el Composer principal, ajustando la ruta al
-lugar copiado; por ejemplo, si se conserva el nombre del directorio:
+El paquete tiene su propio `composer.json`, no tiene dependencias de terceros
+ni un `vendor` propio. La web registra en `includes/api-client.php` un
+autoloader PSR-4 manual para `AstronomyEngine\`, apuntando a
+`astronomy-engine/src/`; por eso la carga del motor no depende de regenerar
+Composer ni de sincronizar `vendor/`. La asignación equivalente es:
 
 ```json
 {
@@ -42,10 +42,12 @@ Requisitos declarados y comprobados:
 - PHP `>=8.5`;
 - extensión estándar `date` y clases `DateTimeImmutable`/`DateTimeZone`;
 - funciones matemáticas estándar de PHP;
-- `ext-gd` con soporte PNG para `MoonImageRenderer`;
+- `ext-gd` con soporte PNG sólo para ejecutar `MoonImageRenderer`;
 - SPL para excepciones e interfaces incluidas con PHP.
 
-No requiere `ext-mbstring`, `ext-curl`, extensiones de base de datos, procesos
+La integración productiva sirve 404 PNG precalculados y rota la imagen en CSS,
+por lo que no requiere GD en runtime. El motor tampoco requiere `ext-mbstring`,
+`ext-curl`, extensiones de base de datos, procesos
 externos ni dependencias Composer adicionales. El código de `src/` no depende
 de Docker, Python, HTTP, PostgreSQL, MariaDB/MySQL, HTML ni del laboratorio.
 
@@ -65,9 +67,9 @@ de Docker, Python, HTTP, PostgreSQL, MariaDB/MySQL, HTML ni del laboratorio.
 | `PrincipalPhaseCalculator.php` | Instantes de las cuatro fases principales. |
 | `SolsticeCalculator.php` | Instantes UTC de los solsticios de junio y diciembre mediante Meeus capítulo 27. |
 | `LunarLibrationCalculator.php` | Libración geocéntrica óptica y física. |
-| `LunarEventCalculator.php` | Fases, ápsides, nodos, libraciones y conjunciones por intervalo. |
+| `LunarEventCalculator.php` | Fases, ápsides, nodos, libraciones y conjunciones por intervalo, con selección opcional de grupos para evitar cálculos no solicitados. |
 | `LunarEvent.php` | Resultado común de un evento lunar. |
-| `LunarEclipseCalculator.php` | Detección y geometría global de eclipses lunares; en validación. |
+| `LunarEclipseCalculator.php` | Detección y geometría global de eclipses lunares validada e integrada. |
 | `LunarEclipse.php`, `LunarEclipseContacts.php` | Resultados globales de eclipse lunar y contactos. |
 | `MeeusEclipsePositionCalculator.php` | Serie completa de Meeus capítulo 47 y posición solar aparente coherente, exclusiva de la geometría de eclipses. |
 | `SolarEclipseCalculator.php` | Detección, máximo y clasificación global de eclipses solares mediante Meeus capítulo 54. |
@@ -127,19 +129,20 @@ eventos diarios usan los umbrales geométricos documentados en el código.
 - extremos de libración este, oeste, norte y sur;
 - conjunciones lunares geocéntricas y sus campos locales de visibilidad.
 
-Los eclipses lunares globales están implementados, pero no validados para
-producto. Ese bloque no incluye circunstancias locales.
+Los eclipses lunares globales y sus circunstancias locales están validados e
+integrados mediante sus calculadores separados.
 
 Los eclipses solares globales están implementados con Meeus capítulo 54 y
 devuelven clasificación, MAX, `gamma`, `u` y geometría disponible. No incluyen
 visibilidad local, mapas, trayectoria ni contactos globales distintos de MAX.
-Su validación de intervalos queda pendiente de ejecución manual en el
-laboratorio y no se declara el bloque listo para producto.
+La fachada portable combina este resultado global con el calculador local ya
+validado e integrado en producto.
 
 Las circunstancias locales lunares y solares están implementadas como clases
 separadas. Reutilizan la infraestructura diaria de horizonte y comparten sólo
-la reducción topocéntrica necesaria. No están validadas para producto; la guía
-y los campos comparables están en `docs/php-local-eclipses.md` del laboratorio.
+la reducción topocéntrica necesaria. Están validadas e integradas en producto;
+la guía y los campos comparables permanecen en `docs/php-local-eclipses.md` del
+laboratorio.
 
 ### Eventos locales derivados
 
@@ -347,6 +350,7 @@ $lunarEvents = (new LunarEventCalculator($lunar))->calculate(
     $endUtc,
     $latitude,
     $longitude,
+    ['moon_phase'], // opcional; omitir para calcular todos los grupos
 );
 
 $lunarEclipses = (new LunarEclipseCalculator($lunar))->events(

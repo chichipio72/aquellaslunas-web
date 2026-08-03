@@ -76,7 +76,13 @@ final class AstronomyEventsFacade
 
         if (array_intersect($selected, ['moon_phase', 'apsis', 'lunar_nodes', 'libration', 'libration_all', 'conjunction'])) {
             $calculator = new LunarEventCalculator(new MeeusLunarCalculator());
-            foreach ($calculator->calculate($start, $end, $observer->latitudeDegrees, $observer->longitudeDegrees) as $event) {
+            $groups = [];
+            if (in_array('moon_phase', $selected, true)) $groups[] = 'moon_phase';
+            if (in_array('apsis', $selected, true)) $groups[] = 'lunar_apsis';
+            if (in_array('lunar_nodes', $selected, true)) $groups[] = 'lunar_orbit';
+            if (array_intersect($selected, ['libration', 'libration_all'])) $groups[] = 'lunar_libration';
+            if (in_array('conjunction', $selected, true)) $groups[] = 'lunar_conjunction';
+            foreach ($calculator->calculate($start, $end, $observer->latitudeDegrees, $observer->longitudeDegrees, $groups) as $event) {
                 $normalized = $this->lunarEvent($event, $selected);
                 if ($normalized !== null) {
                     $items[] = $normalized;

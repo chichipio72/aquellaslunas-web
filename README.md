@@ -2,9 +2,9 @@
 
 ## Estado y alcance
 
-Este repositorio contiene la web pública PHP de Aquellas Lunas y su área administrativa. Los cálculos astronómicos y eventos provienen de una API FastAPI/PostgreSQL separada; PHP valida las solicitudes y presenta sus respuestas. MySQL (`WEB_DB`) conserva contenido público y configuración administrativa, pero no duplica los cálculos ni los eventos de la API.
+Este repositorio contiene la web pública PHP de Aquellas Lunas, su área administrativa y el motor portable integrado en `astronomy-engine/`. La web resuelve en PHP los cálculos ya migrados; la API Python/FastAPI es una fuente opcional y un fallback técnico, no una dependencia operativa. MariaDB (`WEB_DB`) conserva contenido, configuración administrativa y los eventos persistidos de `astronomical_events` para 1900–2050.
 
-La web usa PHP, HTML, CSS y JavaScript sin frameworks. La API, su infraestructura y sus cálculos no forman parte de este repositorio.
+La web usa PHP, HTML, CSS y JavaScript sin frameworks. La infraestructura de la API Python no forma parte de este repositorio. `satellite-lunar-transits` permanece fuera del alcance de esta migración y conserva su arquitectura independiente.
 
 Documentación complementaria:
 
@@ -40,21 +40,26 @@ Documentación complementaria:
 
 ## Responsabilidades
 
-### API
+### Motor PHP portable
 
-- cálculos astronómicos;
-- endpoints diarios y de rango;
-- generación dinámica de imágenes lunares;
-- cálculo de orientación aparente;
-- pregeneración de assets lunares para tablas.
+- fuente seleccionable para `daily`, `range`, `directions`, `moon/instant`, `altitude-profile` y `tonight`, con fallback simétrico hacia la API;
+- eventos lunares, observaciones derivadas y eclipses globales/locales mediante fachadas validadas;
+- cálculo de iluminación y orientación aparente de la imagen lunar;
+- ejecución sin Python, HTTP ni MariaDB para los cálculos portables.
+
+### API Python
+
+- fuente seleccionable para eventos y fallback técnico de los cálculos generales;
+- fallback de la imagen lunar cuando no puede servirse la colección local;
+- dependencia opcional: apagarla no debe impedir el funcionamiento de las funcionalidades migradas.
 
 ### Web
 
 - selección, validación y persistencia de una única ubicación global;
-- consumo server-side de la API;
+- selección server-side de fuentes astronómicas;
 - presentación de datos y errores amigables;
 - selección de miniaturas estáticas;
-- proxy seguro de la imagen lunar aparente;
+- servicio de la colección lunar precalculada y proxy de fallback;
 - comportamiento accesible y responsive.
 
 ## SEO y Analytics
@@ -131,9 +136,9 @@ Los errores de configuración, cURL, HTTP y JSON se registran en `error_log`; el
 
 ## Diagnóstico opcional de tiempos
 
-`includes/api-client.php` centraliza las llamadas HTTP y registra para cada una la etiqueta pública del endpoint, estado HTTP, tiempo total observado por PHP/cURL, `X-Response-Time-Ms` y `Server-Timing` cuando la API los entrega.
+`includes/api-client.php` conserva el registro común de diagnóstico para todas las fuentes astronómicas. Cada operación informa contexto, fuente solicitada y realmente usada, tiempo de la fuente, tiempo total, fallback, errores técnicos y cantidad de resultados cuando corresponde. Las llamadas API agregan HTTP, intentos, cURL, validez JSON, `X-Response-Time-Ms` y `Server-Timing`; PHP informa tiempo de cálculo local, MariaDB tiempo de consulta y `moon/image` distingue colección precalculada, API y PNG estático final.
 
-El tiempo de API es el valor interno informado mediante `X-Response-Time-Ms`. El tiempo total incluye además conexión, red y transferencia hasta la web. La petición independiente de `moon-image.php` queda medida en su propio registro; las páginas HTML muestran al final únicamente las llamadas realizadas durante su renderizado.
+El bloque comienza con el tiempo total de generación PHP de la página, medido desde `REQUEST_TIME_FLOAT` hasta su renderizado. Cada línea conserva el texto técnico completo y antepone una barra fija de comparación: su relleno representa `Fuente ms` respecto de la operación más lenta del bloque y usa verde, amarillo o rojo según el tercio relativo. Este tiempo global no incluye procesamiento del navegador ni descarga de assets.
 
 El diagnóstico visible está autorizado automáticamente en local y, en producción, sólo para una sesión admin válida. Docker Compose lee el archivo local `.env`; un ejemplo sin secretos es:
 
@@ -196,7 +201,7 @@ Los derivados de tienda usan 800 px, calidad 72 y una marca semitransparente rep
 
 `galeria.php` presenta las fotos disponibles que ya tienen `archivo_preview_tienda`, ordenadas por creación descendente. La cuadrícula y el modal usan siempre esa versión comercial; no exponen la variante de contenido, originales ni rutas internas.
 
-El portal privado vive bajo `admin/` y no aparece en la navegación pública. Su menú compartido contiene Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio; “Cerrar sesión” permanece separado. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa la sesión `aquellas_lunas_admin` y exige CSRF en todos los cambios. Contenidos, visibilidad y reglas escriben en `WEB_DB`; el laboratorio sólo consulta `datos_astronomicos`. La arquitectura administrativa completa se describe en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
+El portal privado vive bajo `admin/` y no aparece en la navegación pública. Su menú compartido contiene Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Fuentes astronómicas, Galería, Laboratorio y Notificaciones de prueba; “Cerrar sesión” permanece separado. Los títulos del panel y los encabezados de cada módulo respetan esos mismos nombres y todas las vistas administrativas reutilizan el favicon público. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa la sesión `aquellas_lunas_admin` y exige CSRF en todos los cambios. Contenidos, visibilidad, reglas y fuentes escriben en `WEB_DB`; el laboratorio sólo consulta `datos_astronomicos`. La arquitectura administrativa completa se describe en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
 
 La galería permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
 
@@ -204,11 +209,7 @@ Mercado Pago Checkout Pro se integra server-side sin SDK. La galería crea pedid
 
 El diagnóstico se muestra automáticamente en local. En producción se muestra sólo al navegador que conserva una sesión administrativa válida; no existe un flag adicional de timings.
 
-Los nombres públicos usados actualmente son `moon instant`, `daily`, `home phases`, `home upcoming`, `range`, `events` y `moon image`. Mediciones locales observadas como referencia, no como garantía de rendimiento:
-
-- `daily`: aproximadamente 57 ms;
-- `home phases`: aproximadamente 90 ms;
-- `home upcoming`: aproximadamente 288 ms.
+Los contextos del diagnóstico identifican la operación consumidora, por ejemplo `moon instant`, `daily`, `home v2 phases`, `home v2 upcoming 1-7`, `home v2 upcoming 8-14`, `range`, `events`, `tonight` y `moon image`. En fases lunares, la selección de grupo se empuja hasta el calculador PHP: la consulta de portada de 11 fases pasó localmente de aproximadamente 1,37 s —cuando calculaba también ápsides, nodos, libraciones y conjunciones— a 0,5 ms de cálculo aislado y alrededor de 1,7 ms observados desde la página. Son referencias de diagnóstico, no garantías de rendimiento.
 
 En producción, una sesión anónima o incógnita no debe ver el diagnóstico; la autorización no se comparte con otros navegadores.
 
@@ -359,7 +360,7 @@ Las tarjetas principales muestran una escala civil local de 00 a 24. PHP entrega
 
 El marcador blanco interpola su altura entre muestras. Con reloj real se actualiza una vez por minuto sin repetir la solicitud. Con `debug_now` permanece fijo en el instante simulado. Cada SVG contiene título y descripción accesibles, y las series secundarias combinan color con distintos patrones de trazo.
 
-`altitude-profile.php` es un proxy JSON del mismo origen que sólo admite `GET` y usa `Cache-Control: no-store`. Otros métodos responden 405 y `Allow: GET`. Valida la solicitud y la respuesta y llama a la API desde PHP, por lo que la URL interna no se expone. Sol y Luna se solicitan de manera independiente. El intervalo común se configura con `ALTITUDE_PROFILE_INTERVAL_MINUTES`, prioridad entorno → configuración externa → 15, y admite enteros de 5 a 60.
+`altitude-profile.php` es un endpoint JSON del mismo origen que sólo admite `GET` y usa `Cache-Control: no-store`. Otros métodos responden 405 y `Allow: GET`. Valida la solicitud y la respuesta y usa la fuente API/PHP elegida en administración, con la otra como fallback técnico, sin exponer la URL interna. Sol y Luna se solicitan de manera independiente. El intervalo común se configura con `ALTITUDE_PROFILE_INTERVAL_MINUTES`, prioridad entorno → configuración externa → 15, y admite enteros de 5 a 60.
 
 El gráfico solar conserva salida, puesta y duración, y compara invierno, hoy y verano. El lunar compara ayer, hoy y mañana; está en una fila inferior propia de la tarjeta, bajo la imagen y el texto, y ocupa su ancho útil sin reducir nuevamente la Luna. La leyenda no muestra “Muestras cada 15 min”.
 
@@ -406,7 +407,7 @@ Los encabezados y resúmenes usan `☀` para el Sol, `🌙` para la Luna, `↑` 
 
 ### Eventos
 
-`eventos.php` consulta `/v1/astronomy/events` desde PHP. El formulario conserva en la URL la fecha inicial, el rango de 1 a 366 días y los filtros seleccionados; la ubicación usa las mismas cookies, geolocalización y fallback de Buenos Aires que el resto del sitio.
+`eventos.php` consulta la capa común `includes/astronomy-events.php`. El formulario conserva en la URL la fecha inicial, el rango de 1 a 366 días y los filtros seleccionados; la ubicación usa las mismas cookies, geolocalización y fallback de Buenos Aires que el resto del sitio.
 
 Los filtros disponibles son:
 
@@ -419,7 +420,7 @@ Los filtros disponibles son:
 
 Los resultados se agrupan por fecha local y se presentan como eventos, no como datos técnicos. Las conjunciones son acercamientos geométricos: la indicación de visibilidad aclara si ambos cuerpos estaban simultáneamente sobre el horizonte desde la ubicación consultada. Luna fina y luz cenicienta se integran en una sola tarjeta por oportunidad: dos amaneceres antes y dos atardeceres después de Luna nueva, conservando la ventana histórica de luz cenicienta cuando también se cumple.
 
-`includes/event-presentation.php` transforma los eventos de la API para la portada y para esta página mediante un único contrato de título, resumen, decisión y etiqueta horaria, detalles técnicos y explicación. La portada consume la versión compacta. En la página de eventos, los valores técnicos quedan ocultos en reposo y se consultan mediante el botón accesible **Datos técnicos**, que abre un popover nativo con una lista descriptiva.
+`includes/event-presentation.php` transforma los eventos normalizados, independientemente de su fuente, mediante un único contrato de título, resumen, decisión y etiqueta horaria, detalles técnicos y explicación. La portada consume la versión compacta. En la página de eventos, los valores técnicos quedan ocultos en reposo y se consultan mediante el botón accesible **Datos técnicos**, que abre un popover nativo con una lista descriptiva.
 
 Los eventos con hora confiable ofrecen **Agendar evento**, con opciones para Google
 Calendar, Outlook y Apple Calendar/otros mediante `.ics`. El helper
@@ -442,12 +443,17 @@ En eclipses (`type=eclipse`) la salida pública usa clasificación local de visi
 
 ### Eclipses
 
-`eclipses.php` consulta server-side `/v1/astronomy/events` exclusivamente con
+`eclipses.php` consulta server-side `astronomyEvents()` exclusivamente con
 `types=eclipse`, admite bloques de hasta cinco años y filtra por tipo y visibilidad
 desde la ubicación global. El formulario limita la fecha final y el servidor rechaza
-el exceso antes de consultar la API. El listado muestra sólo el resumen; el detalle
+el exceso antes de consultar la fuente configurada. El listado muestra sólo el resumen; el detalle
 se abre en un `<dialog>` y separa **Datos generales**, **Desde tu ubicación** y
 **Visibilidad mundial**.
+
+Eclipses admite `api`, `database`, `php`, `auto` y `compare`. La capa común
+normaliza los contratos API, MariaDB y PHP. Como MariaDB conserva circunstancias
+globales, sus eventos se enriquecen con los calculadores PHP validados para completar
+subtipo, visibilidad, fase visible y clasificación local del observador.
 
 Para lunares consume `details.eclipse_global`/`details.eclipse_local`; para solares, `details.solar_eclipse_global`/`details.solar_eclipse_local`. El bloque global puede incluir `visibility_map` con `status`, `available`, `source`, `catalog_url`, `source_url`, `local_filename`, `retrieved_at`, `map_kind` y `attribution`. La sección mundial exige `available === true`, `status === "available"` y un nombre simple seguro. La imagen usa `versionedAssetUrl("assets/images/eclipses/<local_filename>")`: resuelve `/assets/...` en Docker y `/astro/assets/...` en producción. `source_url` nunca se usa como imagen; sólo puede aparecer como enlace discreto. Metadatos ausentes, estados `not_found`, `ambiguous` o `download_error` y nombres inseguros ocultan la sección.
 
@@ -543,9 +549,25 @@ $filename = sprintf('moon_%03d_%s_%s.png', $percent, $direction, $hemisphere);
 
 La tabla no solicita una imagen a la API por fila. Sirve estos PNG como assets estáticos y `versionedAssetUrl()` agrega la versión de `filemtime`; son aptos para caché larga porque una modificación cambia la URL. Si falta un archivo, el helper registra el error y reserva un espacio controlado.
 
-### 2. Imagen dinámica en la portada
+La portada reutiliza la misma matriz y el mismo criterio desde
+`assets/images/moon-phases-large/`, con 404 PNG de 240×240. Se generan con el
+mismo modo `percentage`, cambiando `--size 240` y usando
+`--terminator-softness 0.05`. `moon-image.php` calcula iluminación y edad con
+la fachada PHP, selecciona el asset por porcentaje, dirección y hemisferio, y
+no renderiza PNG en runtime. Las páginas calculan además la orientación local
+con `MoonBrightLimbCalculator` y rotan el asset mediante CSS; el signo se
+invierte al pasar de la convención antihoraria del renderer a la convención
+horaria de `transform: rotate()`.
 
-La portada carga `moon-image.php`, un proxy PHP del mismo origen. El proxy usa la configuración centralizada y consulta:
+Producción no necesita GD para `moon/image`: no se generan PNG durante una petición.
+`MoonImageRenderer` se conserva como herramienta de generación validada, pero el
+runtime sirve la colección estática y aplica la orientación aparente con CSS.
+
+### 2. Imagen lunar de la portada
+
+La portada carga `moon-image.php`, un endpoint PHP del mismo origen. Administración
+permite elegir la colección precalculada o la API como fuente primaria; la otra
+queda como fallback y el PNG pequeño es siempre el último recurso.
 
 ```text
 /v1/moon/image
@@ -561,7 +583,7 @@ Parámetros:
 - `size=240`.
 - `terminator_softness`, definido en `moon-image.php` mediante `MOON_TERMINATOR_SOFTNESS` y limitado por la API al rango `0.0`–`0.2`.
 
-La API deriva la fase del instante y calcula la inclinación aparente para el observador. CSS controla el tamaño visual. Una respuesta válida se cachea 15 minutos desde el proxy. Ante parámetros inválidos, error de configuración, cURL, HTTP o tipo de contenido, se sirve `moon_000_waxing_south.png` como fallback con `no-store`, sin perder los datos textuales.
+En el fallback API, la API deriva la fase del instante y calcula la inclinación aparente para el observador. CSS controla el tamaño visual. El asset precalculado se cachea durante un día y una respuesta válida de la API durante 15 minutos. Ante parámetros inválidos, error de configuración, cURL, HTTP o tipo de contenido, se sirve `moon_000_waxing_south.png` como último fallback con `no-store`, sin perder los datos textuales.
 
 ## Caché y versionado de assets
 
@@ -569,7 +591,7 @@ Las miniaturas lunares tienen nombres estables y reciben query strings individua
 
 Las vistas dinámicas que usan `sendDynamicNoCacheHeaders()` —Inicio, Esta noche, Sol y Luna, Planificador, Eventos, Eclipses, Ubicación y Galería— envían directivas privadas `no-store/no-cache`. Los endpoints JSON auxiliares también deshabilitan caché. Los assets estáticos usan `versionedAssetUrl()`, que añade `?v=<filemtime>` cuando el archivo existe.
 
-Estas directivas no se aplican a `assets/`: CSS, JavaScript, iconos y las miniaturas lunares estáticas mantienen el comportamiento normal de caché de Apache/navegador. Una imagen válida de `moon-image.php` conserva su caché pública de 15 minutos; su fallback de error usa `no-store`.
+Estas directivas no se aplican a `assets/`: CSS, JavaScript, iconos y las imágenes lunares estáticas mantienen el comportamiento normal de caché de Apache/navegador. `moon-image.php` usa caché pública de un día para la colección precalculada y de 15 minutos para su fallback API; el fallback final usa `no-store`.
 
 El cliente PHP realiza como máximo dos intentos. Reintenta una sola vez, después de 500 ms, cuando cURL no puede completar la conexión o cuando la API responde 502, 503 o 504. No reintenta respuestas funcionales como 400. Los HTTP no exitosos, cuerpos inválidos y JSON inválido nunca se convierten en datos vacíos exitosos. Cuando el diagnóstico está activo muestra intentos, presencia y código de error cURL, HTTP final, validez JSON y si se renderizaron datos correctos o un estado de error.
 

@@ -1,5 +1,8 @@
 <?php
+$homePageProfileRequestStarted = hrtime(true);
+$homePageProfileBootstrapStarted = $homePageProfileRequestStarted;
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-data.php';
 require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
@@ -19,29 +22,32 @@ require_once __DIR__ . '/includes/date-format.php';
 require_once __DIR__ . '/includes/event-date-header.php';
 require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/moon-phase-presentation.php';
+require_once __DIR__ . '/includes/moon-images.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/home-upcoming-events.php';
 require_once __DIR__ . '/includes/content-system.php';
 sendDynamicNoCacheHeaders();
 
-function homeV2ApiRequest(string $url, string $context, int $timeout, bool $customLocation): ?array
+/** @param array<string,float> $details */
+function homePageProfileRecord(string $label, int $startedAt, array $details = []): void
 {
-    $result = astronomyApiRequest($url, $context, $timeout);
-    if ($customLocation && astronomyApiRejectedLocationParameters($result)) {
-        astronomyRecoverDefaultLocationFromApi($result);
+    if (!astronomyTimingsEnabled()) {
+        return;
     }
-    if ($result['body'] === false || $result['http_code'] !== 200) {
-        astronomyApiRecordValidation($context, null, false);
-        return null;
+    $GLOBALS['home_page_profile']['blocks'][$label] = (hrtime(true) - $startedAt) / 1_000_000;
+    if ($details !== []) {
+        $GLOBALS['home_page_profile']['details'][$label] = $details;
     }
-    $decoded = json_decode($result['body'], true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
-        astronomyApiRecordValidation($context, false, false);
-        return null;
-    }
-    astronomyApiRecordValidation($context, true, true);
-    return $decoded;
 }
+
+function homePageProfileSet(string $label, float $milliseconds): void
+{
+    if (astronomyTimingsEnabled()) {
+        $GLOBALS['home_page_profile']['blocks'][$label] = max(0.0, $milliseconds);
+    }
+}
+
+homePageProfileRecord('Bootstrap/includes', $homePageProfileBootstrapStarted);
 
 function homeV2Date($value, string $timezone): ?DateTimeImmutable
 {
@@ -90,6 +96,7 @@ function homeV2TonightText(?array $data, array $events, DateTimeImmutable $now, 
     return astronomyTonightCardText($data, $events, $now, $timezone);
 }
 
+$homePageProfileLocationStarted = hrtime(true);
 $location = astronomyLocationContext();
 $timezoneName = $location['timezone'];
 $latitude = $location['latitude'];
@@ -99,20 +106,31 @@ $now = get_current_datetime($timezoneName);
 $dateParam = $now->format('Y-m-d');
 $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName];
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
+homePageProfileRecord('Ubicación/contexto', $homePageProfileLocationStarted);
 $daily = $nextDaily = $phasesData = $tonightData = $moonInstantRaw = null;
 $upcomingEvents = [];
 $hasApiError = false;
 
+$homePageProfileAstronomyStarted = hrtime(true);
+$homePageProfileAstronomyDetails = [];
 try {
-    $apiBaseUrl = loadAstronomyApiConfig()['base_url'];
-    $daily = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $dateParam] + $common), 'home v2 daily', 12, $usingCustomLocation);
-    $nextDaily = homeV2ApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $now->modify('+1 day')->format('Y-m-d')] + $common), 'home v2 next daily', 12, $usingCustomLocation);
-    $moonInstantRaw = homeV2ApiRequest($apiBaseUrl . '/v1/moon/instant?' . http_build_query(['datetime' => $now->format(DateTimeInterface::ATOM)] + $common), 'home v2 moon instant', 12, $usingCustomLocation);
+    $homePageProfileOperationStarted = hrtime(true);
+    $daily = astronomyDataDaily($common, $dateParam, false, 'home v2 daily', 12);
+    $homePageProfileAstronomyDetails['daily'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+    $homePageProfileOperationStarted = hrtime(true);
+    $nextDaily = astronomyDataDaily($common, $now->modify('+1 day')->format('Y-m-d'), false, 'home v2 next daily', 12);
+    $homePageProfileAstronomyDetails['next daily'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+    $homePageProfileOperationStarted = hrtime(true);
+    $moonInstantRaw = astronomyDataMoonInstant($common, $now, 'home v2 moon instant', 12);
+    $homePageProfileAstronomyDetails['moon/instant'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+    $homePageProfileOperationStarted = hrtime(true);
     $phasesData = astronomyEvents([
         'start_date' => $now->modify('-35 days')->format('Y-m-d'),
         'days' => 80,
         'types' => 'moon_phase',
     ] + $common, 'home v2 phases', 35);
+    $homePageProfileAstronomyDetails['phases'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+    $homePageProfileOperationStarted = hrtime(true);
     $upcomingSearch = homeUpcomingProgressiveSearch(
         $now,
         $timezoneName,
@@ -129,12 +147,17 @@ try {
             );
         }
     );
+    $homePageProfileAstronomyDetails['upcoming'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
     $upcomingEvents = astronomyFilterEventsForSurface($upcomingSearch['events'], ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING);
-    $tonightData = astronomyTonightRequest($apiBaseUrl, $location, $dateParam, 'summary', 'home v2 tonight', 8);
+    $homePageProfileOperationStarted = hrtime(true);
+    $tonightData = astronomyTonightRequest(null, $location, $dateParam, 'summary', 'home v2 tonight', 8);
+    $homePageProfileAstronomyDetails['tonight'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
 } catch (RuntimeException $exception) {
-    error_log('Aquellas Lunas home v2 API configuration error: ' . $exception->getMessage());
+    error_log('Aquellas Lunas home v2 astronomy error: ' . $exception->getMessage());
 }
+homePageProfileRecord('Astronomía', $homePageProfileAstronomyStarted, $homePageProfileAstronomyDetails);
 
+$homePageProfileCardsStarted = hrtime(true);
 if (!is_array($daily['moon'] ?? null)) {
     $daily = null;
     $hasApiError = true;
@@ -178,11 +201,16 @@ $illumination = isset($moon['illumination_percent']) ? round((float) $moon['illu
 $apparentSizeNumber = is_numeric($moon['apparent_size_percent'] ?? null) ? (float) $moon['apparent_size_percent'] : null;
 $isSupermoon = $apparentSizeNumber !== null && $apparentSizeNumber >= astronomySupermoonMinApparentSizePercent();
 $moonImageUrl = 'moon-image.php?' . http_build_query($common + ['datetime' => $now->format(DateTimeInterface::ATOM)]);
+recordMoonImageDiagnostic('home v2 moon image', $moon['illumination_percent'] ?? null, $moon['age_days'] ?? null, (float) $latitude);
+$moonOrientation = moonApparentRotation($now, (float) $latitude, (float) $longitude, $timezoneName);
+$moonCssRotation = $moonOrientation['css_degrees'] ?? 0.0;
 $displayDate = homeV2LongDate($now, true);
 $tonightText = homeV2TonightText($tonightData, $upcomingEvents, $now, $timezoneName);
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
 $pageSeo = aquellasLunasSeoPage('Aquellas Lunas | El cielo de hoy', 'La Luna, el cielo de esta noche y los próximos eventos para tu ubicación.', '/');
+homePageProfileRecord('Armado de datos/tarjetas', $homePageProfileCardsStarted);
 
+$homePageProfileMysqlStarted = hrtime(true);
 $showHomeTodayCard = astronomySiteHomeBlockEnabled('today');
 $showHomeTonightCard = astronomySiteHomeBlockEnabled('tonight');
 $showHomePhasesCard = astronomySiteHomeBlockEnabled('phases');
@@ -191,6 +219,10 @@ $showHomeExploreCard = astronomySiteHomeBlockEnabled('explore_sky');
 $showHomeInstallCard = astronomySiteHomeBlockEnabled('install');
 $showHomeTriviaCard = astronomySiteHomeBlockEnabled('trivia');
 $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
+$contentEnabled = isContentEnabled();
+homePageProfileRecord('MySQL/configuración', $homePageProfileMysqlStarted);
+$homePageProfileRenderStarted = hrtime(true);
+$homePageProfileContentMilliseconds = 0.0;
 ?>
 <!doctype html>
 <html lang="es">
@@ -224,7 +256,7 @@ $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
             <?php if ($hasApiError): ?><div class="api-error-notice" data-api-error role="alert"><p>No pudimos actualizar todos los datos astronómicos.</p><button type="button" class="button compact-secondary-button" data-api-retry>Reintentar</button></div><?php endif; ?>
             <?php if ($daily !== null): ?>
             <div class="home-v2-moon__body">
-                <div class="home-v2-moon__image"><img src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="360" height="360" alt="Apariencia actual de la Luna desde <?= htmlspecialchars($locationLabel) ?>"></div>
+                <div class="home-v2-moon__image moon-apparent-orientation" data-moon-rotation-degrees="<?= htmlspecialchars((string) $moonCssRotation) ?>"><img src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="360" height="360" alt="Apariencia actual de la Luna desde <?= htmlspecialchars($locationLabel) ?>" style="--moon-apparent-rotation: <?= htmlspecialchars((string) $moonCssRotation) ?>deg"></div>
                 <div class="home-v2-moon__copy">
                     <h2><?= htmlspecialchars($moonPhase) ?></h2>
                     <?php if ($moonHorizonEvents !== []): ?><div class="home-v2-horizon" aria-label="Próximos horarios de la Luna">
@@ -282,7 +314,24 @@ $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
         </article>
         <?php endif; ?>
 
-        <?php if (isContentEnabled() && ($showHomeTriviaCard || $showHomeFactCard)): ?><?php renderAstronomyHomeContentCards(astronomyLoadContentCatalog(), $showHomeTriviaCard, $showHomeFactCard); ?><?php endif; ?>
+        <?php if ($contentEnabled && ($showHomeTriviaCard || $showHomeFactCard)): ?><?php
+            $homePageProfileContentStarted = hrtime(true);
+            $homePageProfileContentLoadStarted = hrtime(true);
+            $GLOBALS['home_page_profile_content_detail_enabled'] = astronomyTimingsEnabled();
+            $homeContentCatalog = astronomyLoadContentCatalog();
+            unset($GLOBALS['home_page_profile_content_detail_enabled']);
+            $homePageProfileContentLoadMilliseconds = (hrtime(true) - $homePageProfileContentLoadStarted) / 1_000_000;
+            $homePageProfileContentRenderStarted = hrtime(true);
+            renderAstronomyHomeContentCards($homeContentCatalog, $showHomeTriviaCard, $showHomeFactCard);
+            $homePageProfileContentRenderMilliseconds = (hrtime(true) - $homePageProfileContentRenderStarted) / 1_000_000;
+            $homePageProfileContentMilliseconds = (hrtime(true) - $homePageProfileContentStarted) / 1_000_000;
+            homePageProfileSet('Contenido/trivias', $homePageProfileContentMilliseconds);
+            if (astronomyTimingsEnabled()) {
+                $GLOBALS['home_page_profile']['details']['Contenido/trivias'] = ['carga de catálogo' => $homePageProfileContentLoadMilliseconds]
+                    + (is_array($GLOBALS['home_page_profile_content_detail'] ?? null) ? $GLOBALS['home_page_profile_content_detail'] : [])
+                    + ['render de tarjetas' => $homePageProfileContentRenderMilliseconds];
+            }
+        ?><?php else: ?><?php homePageProfileSet('Contenido/trivias', 0.0); ?><?php endif; ?>
         <?php if ($showHomeExploreCard): ?><?php renderAstronomyExploreSky(); ?><?php endif; ?>
         <?php if ($showHomeInstallCard): ?>
         <article class="home-v2-card home-v2-install-card" data-install-card hidden aria-labelledby="v2-install-title">
@@ -306,7 +355,16 @@ $showHomeFactCard = astronomySiteHomeBlockEnabled('sabias_que');
             </div>
         </article>
         <?php endif; ?>
-        <?php renderAstronomyTimings(); ?>
+        <?php
+        $homePageProfileRenderedMilliseconds = (hrtime(true) - $homePageProfileRenderStarted) / 1_000_000;
+        homePageProfileSet('Clima/APIs externas server-side', 0.0);
+        homePageProfileSet('Render restante', $homePageProfileRenderedMilliseconds - $homePageProfileContentMilliseconds);
+        if (astronomyTimingsEnabled()) {
+            $GLOBALS['home_page_profile']['total_ms'] = array_sum($GLOBALS['home_page_profile']['blocks'] ?? []);
+            $GLOBALS['home_page_profile']['measured_until_ms'] = (hrtime(true) - $homePageProfileRequestStarted) / 1_000_000;
+        }
+        renderAstronomyTimings();
+        ?>
     </div></main>
     <?php renderAstronomySiteFooter(); ?>
 </body>

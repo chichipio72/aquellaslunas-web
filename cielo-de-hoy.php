@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-data.php';
 require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
@@ -16,26 +17,8 @@ require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/astronomy-icon.php';
 require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/moon-phase-presentation.php';
+require_once __DIR__ . '/includes/moon-images.php';
 sendDynamicNoCacheHeaders();
-
-function todayApiRequest(string $url, string $context, int $timeout, bool $customLocation): ?array
-{
-    $result = astronomyApiRequest($url, $context, $timeout);
-    if ($customLocation && astronomyApiRejectedLocationParameters($result)) {
-        astronomyRecoverDefaultLocationFromApi($result);
-    }
-    if ($result['body'] === false || $result['http_code'] !== 200) {
-        astronomyApiRecordValidation($context, null, false);
-        return null;
-    }
-    $decoded = json_decode($result['body'], true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
-        astronomyApiRecordValidation($context, false, false);
-        return null;
-    }
-    astronomyApiRecordValidation($context, true, true);
-    return $decoded;
-}
 
 function todayDateTime($value, string $timezone): ?DateTimeImmutable
 {
@@ -175,14 +158,13 @@ $apiError = false;
 $eventTypes = implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_TODAY));
 
 try {
-    $apiBaseUrl = loadAstronomyApiConfig()['base_url'];
-    $daily = todayApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $requestedDate, 'include_light_periods' => 'true'] + $common), 'today daily', 18, $usingCustomLocation);
-    $nextDaily = todayApiRequest($apiBaseUrl . '/v1/astronomy/daily?' . http_build_query(['date' => $parsedDate->modify('+1 day')->format('Y-m-d')] + $common), 'today next daily', 15, $usingCustomLocation);
-    $directions = todayApiRequest($apiBaseUrl . '/v1/astronomy/directions?' . http_build_query(['date' => $requestedDate, 'time' => '12:00:00'] + $common), 'today directions', 15, $usingCustomLocation);
+    $daily = astronomyDataDaily($common, $requestedDate, true, 'today daily', 18);
+    $nextDaily = astronomyDataDaily($common, $parsedDate->modify('+1 day')->format('Y-m-d'), false, 'today next daily', 15);
+    $directions = astronomyDataDirections($common, $requestedDate, '12:00:00', 'today directions', 15);
     $eventsData = astronomyEvents(['start_date' => $requestedDate, 'days' => 1, 'types' => $eventTypes] + $common, 'today events', 35);
     $phasesData = astronomyEvents(['start_date' => $parsedDate->modify('-35 days')->format('Y-m-d'), 'days' => 80, 'types' => 'moon_phase'] + $common, 'today phases', 35);
 } catch (RuntimeException $exception) {
-    error_log('Aquellas Lunas today configuration error: ' . $exception->getMessage());
+    error_log('Aquellas Lunas today astronomy error: ' . $exception->getMessage());
 }
 if (!is_array($daily['moon'] ?? null) || !is_array($daily['sun'] ?? null)) {
     $daily = null;
@@ -203,6 +185,9 @@ $illumination = is_numeric($moon['illumination_percent'] ?? null) ? (int) round(
 $isSupermoon = is_numeric($moon['apparent_size_percent'] ?? null) && (float) $moon['apparent_size_percent'] >= astronomySupermoonMinApparentSizePercent();
 $moonImageInstant = $parsedDate->setTime(12, 0);
 $moonImageUrl = 'moon-image.php?' . http_build_query($common + ['datetime' => $moonImageInstant->format(DateTimeInterface::ATOM)]);
+recordMoonImageDiagnostic('today moon image', $moon['illumination_percent'] ?? null, $moon['age_days'] ?? null, (float) $latitude);
+$moonOrientation = moonApparentRotation($moonImageInstant, (float) $latitude, (float) $longitude, $timezoneName);
+$moonCssRotation = $moonOrientation['css_degrees'] ?? 0.0;
 $moonProfileUrl = 'altitude-profile.php?' . http_build_query(['target' => 'moon', 'date' => $requestedDate] + $common);
 $sunProfileUrl = 'altitude-profile.php?' . http_build_query(['target' => 'sun', 'date' => $requestedDate] + $common);
 $moonSummary = $daily !== null ? todayMoonSummary($moon, $timezoneName, $isToday ? $now : $parsedDate, $isToday) : '';
@@ -288,7 +273,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
             <?php if ($locationMessage !== ''): ?><p class="status-info"><?= htmlspecialchars($locationMessage) ?></p><?php endif; ?>
             <?php if ($apiError): ?><div class="api-error-notice" data-api-error role="alert"><p>No pudimos actualizar los datos astronómicos.</p><button type="button" class="button compact-secondary-button" data-api-retry>Reintentar</button></div><?php else: ?>
             <div class="today-summary__body">
-                <img class="today-moon-image" src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="320" height="320" alt="Apariencia de la Luna el <?= htmlspecialchars(todayLongDate($parsedDate)) ?>">
+                <div class="today-moon-image-frame moon-apparent-orientation" data-moon-rotation-degrees="<?= htmlspecialchars((string) $moonCssRotation) ?>"><img class="today-moon-image" src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="320" height="320" alt="Apariencia de la Luna el <?= htmlspecialchars(todayLongDate($parsedDate)) ?>" style="--moon-apparent-rotation: <?= htmlspecialchars((string) $moonCssRotation) ?>deg"></div>
                 <div class="today-summary__copy">
                     <h2><?= htmlspecialchars($phase) ?></h2>
                     <p class="today-lead"><?= htmlspecialchars($moonSummary) ?></p>

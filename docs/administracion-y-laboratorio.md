@@ -106,8 +106,7 @@ herramienta.
 ### Navegación y componentes compartidos
 
 `includes/store-admin-navigation.php` genera el encabezado común mediante
-`renderStoreAdminNavigation($activeSection, $title)`. Su menú desplegable incluye Inicio, Contenidos,
-Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio. El formulario seguro para cerrar sesión queda fuera del menú; aplica
+`renderStoreAdminNavigation($activeSection, $title)`. Los títulos de las tarjetas de Inicio y los encabezados de los módulos usan literalmente los nombres del menú, que incluyen Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Fuentes astronómicas, Galería, Laboratorio y Notificaciones de prueba. El formulario seguro para cerrar sesión queda fuera del menú; aplica
 `aria-current="page"` y la clase activa correspondiente.
 
 La navegación resuelve enlaces válidos en todo `/admin` a partir de la ruta actual
@@ -116,6 +115,22 @@ La ruta canónica del editor es `/admin/contenidos/`.
 
 El componente es adaptable a pantallas angostas y evita duplicar el HTML y el token
 CSRF.
+
+Las vistas administrativas cargan el mismo favicon SVG/ICO/PNG y Apple Touch
+Icon que el sitio público mediante `includes/favicon-links.php`.
+
+### Fuentes astronómicas
+
+`/admin/fuentes-astronomicas/` persiste en `admin_configuracion_sitio` la fuente
+primaria de cada cálculo general y la selección independiente de cada grupo de
+eventos. La pantalla sólo ofrece valores soportados: API/PHP para los seis
+cálculos portables, colección/API para `moon/image` y
+API/database/PHP/auto/compare para los eventos configurables.
+
+Los botones globales modifican únicamente los selectores en el navegador. No
+escriben al pulsarlos: el formulario y su CSRF deben guardarse normalmente. Si
+una funcionalidad no admite la fuente global solicitada —PHP en `moon/image`,
+por ejemplo— conserva su selección y la interfaz lo informa.
 
 Los componentes principales que debe reutilizar una herramienta administrativa son:
 

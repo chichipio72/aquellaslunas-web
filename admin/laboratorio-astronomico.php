@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../includes/store-admin-auth.php';
 require_once __DIR__ . '/../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../includes/asset-url.php';
+require_once __DIR__ . '/../includes/favicon-links.php';
 require_once __DIR__ . '/../includes/astronomy-laboratory.php';
 require_once __DIR__ . '/../includes/astronomy-laboratory-extrema.php';
 
@@ -40,12 +41,13 @@ $extremaClientVariables = array_map(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Laboratorio astronómico · Área privada</title>
+    <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars('../' . versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js" defer></script>
     <script src="<?= htmlspecialchars('../' . versionedAssetUrl('assets/js/astronomy-laboratory.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
 </head>
 <body class="store-admin">
-    <?php renderStoreAdminNavigation('laboratory', 'Laboratorio astronómico'); ?>
+    <?php renderStoreAdminNavigation('laboratory', 'Laboratorio'); ?>
     <main class="store-admin-main astronomy-laboratory">
         <section class="card astronomy-laboratory__controls">
             <form data-astronomy-laboratory-form>

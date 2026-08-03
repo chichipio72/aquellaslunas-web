@@ -230,12 +230,48 @@ metadatos continúan después a ancho completo, fuera de esa grilla visual.
 - `analytics.php`, `seo.php` y `favicon-links.php`: cabecera pública.
 - `moon-images.php`: miniaturas lunares estáticas.
 
+## Motor PHP y selección de fuentes
+
+`astronomy-engine/` es la unidad portable integrada. `includes/api-client.php`
+registra manualmente el namespace PSR-4 `AstronomyEngine\` desde
+`astronomy-engine/src/`; el motor no depende del mapa de Composer ni de
+`vendor/`. `includes/astronomy-data.php` resuelve `daily`, `range`, `directions`,
+`moon/instant`, `altitude-profile` y `tonight` con la fuente `api` o `php`
+seleccionada en administración. La otra fuente actúa como fallback técnico.
+`moon/image` permite `static` o `api`, con la alternativa como fallback y el PNG
+pequeño como último recurso.
+
+`includes/astronomy-events.php` es el punto único para eventos. Fases, ápsides,
+nodos, libraciones, conjunciones y eclipses admiten `api`, `database`, `php`,
+`auto` y `compare`. `earthshine` y `full_moon_observation` se calculan primero
+con sus fachadas PHP y conservan la API como fallback técnico.
+
+La selección llega hasta `LunarEventCalculator`: una consulta PHP de un solo
+grupo ejecuta exclusivamente ese fenómeno, y una consulta combinada ejecuta
+sólo la unión pedida. La caché exacta incluye los grupos en su clave. Omitir la
+selección al invocar directamente el calculador conserva el cálculo completo
+compatible. No existe todavía reutilización entre rangos contenedores.
+
+Los modos configurables significan:
+
+- `api`: API primaria; ante falla técnica, MariaDB dentro de cobertura y luego PHP;
+- `database`: exclusivamente `astronomical_events`;
+- `php`: exclusivamente la fachada portable;
+- `auto`: MariaDB si cubre todo el intervalo 1900–2050 y PHP fuera de cobertura o ante indisponibilidad de la base;
+- `compare`: MariaDB como resultado principal y PHP sólo como diagnóstico, sin modificar ninguna fuente.
+
+La API Python es opcional para las funcionalidades migradas. La prueba final de
+cierre debe detenerla y ejecutar smoke tests de Inicio, Esta noche, Sol y Luna,
+Planificador, Eventos, Eclipses, `altitude-profile.php` y `moon-image.php`; luego
+debe restaurarse el servicio y confirmarse nuevamente HTTP 200. La migración no
+incluye `satellite-lunar-transits`.
+
 ## Eclipses y mapas mundiales
 
 `eclipses.php` valida el formulario, limita la búsqueda exclusiva de eclipses a cinco
-años y consume server-side `/v1/astronomy/events?types=eclipse`. El límite se refleja
-en los controles del navegador y se vuelve a comprobar antes de cualquier consulta a
-la API; un exceso muestra “El intervalo máximo de consulta es de 5 años.” El listado
+años y consume server-side `astronomyEvents()` con `types=eclipse`. El límite se refleja
+en los controles del navegador y se vuelve a comprobar antes de consultar la fuente;
+un exceso muestra “El intervalo máximo de consulta es de 5 años.” El listado
 no renderiza mapas. Cada evento contiene un `<template>` que `assets/js/eclipses.js`
 clona dentro de un `<dialog>`.
 
@@ -247,10 +283,17 @@ no realizan otra petición. `assets/js/eclipses.js` resuelve la plantilla por el
 identificador del eclipse. Mapas no disponibles producen `null` y no renderizan
 sección ni espacio residual. La agenda se construye con el helper común de calendario.
 
+La capa normaliza los contratos de API, MariaDB y PHP al esquema que consume el
+componente. MariaDB aporta las circunstancias globales persistidas; cuando no
+incluye circunstancias locales, la fachada PHP validada busca el eclipse
+correspondiente y completa subtipo, visibilidad, fase visible, clasificación y
+contactos del observador sin alterar el registro global. Eclipses soporta los
+cinco modos de fuente, incluido el fallback API → MariaDB → PHP.
+
 ## Visibilidad de esta noche
 
-Inicio consume `GET /v1/astronomy/tonight` con `detail=summary`; la página
-`cielo-de-esta-noche.php` usa `detail=full`. En ambos casos PHP envía la fecha local
+Inicio resuelve `tonight` con la fuente API/PHP configurada y `detail=summary`; la página
+`cielo-de-esta-noche.php` usa la misma selección con `detail=full`. En ambos casos la capa común recibe la fecha local
 resuelta por `get_current_datetime()` y exactamente la ubicación global. No hay endpoint
 intermedio ni segunda consulta al abrir tarjetas.
 
@@ -283,7 +326,7 @@ se elimina el nodo completo.
 
 La vista lee los bloques global/local específicos de cada subtipo. `visibility_map` es opcional y sólo se busca en el bloque global. Para publicar una imagen exige `available=true`, `status=available` y `local_filename` simple, sin barras, `..` ni ruta absoluta. `versionedAssetUrl()` genera una ruta relativa al base path de la aplicación. `catalog_url` o `source_url` se validan como HTTP/HTTPS y sólo se ofrecen como enlace; nunca se hace hotlink.
 
-Los GIF se generan desde la operación de la API pero FastAPI no los sirve. Se depositan en `assets/images/eclipses/`, se ignoran en Git salvo `.gitkeep` y se transfieren mediante el mirror FTPS. Apache debe poder leerlos (`0644` en local).
+Los GIF de mapas mundiales se generan desde la operación de la API pero FastAPI no los sirve. Se depositan en `assets/images/eclipses/`, se ignoran en Git salvo `.gitkeep` y se transfieren mediante el mirror FTPS. Apache debe poder leerlos (`0644` en local).
 
 `api-config.php` también expone `loadStoreConfig()`: resuelve originales, previews y catálogo desde entorno o configuración externa y valida los permisos del conjunto. Originales y catálogo son almacenamiento privado; sólo los previews pertenecen al árbol público y son consumidos por la galería.
 
@@ -313,9 +356,30 @@ La confirmación bloquea pedido y pago dentro de una transacción. Exige referen
 
 ## Administración privada
 
-`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. `includes/store-admin-navigation.php` comparte un menú desplegable con Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Galería y Laboratorio; el cierre de sesión permanece como acción separada.
+`admin/` y `admin/index.php` son el punto de entrada del panel privado, no enlazado desde el sitio público. `includes/store-admin-navigation.php` comparte el menú; los títulos de las tarjetas del panel y los encabezados de cada módulo respetan sus mismos nombres. El cierre de sesión permanece como acción separada. Las páginas administrativas reutilizan `renderFaviconLinks()` y publican el mismo conjunto SVG/ICO/PNG/Apple Touch Icon que la web pública, ajustando únicamente el prefijo relativo.
+
+`admin/fuentes-astronomicas/` separa **Cálculos astronómicos generales** de
+**Eventos astronómicos** y muestra solamente las fuentes válidas de cada
+funcionalidad. `daily`, `range`, `directions`, `moon/instant`,
+`altitude-profile` y `tonight` permiten elegir API o PHP; `moon/image`, colección
+precalculada o API; los grupos de eventos muestran sus cinco modos. **Todo a
+API** y **Todo a PHP** preparan los selectores compatibles sin guardar
+automáticamente y conservan el valor actual donde la fuente pedida no existe.
 
 `includes/store-admin-auth.php` conserva la autenticación histórica: cookie de sesión `aquellas_lunas_admin`, estado `store_admin_authenticated`, cookie HttpOnly/SameSite=Lax, validación mediante `password_verify()`, regeneración del ID, CSRF y destrucción completa. `admin/login.php` dirige al panel general después de autenticar y `admin/logout.php` mantiene el cierre por POST. Todas las respuestas administrativas usan `no-store` y `X-Robots-Tag: noindex`.
+
+## Diagnóstico astronómico común
+
+El registro histórico de `includes/api-client.php` se reutiliza para API, PHP,
+MariaDB y assets lunares estáticos. Cada entrada conserva el contexto de uso y
+registra fuente solicitada/usada, `source_ms`, tiempo total, fallback, error y
+cantidad de resultados. Las entradas API mantienen además HTTP, cURL, intentos,
+JSON y `Server-Timing`.
+
+`renderAstronomyTimings()` sólo se muestra con la autorización técnica ya
+existente. Antes de las operaciones informa el tiempo PHP completo transcurrido
+desde `$_SERVER['REQUEST_TIME_FLOAT']`. Las barras auxiliares tienen ancho fijo,
+normalizan `source_ms` contra el máximo del bloque y no alteran las mediciones.
 
 La configuración editorial de tipos de eventos se mantiene separada de
 `admin_configuracion_sitio`: `admin_tipos_eventos` identifica de forma estable

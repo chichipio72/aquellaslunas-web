@@ -7,6 +7,7 @@ if (!defined('STORE_ADMIN_LOGIN_PATH')) {
 require_once __DIR__ . '/../../includes/store-admin-auth.php';
 require_once __DIR__ . '/../../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../../includes/asset-url.php';
+require_once __DIR__ . '/../../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -298,6 +299,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Contenidos · Área privada</title>
+    <?php renderFaviconLinks('../../'); ?>
     <link rel="stylesheet" href="../../<?= editorHtml(versionedAssetUrl('assets/css/styles.css')) ?>">
     <link rel="stylesheet" href="../../<?= editorHtml(versionedAssetUrl('admin/contenidos/editor.css')) ?>">
 </head>

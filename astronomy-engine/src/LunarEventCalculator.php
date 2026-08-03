@@ -11,15 +11,23 @@ use InvalidArgumentException;
 /** Finds geocentric lunar events from the reusable Meeus lunar coordinates. */
 final class LunarEventCalculator
 {
+    private const GROUPS = ['moon_phase','lunar_apsis','lunar_orbit','lunar_libration','lunar_conjunction'];
     private readonly PrincipalPhaseCalculator $phaseCalculator;private readonly LunarLibrationCalculator $librationCalculator;private readonly ApproximatePlanetCalculator $targets;private readonly MeeusSolarPositionCalculator $sun;
     public function __construct(private readonly MeeusLunarCalculator $coordinates){$this->phaseCalculator=new PrincipalPhaseCalculator();$this->librationCalculator=new LunarLibrationCalculator();$this->targets=new ApproximatePlanetCalculator();$this->sun=new MeeusSolarPositionCalculator();}
 
-    /** @return list<LunarEvent> */
-    public function calculate(DateTimeImmutable $start, DateTimeImmutable $end,float $latitudeDegrees=0,float $longitudeDegrees=0): array
+    /** @param list<string>|null $groups @return list<LunarEvent> */
+    public function calculate(DateTimeImmutable $start, DateTimeImmutable $end,float $latitudeDegrees=0,float $longitudeDegrees=0,?array $groups=null): array
     {
         $start=$start->setTimezone(new DateTimeZone('UTC'));$end=$end->setTimezone(new DateTimeZone('UTC'));
         if($end<=$start)throw new InvalidArgumentException('Event interval end must be after start.');
-        $events=[...$this->phases($start,$end),...$this->extrema($start,$end),...$this->nodes($start,$end),...$this->librations($start,$end),...$this->conjunctions($start,$end,$latitudeDegrees,$longitudeDegrees)];
+        $groups=$groups===null?self::GROUPS:array_values(array_unique($groups));
+        foreach($groups as $group)if(!is_string($group)||!in_array($group,self::GROUPS,true))throw new InvalidArgumentException('Unsupported lunar event group.');
+        $events=[];
+        if(in_array('moon_phase',$groups,true))$events=[...$events,...$this->phases($start,$end)];
+        if(in_array('lunar_apsis',$groups,true))$events=[...$events,...$this->extrema($start,$end)];
+        if(in_array('lunar_orbit',$groups,true))$events=[...$events,...$this->nodes($start,$end)];
+        if(in_array('lunar_libration',$groups,true))$events=[...$events,...$this->librations($start,$end)];
+        if(in_array('lunar_conjunction',$groups,true))$events=[...$events,...$this->conjunctions($start,$end,$latitudeDegrees,$longitudeDegrees)];
         usort($events,static fn(LunarEvent $a,LunarEvent $b):int=>$a->dateTime<=>$b->dateTime);
         return $events;
     }

@@ -542,6 +542,8 @@ function astronomyContentValidateFact($raw, string $slug, int $index): array
 
 function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = null): array
 {
+    $homeProfileEnabled = ($GLOBALS['home_page_profile_content_detail_enabled'] ?? false) === true;
+    $homeProfile = ['conexión MySQL' => 0.0, 'listado de artículos' => 0.0, 'carga SQL por artículo' => 0.0, 'validación de artículos' => 0.0, 'trivias/hechos y diagnósticos' => 0.0];
     $catalog = ['articles' => [], 'trivias' => [], 'facts' => [], 'diagnostics' => [], 'warnings' => []];
     if (!isContentEnabled() && !astronomyContentAdminPreviewEnabled()) {
         return $catalog;
@@ -550,18 +552,30 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
     $connectionFactory ??= static fn(): PDO => getWebDatabaseConnection();
 
     try {
+        $profileStarted = hrtime(true);
         $connection = $connectionFactory();
+        if ($homeProfileEnabled) {
+            $homeProfile['conexión MySQL'] = (hrtime(true) - $profileStarted) / 1_000_000;
+        }
         if (!$connection instanceof PDO) {
             throw new RuntimeException('La conexión de contenidos no devolvió un objeto PDO válido.');
         }
 
+        $profileStarted = hrtime(true);
         $rows = astronomyContentDbListArticles($connection);
+        if ($homeProfileEnabled) {
+            $homeProfile['listado de artículos'] = (hrtime(true) - $profileStarted) / 1_000_000;
+        }
         foreach ($rows as $row) {
             $slug = (string) ($row['slug'] ?? '');
             if ($slug === '') {
                 continue;
             }
+            $profileStarted = hrtime(true);
             $loaded = astronomyContentDbLoadArticleRaw($connection, $slug);
+            if ($homeProfileEnabled) {
+                $homeProfile['carga SQL por artículo'] += (hrtime(true) - $profileStarted) / 1_000_000;
+            }
             if ($loaded === null || !is_array($loaded['raw'] ?? null)) {
                 $catalog['diagnostics'][] = [
                     'type' => 'article',
@@ -570,7 +584,11 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
                 ];
                 continue;
             }
+            $profileStarted = hrtime(true);
             $article = astronomyContentValidateArticle($slug, $loaded['raw'], $slug . '.php');
+            if ($homeProfileEnabled) {
+                $homeProfile['validación de artículos'] += (hrtime(true) - $profileStarted) / 1_000_000;
+            }
             $article['source'] = 'mysql';
             $catalog['articles'][$slug] = $article;
         }
@@ -584,6 +602,7 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
         return $catalog;
     }
 
+    $profileStarted = hrtime(true);
     foreach ($catalog['articles'] as $slug => &$article) {
         $raw = is_array($article['raw']) ? $article['raw'] : [];
         $triviaIds = [];
@@ -638,6 +657,10 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
     }
 
     ksort($catalog['articles']);
+    if ($homeProfileEnabled) {
+        $homeProfile['trivias/hechos y diagnósticos'] = (hrtime(true) - $profileStarted) / 1_000_000;
+        $GLOBALS['home_page_profile_content_detail'] = $homeProfile;
+    }
     return $catalog;
 }
 

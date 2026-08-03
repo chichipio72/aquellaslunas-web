@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/includes/api-client.php';
+require_once __DIR__ . '/includes/astronomy-events.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
@@ -33,6 +34,40 @@ function eclipsesParseDate(string $value, DateTimeZone $timezone): ?DateTimeImmu
         return null;
     }
     return $parsed;
+}
+
+/** @return array{items:list<array<string,mixed>>} */
+function eclipsesAstronomyEvents(
+    DateTimeImmutable $startDate,
+    DateTimeImmutable $endDate,
+    float $latitude,
+    float $longitude,
+    string $timezoneName
+): array {
+    $items = [];
+    $segmentStart = $startDate;
+    $segmentNumber = 0;
+    while ($segmentStart <= $endDate) {
+        $segmentNumber++;
+        $segmentEnd = $segmentStart->modify('+365 days');
+        if ($segmentEnd > $endDate) {
+            $segmentEnd = $endDate;
+        }
+        $days = (int) $segmentStart->diff($segmentEnd)->days + 1;
+        $segment = astronomyEvents([
+            'start_date' => $segmentStart->format('Y-m-d'),
+            'days' => $days,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'timezone' => $timezoneName,
+            'types' => 'eclipse',
+        ], 'eclipses segment ' . $segmentNumber, 35);
+        if (is_array($segment['items'] ?? null)) {
+            $items = array_merge($items, array_values(array_filter($segment['items'], 'is_array')));
+        }
+        $segmentStart = $segmentEnd->modify('+1 day');
+    }
+    return ['items' => $items];
 }
 
 function eclipsesEventDateTime($value, string $timezoneName): ?DateTimeImmutable
@@ -470,31 +505,15 @@ if ($filtersWereSubmitted) {
         if (!eclipsesRangeIsAllowed($startDate, $endDate)) {
             $rangeNotice = 'El intervalo máximo de consulta es de 5 años.';
         } else {
-            $days = (int) $startDate->diff($endDate)->days + 1;
             try {
-                $apiConfig = loadAstronomyApiConfig();
-                $query = http_build_query([
-                    'start_date' => $startDate->format('Y-m-d'),
-                    'days' => $days,
-                    'latitude' => $latitude,
-                    'longitude' => $longitude,
-                    'timezone' => $timezoneName,
-                    'types' => 'eclipse',
-                ]);
-                $requestResult = astronomyApiRequest($apiConfig['base_url'] . '/v1/astronomy/events?' . $query, 'eclipses', 35);
-                if ($locationMode !== 'default' && astronomyApiRejectedLocationParameters($requestResult)) {
-                    astronomyRecoverDefaultLocationFromApi($requestResult);
-                }
-                if ($requestResult['body'] === false || (int) $requestResult['http_code'] !== 200) {
-                    $apiErrorMessage = 'No se pudieron cargar los eclipses en este momento.';
-                    astronomyApiRecordValidation('eclipses', null, false);
-                } else {
-                    $decoded = json_decode((string) $requestResult['body'], true);
-                    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded) || !is_array($decoded['items'] ?? null)) {
-                        $apiErrorMessage = 'No se pudieron cargar los eclipses en este momento.';
-                        astronomyApiRecordValidation('eclipses', false, false);
-                    } else {
-                        astronomyApiRecordValidation('eclipses', true, true);
+                $decoded = eclipsesAstronomyEvents(
+                    $startDate,
+                    $endDate,
+                    (float) $latitude,
+                    (float) $longitude,
+                    $timezoneName
+                );
+                if (is_array($decoded['items'] ?? null)) {
                         foreach (astronomyFilterEventsForSurface($decoded['items'], ASTRONOMY_EVENT_SURFACE_ECLIPSES) as $item) {
                             if (!is_array($item) || ($item['type'] ?? null) !== 'eclipse') {
                                 continue;
@@ -531,7 +550,6 @@ if ($filtersWereSubmitted) {
                                 $emptyMessage = 'No se encontraron eclipses para el rango y filtros seleccionados.';
                             }
                         }
-                    }
                 }
             } catch (RuntimeException $exception) {
                 $apiErrorMessage = 'No se pudieron cargar los eclipses en este momento.';

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/api-client.php';
 require_once __DIR__ . '/web-database.php';
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+use AstronomyEngine\Facade\AstronomyEventsFacade;
+use AstronomyEngine\Facade\AstronomyObserver;
 
 const ASTRONOMY_EVENT_DATABASE_START = '1900-01-01T00:00:00+00:00';
 const ASTRONOMY_EVENT_DATABASE_END = '2051-01-01T00:00:00+00:00';
@@ -36,7 +40,11 @@ function astronomyEventSourceCatalog(): array
             'sources' => ['api', 'database', 'php', 'auto', 'compare'],
             'environment' => 'ASTRONOMY_EVENT_SOURCE_LUNAR_CONJUNCTION',
         ],
-        'eclipse' => ['label' => 'Eclipses', 'sources' => ['api']],
+        'eclipse' => [
+            'label' => 'Eclipses',
+            'sources' => ['api', 'database', 'php', 'auto', 'compare'],
+            'environment' => 'ASTRONOMY_EVENT_SOURCE_ECLIPSE',
+        ],
     ];
 }
 
@@ -136,7 +144,12 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
     $apiGroups = [];
     $apiTypesWithoutFallback = [];
     $localGroups = [];
+    $phpFacadeTypes = [];
     foreach ($requestedTypes as $publicType) {
+        if (in_array($publicType, ['earthshine', 'full_moon_observation'], true)) {
+            $phpFacadeTypes[] = $publicType;
+            continue;
+        }
         $eventGroup = astronomyEventGroupFromPublicType($publicType);
         $source = $eventGroup !== null ? astronomyEventSourceFor($eventGroup) : 'api';
         if ($eventGroup === null || $source === 'api') {
@@ -152,6 +165,22 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
     }
 
     $items = [];
+    if ($phpFacadeTypes !== []) {
+        try {
+            $derivedLabel = implode(',', $phpFacadeTypes);
+            $items = astronomyEventsTimedSource(
+                $context,
+                $derivedLabel,
+                'php',
+                'php',
+                static fn(): array => astronomyEventsFromPhpFacade($request, $phpFacadeTypes)
+            );
+        } catch (Throwable $phpException) {
+            error_log('Aquellas Lunas PHP derived events error; using API fallback: ' . $phpException->getMessage());
+            $apiTypes = array_merge($apiTypes, $phpFacadeTypes);
+            $apiTypesWithoutFallback = array_merge($apiTypesWithoutFallback, $phpFacadeTypes);
+        }
+    }
     if ($apiTypes !== []) {
         $apiRequest = $request;
         $apiRequest['types'] = implode(',', $apiTypes);
@@ -177,6 +206,7 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
                     $endUtc,
                     (float) ($request['latitude'] ?? 0.0),
                     (float) ($request['longitude'] ?? 0.0),
+                    (string) ($request['timezone'] ?? 'UTC'),
                     $context,
                     $apiException
                 ));
@@ -191,12 +221,48 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
             $endUtc,
             (float) ($request['latitude'] ?? 0.0),
             (float) ($request['longitude'] ?? 0.0),
+            (string) ($request['timezone'] ?? 'UTC'),
             $context
         ));
     }
 
+    if (in_array('eclipse', $requestedTypes, true)) {
+        $items = astronomyNormalizeEclipseItems(
+            $items,
+            $startUtc,
+            $endUtc,
+            (float) ($request['latitude'] ?? 0.0),
+            (float) ($request['longitude'] ?? 0.0),
+            (string) ($request['timezone'] ?? 'UTC')
+        );
+    }
+
     usort($items, 'astronomyEventsChronologicalComparison');
     return ['items' => $items];
+}
+
+/** @param list<string> $types @return list<array<string,mixed>> */
+function astronomyEventsFromPhpFacade(array $request, array $types): array
+{
+    $timezone = (string) ($request['timezone'] ?? 'UTC');
+    $startDate = (string) ($request['start_date'] ?? '');
+    $observer = new AstronomyObserver(
+        (float) ($request['latitude'] ?? 0.0),
+        (float) ($request['longitude'] ?? 0.0),
+        $timezone,
+        (float) ($request['elevation'] ?? $request['elevation_meters'] ?? 0.0)
+    );
+    $result = (new AstronomyEventsFacade())->between(
+        new DateTimeImmutable($startDate, new DateTimeZone($timezone)),
+        $observer,
+        (int) ($request['days'] ?? 30),
+        $types,
+        ['max_difference_minutes' => (int) ($request['max_difference_minutes'] ?? 90)]
+    );
+    if (!is_array($result['items'] ?? null)) {
+        throw new UnexpectedValueException('La fachada PHP de eventos devolvió un contrato inválido.');
+    }
+    return array_values(array_filter($result['items'], 'is_array'));
 }
 
 /** @return list<array<string,mixed>> */
@@ -206,13 +272,14 @@ function astronomyEventsForApiFallback(
     DateTimeImmutable $endUtc,
     float $latitude,
     float $longitude,
+    string $timezone,
     string $context,
     Throwable $apiException
 ): array {
     $supportsPhp = in_array('php', astronomyEventSourceCatalog()[$eventGroup]['sources'] ?? [], true);
     if (astronomyEventDatabaseCovers($startUtc, $endUtc)) {
         try {
-            $items = astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc);
+            $items = astronomyEventsTimedSource($context, $eventGroup, 'api', 'database', static fn(): array => astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc), 'api');
             astronomyEventsRecordDiagnostic($context, [
                 'group' => $eventGroup,
                 'requested' => 'api',
@@ -224,7 +291,7 @@ function astronomyEventsForApiFallback(
             if (!$supportsPhp) {
                 throw $apiException;
             }
-            $items = astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude);
+            $items = astronomyEventsTimedSource($context, $eventGroup, 'api', 'php', static fn(): array => astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude, $timezone), 'database');
             astronomyEventsRecordDiagnostic($context, [
                 'group' => $eventGroup,
                 'requested' => 'api',
@@ -238,7 +305,7 @@ function astronomyEventsForApiFallback(
     if (!$supportsPhp) {
         throw $apiException;
     }
-    $items = astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude);
+    $items = astronomyEventsTimedSource($context, $eventGroup, 'api', 'php', static fn(): array => astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude, $timezone), 'api');
     astronomyEventsRecordDiagnostic($context, [
         'group' => $eventGroup,
         'requested' => 'api',
@@ -291,7 +358,50 @@ function astronomyEventsFromApi(array $request, string $context, int $timeout): 
         throw new RuntimeException('La respuesta de eventos astronómicos de la API no es válida.');
     }
     astronomyApiRecordValidation($context, true, true);
-    return array_values(array_filter($decoded['items'], 'is_array'));
+    $items = array_values(array_filter($decoded['items'], 'is_array'));
+    astronomyAnnotateLastDiagnostic($context, ['result_count' => count($items)]);
+    return $items;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyEventsTimedSource(
+    string $context,
+    string $eventGroup,
+    string $requestedSource,
+    string $usedSource,
+    callable $operation,
+    ?string $fallbackFrom = null
+): array {
+    $started = hrtime(true);
+    try {
+        $items = $operation();
+        $elapsed = (hrtime(true) - $started) / 1_000_000;
+        astronomyRecordDiagnostic([
+            'label' => $context . ' · ' . $eventGroup,
+            'requested_source' => $requestedSource,
+            'used_source' => $usedSource,
+            'source_ms' => $elapsed,
+            'total_ms' => $elapsed,
+            'fallback_from' => $fallbackFrom,
+            'fallback_to' => $fallbackFrom !== null ? $usedSource : null,
+            'result_count' => count($items),
+        ]);
+        return $items;
+    } catch (Throwable $exception) {
+        $elapsed = (hrtime(true) - $started) / 1_000_000;
+        astronomyRecordDiagnostic([
+            'label' => $context . ' · ' . $eventGroup,
+            'requested_source' => $requestedSource,
+            'used_source' => $usedSource,
+            'source_ms' => $elapsed,
+            'total_ms' => $elapsed,
+            'fallback_from' => $fallbackFrom,
+            'fallback_to' => $fallbackFrom !== null ? $usedSource : null,
+            'technical_error' => get_debug_type($exception) . ': ' . $exception->getMessage(),
+            'outcome' => 'error',
+        ]);
+        throw $exception;
+    }
 }
 
 /** @return list<array<string,mixed>> */
@@ -302,18 +412,19 @@ function astronomyEventsForGroup(
     DateTimeImmutable $endUtc,
     float $latitude,
     float $longitude,
+    string $timezone,
     string $context
 ): array {
     if ($source === 'database') {
-        return astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc);
+        return astronomyEventsTimedSource($context, $eventGroup, 'database', 'database', static fn(): array => astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc));
     }
     if ($source === 'php') {
-        return astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude);
+        return astronomyEventsTimedSource($context, $eventGroup, 'php', 'php', static fn(): array => astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude, $timezone));
     }
     if ($source === 'auto') {
         if (astronomyEventDatabaseCovers($startUtc, $endUtc)) {
             try {
-                return astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc);
+                return astronomyEventsTimedSource($context, $eventGroup, 'auto', 'database', static fn(): array => astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc));
             } catch (Throwable $exception) {
                 astronomyEventsRecordDiagnostic($context, [
                     'group' => $eventGroup,
@@ -323,12 +434,12 @@ function astronomyEventsForGroup(
                 ]);
             }
         }
-        return astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude);
+        return astronomyEventsTimedSource($context, $eventGroup, 'auto', 'php', static fn(): array => astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude, $timezone), astronomyEventDatabaseCovers($startUtc, $endUtc) ? 'database' : null);
     }
     if ($source === 'compare') {
-        $phpItems = astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude);
+        $phpItems = astronomyEventsTimedSource($context . ' compare', $eventGroup, 'compare', 'php', static fn(): array => astronomyEventsFromPhp($eventGroup, $startUtc, $endUtc, $latitude, $longitude, $timezone));
         try {
-            $databaseItems = astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc);
+            $databaseItems = astronomyEventsTimedSource($context, $eventGroup, 'compare', 'database', static fn(): array => astronomyEventsFromDatabase($eventGroup, $startUtc, $endUtc));
             astronomyEventsRecordDiagnostic($context, [
                 'group' => $eventGroup,
                 'mode' => 'compare',
@@ -337,6 +448,9 @@ function astronomyEventsForGroup(
             ]);
             return $databaseItems;
         } catch (Throwable $exception) {
+            if ($eventGroup === 'eclipse') {
+                throw new RuntimeException('No se pudo obtener el resultado principal de eclipses desde MariaDB.', 0, $exception);
+            }
             astronomyEventsRecordDiagnostic($context, [
                 'group' => $eventGroup,
                 'mode' => 'compare',
@@ -405,11 +519,15 @@ function astronomyEventsFromPhp(
     DateTimeImmutable $startUtc,
     DateTimeImmutable $endUtc,
     float $latitude,
-    float $longitude
+    float $longitude,
+    string $timezone = 'UTC'
 ): array
 {
+    if ($eventGroup === 'eclipse') {
+        return astronomyEclipseEventsFromPhp($startUtc, $endUtc, $latitude, $longitude, $timezone);
+    }
     $items = [];
-    foreach (astronomyLunarEventsFromPhp($startUtc, $endUtc, $latitude, $longitude) as $event) {
+    foreach (astronomyLunarEventsFromPhp($startUtc, $endUtc, $latitude, $longitude, [$eventGroup]) as $event) {
         if ($event->group !== $eventGroup) {
             continue;
         }
@@ -423,6 +541,214 @@ function astronomyEventsFromPhp(
         );
     }
     return $items;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyEclipseEventsFromPhp(
+    DateTimeImmutable $startUtc,
+    DateTimeImmutable $endUtc,
+    float $latitude,
+    float $longitude,
+    string $timezone
+): array {
+    $zone = new DateTimeZone($timezone);
+    $startLocal = $startUtc->setTimezone($zone);
+    $endLocal = $endUtc->setTimezone($zone);
+    $days = (int) $startLocal->diff($endLocal)->days;
+    $result = (new AstronomyEventsFacade())->between(
+        $startLocal,
+        new AstronomyObserver($latitude, $longitude, $timezone),
+        $days,
+        ['eclipse']
+    );
+    $items = [];
+    foreach (($result['items'] ?? []) as $item) {
+        if (!is_array($item) || ($item['type'] ?? null) !== 'eclipse') {
+            continue;
+        }
+        $dateTime = new DateTimeImmutable((string) ($item['datetime'] ?? ''));
+        $endDateTime = is_string($item['end_datetime'] ?? null)
+            ? new DateTimeImmutable($item['end_datetime'])
+            : null;
+        $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+        $details['_source'] = 'php';
+        $items[] = [
+            'type' => 'eclipse',
+            'subtype' => (string) ($item['subtype'] ?? ''),
+            'datetime' => $dateTime->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.uP'),
+            'end_datetime' => $endDateTime?->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.uP'),
+            'title' => (string) ($item['title'] ?? ''),
+            'details' => $details,
+        ];
+    }
+    return $items;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyNormalizeEclipseItems(
+    array $items,
+    DateTimeImmutable $startUtc,
+    DateTimeImmutable $endUtc,
+    float $latitude,
+    float $longitude,
+    string $timezone
+): array {
+    $needsPortableLocal = false;
+    foreach ($items as $item) {
+        if (!is_array($item) || ($item['type'] ?? null) !== 'eclipse') {
+            continue;
+        }
+        $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+        $subtype = (string) ($item['subtype'] ?? '');
+        $localKey = $subtype === 'solar_eclipse' ? 'solar_eclipse_local' : 'eclipse_local';
+        if (!is_array($details[$localKey] ?? null) && !is_array($details['local'] ?? null)) {
+            $needsPortableLocal = true;
+            break;
+        }
+    }
+    $portableItems = $needsPortableLocal
+        ? astronomyEclipseEventsFromPhp($startUtc, $endUtc, $latitude, $longitude, $timezone)
+        : [];
+
+    foreach ($items as $index => $item) {
+        if (!is_array($item) || ($item['type'] ?? null) !== 'eclipse') {
+            continue;
+        }
+        $portable = is_array($item['details']['local'] ?? null)
+            ? $item
+            : astronomyClosestEclipseItem($item, $portableItems);
+        $items[$index] = astronomyNormalizeEclipseItemContract($item, $portable);
+    }
+    return $items;
+}
+
+function astronomyClosestEclipseItem(array $item, array $candidates): ?array
+{
+    $timestamp = astronomyEventTimestamp($item['datetime'] ?? null);
+    $closest = null;
+    $difference = PHP_FLOAT_MAX;
+    foreach ($candidates as $candidate) {
+        if (!is_array($candidate) || ($candidate['subtype'] ?? null) !== ($item['subtype'] ?? null)) {
+            continue;
+        }
+        $candidateTimestamp = astronomyEventTimestamp($candidate['datetime'] ?? null);
+        if ($timestamp === null || $candidateTimestamp === null) {
+            continue;
+        }
+        $candidateDifference = abs($timestamp - $candidateTimestamp);
+        if ($candidateDifference < $difference) {
+            $difference = $candidateDifference;
+            $closest = $candidate;
+        }
+    }
+    return $difference <= 86400.0 ? $closest : null;
+}
+
+function astronomyNormalizeEclipseItemContract(array $item, ?array $portable): array
+{
+    $subtype = (string) ($item['subtype'] ?? '');
+    $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+    $portableDetails = is_array($portable['details'] ?? null) ? $portable['details'] : [];
+    $globalKey = $subtype === 'solar_eclipse' ? 'solar_eclipse_global' : 'eclipse_global';
+    $localKey = $subtype === 'solar_eclipse' ? 'solar_eclipse_local' : 'eclipse_local';
+    if (is_array($details[$globalKey] ?? null) && is_array($details[$localKey] ?? null)) {
+        return $item;
+    }
+
+    $global = is_array($details[$globalKey] ?? null) ? $details[$globalKey] : [];
+    if ($global === []) {
+        if (is_array($details['global'] ?? null)) {
+            $global = $details['global'];
+        } else {
+            $global = $details;
+            unset($global['_source']);
+        }
+    }
+    $classification = (string) ($details['classification'] ?? $global['global_type'] ?? $portableDetails['classification'] ?? '');
+    if (!is_string($global['global_type'] ?? null) || trim((string) $global['global_type']) === '') {
+        $global['global_type'] = $classification;
+    }
+
+    $local = is_array($details[$localKey] ?? null) ? $details[$localKey] : [];
+    if ($local === []) {
+        $portableLocal = is_array($details['local'] ?? null)
+            ? $details['local']
+            : (is_array($portableDetails['local'] ?? null) ? $portableDetails['local'] : []);
+        $local = astronomyEclipsePortableLocalContract($subtype, $portableLocal, $classification);
+    }
+
+    $source = (string) ($details['_source'] ?? $portableDetails['_source'] ?? 'unknown');
+    $item['details'] = [
+        $globalKey => $global,
+        $localKey => $local,
+        '_source' => $source,
+    ];
+    $globalType = strtolower(trim((string) ($global['global_type'] ?? '')));
+    $translated = ['partial' => 'parcial', 'penumbral' => 'penumbral', 'total' => 'total', 'annular' => 'anular', 'hybrid' => 'híbrido'][$globalType] ?? $globalType;
+    if ($translated !== '') {
+        $item['title'] = ($subtype === 'solar_eclipse' ? 'Eclipse solar ' : 'Eclipse lunar ') . $translated;
+    }
+    return $item;
+}
+
+/** @return array<string,mixed> */
+function astronomyEclipsePortableLocalContract(string $subtype, array $local, string $globalType): array
+{
+    $visibleContacts = array_values(array_filter($local['visibleContacts'] ?? [], 'is_string'));
+    if ($subtype === 'solar_eclipse') {
+        $visibility = ($local['visible'] ?? false) === true
+            ? (string) ($local['localClassification'] ?? 'partial')
+            : 'not_visible';
+        $body = 'sun';
+    } else {
+        $visibleSet = array_fill_keys($visibleContacts, true);
+        $globalType = strtolower(trim($globalType));
+        $visibility = match (true) {
+            $visibleContacts === [] => 'not_visible',
+            isset($visibleSet['U2']) || isset($visibleSet['U3']) || ($globalType === 'total' && isset($visibleSet['MAX'])) => 'visible_total',
+            isset($visibleSet['U1']) || isset($visibleSet['U4']) || (in_array($globalType, ['partial', 'total'], true) && isset($visibleSet['MAX'])) => 'visible_partial',
+            default => 'visible_penumbral_only',
+        };
+        $body = 'moon';
+    }
+    $interval = is_array($local['visibleInterval'] ?? null) ? $local['visibleInterval'] : [];
+    $contacts = [];
+    foreach ((is_array($local['contacts'] ?? null) ? $local['contacts'] : []) as $contact) {
+        if (!is_array($contact)) {
+            continue;
+        }
+        $contacts[] = [
+            'code' => (string) ($contact['code'] ?? ''),
+            'datetime' => $contact['local'] ?? $contact['utc'] ?? null,
+            $body => [
+                'altitude_degrees' => $contact['altitude_degrees'] ?? null,
+                'azimuth_degrees' => $contact['azimuth_degrees'] ?? null,
+                'above_horizon' => ($contact['visible'] ?? false) === true,
+            ],
+        ];
+    }
+    $result = [
+        'timezone' => (string) ($local['timezone'] ?? ''),
+        'visibility_classification' => $visibility,
+        'visible_contact_codes' => $visibleContacts,
+        'first_visible_instant' => $interval['start'] ?? null,
+        'last_visible_instant' => $interval['end'] ?? null,
+        'contacts' => $contacts,
+    ];
+    if ($subtype === 'solar_eclipse') {
+        $result += [
+            'max_magnitude' => $local['localMagnitude'] ?? 0.0,
+            'max_obscuration' => $local['obscuration'] ?? 0.0,
+            'sunrise_during_eclipse' => $local['sunrise'] ?? null,
+            'sunset_during_eclipse' => $local['sunset'] ?? null,
+        ];
+    } else {
+        $result += [
+            'moonrise_during_eclipse' => $local['moonrise'] ?? null,
+            'moonset_during_eclipse' => $local['moonset'] ?? null,
+        ];
+    }
+    return $result;
 }
 
 /** @return array<string,mixed> */
@@ -563,10 +889,13 @@ function astronomyLunarEventsFromPhp(
     DateTimeImmutable $startUtc,
     DateTimeImmutable $endUtc,
     float $latitude,
-    float $longitude
+    float $longitude,
+    array $eventGroups
 ): array {
     static $cache = [];
-    $key = implode('|', [$startUtc->format('U.u'), $endUtc->format('U.u'), $latitude, $longitude]);
+    $eventGroups = array_values(array_unique($eventGroups));
+    sort($eventGroups);
+    $key = implode('|', [$startUtc->format('U.u'), $endUtc->format('U.u'), $latitude, $longitude, implode(',', $eventGroups)]);
     if (isset($cache[$key])) {
         return $cache[$key];
     }
@@ -576,7 +905,7 @@ function astronomyLunarEventsFromPhp(
     }
     require_once $autoload;
     $calculator = new AstronomyEngine\LunarEventCalculator(new AstronomyEngine\MeeusLunarCalculator());
-    return $cache[$key] = $calculator->calculate($startUtc, $endUtc, $latitude, $longitude);
+    return $cache[$key] = $calculator->calculate($startUtc, $endUtc, $latitude, $longitude, $eventGroups);
 }
 
 function astronomyEventsRecordDiagnostic(string $context, array $diagnostic): void

@@ -1,13 +1,20 @@
 # Estado actual verificado
 
-Fecha de revisión documental: 2026-08-01.
+Fecha de revisión documental: 2026-08-03.
 
 ## Implementado en el árbol web
 
 - nueve vistas públicas: Inicio, Esta noche, Sol y Luna, Planificador, Eventos, Eclipses, Ubicación, Galería y Acerca;
 - navegación centralizada; Galería está temporalmente fuera del menú y Eclipses fuera del swipe;
 - ubicación global persistida en cookies y fallback Buenos Aires;
-- consumo server-side de FastAPI, proxies de imagen lunar, perfiles y direcciones;
+- motor PHP portable y API FastAPI seleccionables como fuente primaria de cálculos generales, con fallback simétrico;
+- eventos configurables por grupo con `api`, `database`, `php`, `auto` y `compare`, y cobertura MariaDB 1900–2050;
+- eclipses API/DB/PHP normalizados, con enriquecimiento local PHP para eventos globales de MariaDB;
+- `moon/image` seleccionable entre 404 PNG precalculados y API, con PNG pequeño final, orientación apparent por CSS y sin GD en runtime;
+- diagnóstico astronómico común para API, PHP, MariaDB y colección estática, con fuente solicitada/usada, fallback, tiempos comparables y tiempo PHP total de página;
+- selección interna de grupos lunares: cada consulta PHP calcula sólo fases, ápsides, nodos, libraciones o conjunciones solicitadas, conservando la caché exacta;
+- administración de fuentes generales y de eventos, con acciones globales no persistentes hasta guardar;
+- panel administrativo con nombres alineados al menú y favicon compartido con la web pública;
 - tarjeta nocturna resumida y página detallada con planetas, Luna, estrellas y cúmulos;
 - eventos generales y vista específica de eclipses;
 - mapas mundiales locales desde `assets/images/eclipses/`, sin hotlink;

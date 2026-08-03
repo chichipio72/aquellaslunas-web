@@ -7,9 +7,9 @@ El motor recibe datos astronómicos y devuelve resultados. No depende de la
 interfaz del laboratorio, Docker, la API Python ni código de comparación o
 benchmark.
 
-Los contratos se incorporarán cálculo por cálculo. Cuando exista más de una
-implementación de un cálculo, compartirán el contrato específico de ese
-cálculo; no se crea todavía una interfaz general sin requisitos concretos.
+La web integra estos contratos mediante las fachadas portables y conserva la
+API Python sólo como fuente opcional o fallback. El paquete sigue desacoplado
+de esa integración y no accede a HTTP ni a bases de datos.
 
 `LunarEventCalculator` encuentra fases principales exactas (perfil `preciso`),
 perigeos, apogeos, pasos por nodos, extremos de libración y conjunciones
@@ -18,24 +18,29 @@ formulación óptica y física de Meeus capítulo 53; las conjunciones combinan
 elementos planetarios aproximados publicados por JPL con el catálogo
 Hipparcos/SIMBAD utilizado por la referencia.
 
+`calculate()` acepta opcionalmente una lista de grupos: `moon_phase`,
+`lunar_apsis`, `lunar_orbit`, `lunar_libration` y `lunar_conjunction`. Cuando se
+indica, ejecuta sólo los algoritmos correspondientes; varias entradas calculan
+únicamente esa combinación. Omitir el argumento conserva el comportamiento
+histórico de calcular todos los grupos. Esta selección no modifica algoritmos,
+resultados ni perfiles de precisión.
+
 `LunarEclipseCalculator` añade eclipses lunares globales mediante geometría
 dinámica de sombra y una serie completa de Meeus capítulo 47 aislada en
 `MeeusEclipsePositionCalculator`. La batería comparativa 2025–2030 cubre los
-14 eventos de referencia y coincide en sus clasificaciones. No incluye
-eclipses solares ni circunstancias locales.
+14 eventos de referencia y coincide en sus clasificaciones; las circunstancias
+del observador se resuelven por separado con el calculador local.
 
 `SolarEclipseCalculator` detecta y clasifica eclipses solares globales con el
 método analítico de Meeus capítulo 54. Devuelve máximo, `gamma`, `u`, magnitud
-parcial y geometría auxiliar. No calcula circunstancias locales, mapas ni
-contactos globales distintos de MAX; el bloque permanece pendiente de la
-validación manual de intervalos del laboratorio.
+parcial y geometría auxiliar. Las circunstancias locales se calculan con la
+clase específica; los mapas mundiales no pertenecen al motor portable.
 
 `LunarEclipseLocalCalculator` y `SolarEclipseLocalCalculator` añaden
 circunstancias para un `EclipseObserver`. El bloque lunar evalúa individualmente
 los contactos globales y cruces de horizonte; el solar resuelve discos
 aparentes topocéntricos, C1–C4, clase, magnitud y cobertura local. Este bloque
-permanece pendiente de validación manual y no está declarado listo para
-producto.
+está validado e integrado en la fachada de eventos usada por la web.
 
 El subnamespace `AstronomyEngine\Facade` contiene compositores portables para
 los contratos conceptuales `daily`, `range`, `directions`, `moonInstant`,
@@ -61,6 +66,11 @@ fija, por hemisferio o aparente local, sombreado configurable y caché de
 archivos. Reutiliza los calculadores existentes para la orientación aparente.
 El contrato está documentado en
 [`../docs/php-moon-image.md`](../docs/php-moon-image.md).
+
+La integración productiva no invoca este renderer en runtime: sirve una
+colección precalculada de 404 PNG y aplica la orientación aparente mediante
+`MoonBrightLimbCalculator` y rotación CSS. Por lo tanto GD no es un requisito
+del runtime de producción de la web.
 
 `TonightCalculator` compone posiciones solares, lunares, planetarias y de un
 catálogo fijo para producir ventanas observables entre mediodías, con los

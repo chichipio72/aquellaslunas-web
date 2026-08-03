@@ -6,6 +6,7 @@ require_once __DIR__ . '/../includes/store-admin-auth.php';
 require_once __DIR__ . '/../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../includes/web-push.php';
 require_once __DIR__ . '/../includes/asset-url.php';
+require_once __DIR__ . '/../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -99,6 +100,7 @@ $activeRows = array_values(array_filter($rows, static fn(array $row): bool => (i
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Notificaciones de prueba · Aquellas Lunas</title>
+    <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= pushAdminHtml('../' . versionedAssetUrl('assets/css/styles.css')) ?>">
     <?php if ($publicConfig !== null): ?><script src="<?= pushAdminHtml('../' . versionedAssetUrl('assets/js/push-notifications.js')) ?>" defer></script><?php endif; ?>
 </head>

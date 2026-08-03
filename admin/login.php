@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/store-admin-auth.php';
 require_once __DIR__ . '/../includes/asset-url.php';
+require_once __DIR__ . '/../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -32,6 +33,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive"><title>Administración · Aquellas Lunas</title>
+    <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars('../' . versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body class="store-admin"><main class="store-admin-login"><section class="card store-admin-panel">

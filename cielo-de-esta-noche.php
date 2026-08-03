@@ -27,10 +27,8 @@ $tonightEvents = [];
 $apiErrorMessage = null;
 
 try {
-    $apiConfig = loadAstronomyApiConfig();
-    error_log('Aquellas Lunas API configuration source: ' . $apiConfig['source']);
     $tonightData = astronomyTonightRequest(
-        $apiConfig['base_url'],
+        null,
         $location,
         $date,
         'full',
@@ -45,7 +43,7 @@ try {
         if (($nightEnd !== null && $nightEnd < $now) || ($nightStart !== null && $date < $now->format('Y-m-d') && $nightStart > $now)) {
             $date = $now->format('Y-m-d');
             $tonightData = astronomyTonightRequest(
-                $apiConfig['base_url'],
+                null,
                 $location,
                 $date,
                 'full',
@@ -71,7 +69,7 @@ try {
     }
 } catch (RuntimeException $exception) {
     $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';
-    error_log('Aquellas Lunas API configuration error: ' . $exception->getMessage());
+    error_log('Aquellas Lunas tonight astronomy error: ' . $exception->getMessage());
 }
 
 $sections = $tonightData !== null ? astronomyTonightPreparedSections($tonightData, $now, $timezoneName) : [];

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/store-admin-auth.php';
 require_once __DIR__ . '/../../includes/store-admin-navigation.php';
 require_once __DIR__ . '/../../includes/event-type-configuration.php';
 require_once __DIR__ . '/../../includes/asset-url.php';
+require_once __DIR__ . '/../../includes/favicon-links.php';
 
 sendStoreAdminHeaders();
 startStoreAdminSession();
@@ -81,11 +82,12 @@ $surfaces = astronomyEventSurfaceCatalog();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Presentación del sitio · Aquellas Lunas</title>
+    <?php renderFaviconLinks('../../'); ?>
     <link rel="stylesheet" href="<?= eventAdminHtml('../../' . versionedAssetUrl('assets/css/styles.css')) ?>">
     <link rel="stylesheet" href="<?= eventAdminHtml('../../' . versionedAssetUrl('assets/css/admin-presentation.css')) ?>">
 </head>
 <body class="store-admin">
-<?php renderStoreAdminNavigation('presentation', 'Presentación del sitio'); ?>
+<?php renderStoreAdminNavigation('presentation', 'Visibilidad de eventos'); ?>
 <main class="store-admin-main presentation-admin">
     <section class="card presentation-admin__intro">
         <p class="eyebrow">PRESENTACIÓN EDITORIAL</p>

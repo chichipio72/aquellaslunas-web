@@ -31,9 +31,9 @@ entorno.
 ASTRONOMY_API_BASE_URL=http://host.docker.internal:18000
 ```
 
-`extra_hosts: host.docker.internal:host-gateway` permite alcanzar desde el contenedor la API ejecutada en el host. PHP, no JavaScript, consulta `/v1/astronomy/daily`, `/v1/moon/instant`, `/v1/astronomy/range` y `/v1/astronomy/events`. `moon-image.php` actúa como proxy server-side para `/v1/moon/image`. El navegador nunca llama directamente a la API.
+`extra_hosts: host.docker.internal:host-gateway` permite alcanzar desde el contenedor la API opcional ejecutada en el host. PHP, no JavaScript, la consulta únicamente cuando una fuente está configurada en `api` o cuando se activa un fallback técnico. Los cálculos generales usan como primaria la fuente elegida en administración y la otra como fallback; `moon-image.php` hace lo mismo entre la colección de 404 PNG grandes y `/v1/moon/image`, conservando el PNG pequeño como último recurso. El navegador nunca llama directamente a la API.
 
-La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-profile.php`. Este proxy del mismo origen valida ubicación, fecha y zona horaria antes de consultar `/v1/astronomy/altitude-profile`; una falla de un perfil no impide cargar el otro. `ALTITUDE_PROFILE_INTERVAL_MINUTES` configura ambos perfiles, admite valores de 5 a 60 y usa 15 de forma predeterminada.
+La portada solicita sus perfiles del Sol y la Luna por separado a `altitude-profile.php`. Este endpoint del mismo origen valida ubicación, fecha y zona horaria, usa API o PHP según administración y conserva la otra como fallback; una falla de un perfil no impide cargar el otro. `ALTITUDE_PROFILE_INTERVAL_MINUTES` configura ambos perfiles, admite valores de 5 a 60 y usa 15 de forma predeterminada.
 
 Superluna y la anticipación de salida lunar se prueban con los valores efectivos de `/admin/presentacion/reglas.php`: defaults del catálogo PHP más overrides opcionales en `WEB_DB`. Las variables históricas homónimas pueden seguir existiendo en el entorno, pero no son la fuente operativa de estas reglas.
 
@@ -273,7 +273,7 @@ docker compose exec -T web bash tests/store-admin-http.sh
 
 La prueba PHP administrativa usa credenciales efímeras y una transacción revertida para login, sesión, CSRF, logout, disponibilidad, precios y metadatos editoriales completos, parciales, vacíos y excesivos. La prueba de extremos valida catálogo, rangos y consultas reales con `LAG()`/`LEAD()`. La prueba HTTP verifica redirecciones, panel, ambos modos del laboratorio, formularios administrativos, cabeceras privadas, logout sólo por POST y bloqueo de archivos internos.
 
-Los nombres de portada son `moon instant`, `daily`, `home phases` y `home upcoming`. Como referencia no contractual, se observaron localmente unos 57 ms para `daily`, 90 ms para fases y 288 ms para próximos eventos. No dejar habilitado el diagnóstico en producción salvo durante una comprobación puntual.
+Los contextos de portada incluyen `moon instant`, `daily`, `home v2 phases` y los tramos `home v2 upcoming 1-7`, `8-14` y `15-30`. El diagnóstico ahora separa fuente solicitada/usada, `Fuente ms`, tiempo total, fallback y resultados; API agrega HTTP/cURL/JSON/`Server-Timing`. Como referencia no contractual, después de seleccionar grupos dentro de `LunarEventCalculator`, las 11 fases de portada tardaron 0,5 ms en cálculo aislado y aproximadamente 1,7 ms desde la página; los tramos 1-7 y 8-14 quedaron alrededor de 0,2 ms de cálculo. No dejar habilitado el diagnóstico en producción salvo para la sesión admin que realiza una comprobación puntual.
 
 ### Reloj simulado
 
