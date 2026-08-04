@@ -44,3 +44,6 @@ Desktop.ini
 .vscode/
 web-produccion.zip
 /vendor/
+
+explorador/benchmarks/results/*
+!explorador/benchmarks/results/.gitkeep
