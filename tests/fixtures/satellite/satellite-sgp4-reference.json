@@ -1,0 +1,77 @@
+{
+  "schema": "satellite-sgp4-reference-v1",
+  "description": "Fixed offline TEME and WGS84 topocentric reference values generated with the project's current Skyfield/SGP4 stack.",
+  "conventions": {
+    "gravity_model": "WGS72",
+    "teme_position_units": "km",
+    "teme_velocity_units": "km/s",
+    "geocentric_distance_definition": "Euclidean norm of TEME position",
+    "longitude_positive": "east",
+    "azimuth_origin": "north",
+    "azimuth_direction": "eastward",
+    "altaz_refraction": "none",
+    "time_input": "UTC Julian date as used by Skyfield EarthSatellite"
+  },
+  "runtime": {"python": "3.14.6", "sgp4": "2.25", "skyfield": "1.54"},
+  "observer": {"latitude_degrees": -34.6037, "longitude_degrees": -58.3816, "elevation_m": 0.0},
+  "satellites": [
+    {
+      "id": "iss", "name": "ISS (ZARYA)",
+      "tle": {
+        "name": "ISS (ZARYA)",
+        "line1": "1 25544U 98067A   26206.44322024  .00008631  00000+0  16367-3 0  9990",
+        "line2": "2 25544  51.6316 110.7757 0006908 336.1751  23.8916 15.49160253577689"
+      },
+      "epoch_utc": "2026-07-25T10:38:14.228729Z",
+      "states": [
+        {
+          "timestamp_utc": "2026-07-25T12:00:00.000000Z", "sgp4_error_code": 0, "sgp4_error_message": null,
+          "teme_position_km": [969.0980183410917, 5654.448783758318, -3644.628254245089],
+          "teme_velocity_km_s": [-5.081626487758627, 3.6909622625368597, 4.383251659202266],
+          "geocentric_distance_km": 6796.709286775487,
+          "topocentric_altitude_degrees": 9.266474918695506,
+          "topocentric_azimuth_degrees": 85.49248223457383,
+          "observer_distance_km": 1552.7803505159407
+        },
+        {
+          "timestamp_utc": "2026-07-26T08:25:00.000000Z", "sgp4_error_code": 0, "sgp4_error_message": null,
+          "teme_position_km": [-3405.210334177035, 5450.610286388887, 2196.7492684986514],
+          "teme_velocity_km_s": [-3.269931708582953, -4.254497911906361, 5.475282811118607],
+          "geocentric_distance_km": 6791.930304613246,
+          "topocentric_altitude_degrees": -57.28661705730572,
+          "topocentric_azimuth_degrees": 84.93222967074544,
+          "observer_distance_km": 11213.233930580276
+        }
+      ]
+    },
+    {
+      "id": "tiangong", "name": "CSS (TIANHE)",
+      "tle": {
+        "name": "CSS (TIANHE)",
+        "line1": "1 48274U 21035A   26205.70067244  .00011455  00000+0  15064-3 0  9995",
+        "line2": "2 48274  41.4690  94.2105 0001495 308.5106  51.5598 15.58352000299028"
+      },
+      "epoch_utc": "2026-07-24T16:48:58.098846Z",
+      "states": [
+        {
+          "timestamp_utc": "2026-07-25T12:00:00.000000Z", "sgp4_error_code": 0, "sgp4_error_message": null,
+          "teme_position_km": [-929.9329108859666, -6663.1650338829195, 755.6783669429906],
+          "teme_velocity_km_s": [5.652772796821035, -1.3628623601216814, -5.012410702181639],
+          "geocentric_distance_km": 6770.051202300795,
+          "topocentric_altitude_degrees": -73.24057177231228,
+          "topocentric_azimuth_degrees": 213.17555186231144,
+          "observer_distance_km": 12625.939062875457
+        },
+        {
+          "timestamp_utc": "2026-07-26T08:25:00.000000Z", "sgp4_error_code": 0, "sgp4_error_message": null,
+          "teme_position_km": [5037.548048384029, -634.1995189609419, -4482.605622918016],
+          "teme_velocity_km_s": [0.8769680905842693, 7.618071483059935, -0.09098409853631724],
+          "geocentric_distance_km": 6772.9500618448565,
+          "topocentric_altitude_degrees": 3.663120373689885,
+          "topocentric_azimuth_degrees": 239.33334360173023,
+          "observer_distance_km": 1934.8853153483365
+        }
+      ]
+    }
+  ]
+}

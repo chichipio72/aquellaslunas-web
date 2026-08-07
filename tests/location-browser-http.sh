@@ -29,7 +29,7 @@ curl -sS \
     --data-urlencode 'location_name=Vicente López' \
     --data-urlencode 'latitude=-34.525' \
     --data-urlencode 'longitude=-58.473' \
-    --data-urlencode 'timezone=America/Argentina/Buenos_Aires' \
+    --data-urlencode 'elevation_meters=18' \
     "$base_url/ubicacion.php"
 grep -Eqi '^Set-Cookie: astro_location_confirmed=1;.*Max-Age=34560000' "$work_dir/manual-headers"
 curl -sS -b "$work_dir/manual-cookies" -o "$work_dir/manual-home" "$base_url/index.php"
@@ -46,13 +46,14 @@ curl -sS \
     --data-urlencode 'location_name=Boulogne Sur Mer' \
     --data-urlencode 'latitude=-34.4990' \
     --data-urlencode 'longitude=-58.5751' \
-    --data-urlencode 'timezone=America/Buenos_Aires' \
+    --data-urlencode 'elevation_meters=21' \
     "$base_url/ubicacion.php"
 
 grep -Eqi '^HTTP/[0-9.]+ 303' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_location_mode=geolocation;' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_latitude=-34\.499;' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_longitude=-58\.5751;' "$work_dir/headers"
+grep -Eqi '^Set-Cookie: astro_elevation=21;' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_timezone=America%2FArgentina%2FBuenos_Aires;' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_location_name=[^;]+;' "$work_dir/headers"
 grep -Eqi '^Set-Cookie: astro_location_confirmed=1;.*Max-Age=34560000' "$work_dir/headers"
@@ -72,7 +73,7 @@ curl -sS \
     --data-urlencode 'location_name=Buenos Aires' \
     --data-urlencode 'latitude=-34.53' \
     --data-urlencode 'longitude=-58.48' \
-    --data-urlencode 'timezone=America/Argentina/Buenos_Aires' \
+    --data-urlencode 'elevation_meters=0' \
     --data-urlencode 'return_to=/index.php' \
     "$base_url/ubicacion.php"
 grep -Eqi '^Location: /index\.php' "$work_dir/default-headers"
@@ -80,6 +81,16 @@ grep -Eqi '^Set-Cookie: astro_location_confirmed=1;.*Max-Age=34560000' "$work_di
 curl -sS -b "$work_dir/default-cookies" -o "$work_dir/default-home" "$base_url/index.php"
 ! grep -Fq 'data-location-intro' "$work_dir/default-home"
 ! grep -Fq 'ubicación inicial' "$work_dir/default-home"
+
+# El servidor corrige cookies antiguas aunque sus coordenadas y timezone discrepen.
+curl -sS \
+    -D "$work_dir/legacy-headers" \
+    -o "$work_dir/legacy-body" \
+    -H 'Cookie: astro_latitude=37.8846; astro_longitude=-4.7760; astro_timezone=America%2FArgentina%2FBuenos_Aires; astro_location_mode=manual; astro_location_name=Cordoba; astro_location_confirmed=1' \
+    "$base_url/index.php"
+grep -Eqi '^Set-Cookie: astro_timezone=Europe%2FMadrid;' "$work_dir/legacy-headers"
+grep -Eqi '^Set-Cookie: astro_elevation=0;' "$work_dir/legacy-headers"
+grep -Eqi '^Set-Cookie: astro_location_version=2;' "$work_dir/legacy-headers"
 
 # Cookies inválidas vuelven al estado inicial, se limpian y no generan warnings.
 curl -sS \

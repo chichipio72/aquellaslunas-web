@@ -36,6 +36,10 @@ check(in_array('moonrise_time', $plan['required'], true), 'No se incluyó el cam
 $cases = [
     'moon_illumination' => 'moon_instant',
     'sun_altitude' => 'sun_instant',
+    'sun_distance_km' => 'sun_instant',
+    'sun_equation_of_time_minutes' => 'sun_instant',
+    'sun_moon_angular_distance' => 'moon_instant',
+    'moon_apparent_diameter_arcmin' => 'moon_instant',
     'moonrise_time' => 'moon_events',
     'sunrise_time' => 'sun_events',
     'sunrise_daily_difference' => 'sun_events',

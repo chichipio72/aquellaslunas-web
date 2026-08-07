@@ -234,7 +234,7 @@ $events = array_values(array_filter($eventsData['items'] ?? [], static function 
 }));
 $events = astronomyFilterEventsForSurface($events, ASTRONOMY_EVENT_SURFACE_TODAY);
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
-$pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la Luna, el Sol, la luz y las condiciones del cielo para una fecha y ubicación.', '/cielo-de-hoy.php', 'article');
+$pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la Luna, el Sol, la luz y las condiciones del cielo para una fecha y ubicación.', '/cielo-de-hoy.php', 'webpage');
 ?>
 <!doctype html>
 <html lang="es">

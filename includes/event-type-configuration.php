@@ -203,14 +203,28 @@ function astronomyEventTypeConfigLoad(?callable $connectionFactory = null): arra
     $state = ['loaded' => true, 'available' => false, 'rows' => [], 'error_reported' => $cache['error_reported']];
     try {
         $connection = $connectionFactory !== null ? $connectionFactory() : getWebDatabaseConnection();
-        $types = $connection->query(
-            'SELECT id,scope,event_group,event_type,public_type,public_subtype,category_key,nombre_amigable,habilitado,relevante_esta_noche,renderer_key '
-            . 'FROM admin_tipos_eventos ORDER BY id'
+        $joinedRows = $connection->query(
+            'SELECT t.id,t.scope,t.event_group,t.event_type,t.public_type,t.public_subtype,t.category_key,'
+            . 't.nombre_amigable,t.habilitado,t.relevante_esta_noche,t.renderer_key,'
+            . 's.superficie,s.posicion AS superficie_posicion '
+            . 'FROM admin_tipos_eventos t '
+            . 'LEFT JOIN admin_tipos_eventos_superficies s ON s.tipo_evento_id=t.id '
+            . 'ORDER BY t.id,s.posicion,s.superficie'
         )->fetchAll();
-        $surfaceStatement = $connection->prepare('SELECT superficie,posicion FROM admin_tipos_eventos_superficies WHERE tipo_evento_id=:id ORDER BY posicion,superficie');
+        $types = [];
+        foreach ($joinedRows as $joinedRow) {
+            $id = (int) ($joinedRow['id'] ?? 0);
+            if (!isset($types[$id])) {
+                $row = $joinedRow;
+                unset($row['superficie'], $row['superficie_posicion']);
+                $row['surfaces'] = [];
+                $types[$id] = $row;
+            }
+            if (is_string($joinedRow['superficie'] ?? null) && $joinedRow['superficie'] !== '') {
+                $types[$id]['surfaces'][] = $joinedRow['superficie'];
+            }
+        }
         foreach ($types as $row) {
-            $surfaceStatement->execute(['id' => (int) $row['id']]);
-            $row['surfaces'] = array_column($surfaceStatement->fetchAll(), 'superficie');
             if ($row['relevante_esta_noche'] === null) {
                 $fallback = astronomyEventTypeCatalog()[$row['scope'] . '/' . $row['event_group'] . '/' . $row['event_type']] ?? null;
                 $row['relevantTonight'] = ($fallback['relevantTonight'] ?? false) === true;

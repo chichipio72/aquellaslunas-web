@@ -23,6 +23,7 @@ tmp/
 
 # Cache and local tool output
 .cache/
+/astronomy-engine/cache/
 coverage/
 .phpunit.result.cache
 __pycache__/

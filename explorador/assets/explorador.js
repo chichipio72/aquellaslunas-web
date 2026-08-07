@@ -90,6 +90,10 @@
 
     const metric = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
     const number = (value, digits = 1) => Number(value).toLocaleString('es-AR', {maximumFractionDigits: digits});
+    const roundedAxisDigits = {solar_distance: 0, equation_of_time: 0,
+        angular_separation: 0, lunar_angular_diameter: 1};
+    const roundedAxisStep = {solar_distance: 1000, equation_of_time: 1,
+        angular_separation: 1, lunar_angular_diameter: 0.1};
     const localTime = value => {
         if (value === null || value === undefined) return '—';
         let minutes = Math.round(Number(value) * 60);
@@ -504,7 +508,11 @@
             nameRotate: index % 2 ? -90 : 90,
             scale: true,
             ...(group === 'local_time' ? {min: 0, max: 24, interval: 4} : {}),
-            axisLabel: {color: '#9eabc0', formatter: group === 'local_time' ? localTimeAxis : undefined},
+            ...(roundedAxisStep[group] !== undefined ? {minInterval: roundedAxisStep[group]} : {}),
+            axisLabel: {color: '#9eabc0', formatter: group === 'local_time'
+                ? localTimeAxis
+                : (roundedAxisDigits[group] !== undefined
+                    ? value => number(value, roundedAxisDigits[group]) : undefined)},
             nameTextStyle: {color: '#9eabc0'},
             splitLine: {show: index === 0, lineStyle: {color: '#252f43'}},
         }));
@@ -777,7 +785,8 @@
 
     function canonicalShareUrl() {
         const visible = visibleShareConfiguration();
-        const url = shareTools.build(visible, `${window.location.origin}${window.location.pathname}`);
+        const sharePath = document.body.dataset.explorerSharePath || window.location.pathname;
+        const url = shareTools.build(visible, new URL(sharePath, window.location.origin).toString());
         const checked = shareTools.parse(new URL(url).search, shareSchema, safeDefaults());
         return checked.valid ? {url, warning: ''} : {url: '', warning: checked.warnings.join(' ')};
     }

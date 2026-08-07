@@ -63,6 +63,20 @@ try {
     webPushAssert(!str_contains($clientScript, 'WEB_PUSH_VAPID_PRIVATE_KEY'), 'El frontend referencia la clave privada.');
     webPushAssert(is_string($workerScript) && str_contains($workerScript, "addEventListener('push'"), 'El service worker no atiende push.');
     webPushAssert(str_contains($workerScript, "addEventListener('notificationclick'"), 'El service worker no atiende el clic.');
+    webPushAssert(str_contains($workerScript, 'new URL(path, self.registration.scope).href'),
+        'Los recursos de notificación no se resuelven desde el scope local o /astro/.');
+    webPushAssert(str_contains($workerScript, "icon: notificationAssetUrl('assets/images/favicon/icon-192.png')"),
+        'La notificación no declara el icono principal de Aquellas Lunas.');
+    webPushAssert(str_contains($workerScript, "badge: notificationAssetUrl('assets/images/favicon/badge-96.png')"),
+        'La notificación no declara el badge monocromo.');
+    $badge = file_get_contents(__DIR__ . '/../assets/images/favicon/badge-96.png');
+    webPushAssert(is_string($badge) && substr($badge, 1, 3) === 'PNG'
+        && unpack('Nwidth/Nheight', substr($badge, 16, 8)) === ['width' => 96, 'height' => 96],
+        'El badge no es un PNG válido de 96×96.');
+    $manifest = json_decode((string) file_get_contents(__DIR__ . '/../manifest.webmanifest'), true);
+    webPushAssert(is_array($manifest) && in_array([
+        'src' => 'assets/images/favicon/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png',
+    ], $manifest['icons'] ?? [], true), 'El manifiesto no conserva el icono 192×192 adecuado.');
     webPushAssert(!str_contains($workerScript, 'caches.'), 'El service worker introdujo caché fuera del alcance.');
     $homeSource = file_get_contents(__DIR__ . '/../index.php');
     webPushAssert(is_string($homeSource) && !str_contains($homeSource, 'data-push-notifications'), 'La portada todavía contiene el bloque de suscripción.');

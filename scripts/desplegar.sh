@@ -7,6 +7,17 @@ readonly FTP_HOST='set.servidoraweb.net'
 readonly FTP_PORT='21'
 readonly FTP_USER='andres@aquellaslunas.com.ar'
 readonly ROOT_ROBOTS_REMOTE_PATH='robots.txt'
+readonly -a DEPLOY_EXPLICIT_FILES=(
+    'scripts/run-scheduled-tasks.php'
+    'scripts/migrations/registry.php'
+    'scripts/migrations/web-push-astronomy-config.sql'
+    'scripts/migrations/create-web-push-astronomy-config.php'
+    'scripts/migrations/web-push-notification-types.sql'
+    'scripts/migrations/create-web-push-notification-types.php'
+    'scripts/migrations/astronomy-request-log.sql'
+    'scripts/migrations/create-astronomy-request-log.php'
+    'scripts/cleanup-astronomy-request-log.php'
+)
 
 usage() {
     printf 'Uso: %s [--dry-run] [--list-local] [--include-vendor]\n' "$0" >&2
@@ -44,6 +55,7 @@ DEPLOY_EXCLUDE_PATTERNS=(
     '^tests(/|$)'
     '(^|/)local-tools(/|$)'
     '^storage(/|$)'
+    '^explorador/benchmarks/results(/|$)'
     '(^|/)Dockerfile[^/]*$'
     '^docker-compose\.yml$'
     '^\.(dockerignore|gitignore)$'
@@ -76,7 +88,13 @@ readonly -a DEPLOY_EXCLUDE_PATTERNS
 
 deployment_path_is_excluded() {
     local relative_path="$1"
+    local included_path
     local pattern
+    for included_path in "${DEPLOY_EXPLICIT_FILES[@]}"; do
+        if [[ "$relative_path" == "$included_path" ]]; then
+            return 1
+        fi
+    done
     for pattern in "${DEPLOY_EXCLUDE_PATTERNS[@]}"; do
         if [[ "$relative_path" =~ $pattern ]]; then
             return 0
@@ -125,7 +143,7 @@ set ftp:ssl-protect-data true
 set ssl:verify-certificate true
 set ssl:check-hostname true
 open --env-password -u "${ASTRONOMY_ROOT_FTP_USER}" -p ${FTP_PORT} ftp://${FTP_HOST}
-put --verbose "${local_root}/robots.txt" -o "${ROOT_ROBOTS_REMOTE_PATH}"
+put "${local_root}/robots.txt" -o "${ROOT_ROBOTS_REMOTE_PATH}"
 bye
 LFTP_ROOT_COMMANDS
         export LFTP_PASSWORD="$ASTRONOMY_FTP_PASSWORD"
@@ -150,3 +168,30 @@ open --env-password -u "${FTP_USER}" -p ${FTP_PORT} ftp://${FTP_HOST}
 mirror --reverse ${dry_run_option} --verbose ${mirror_excludes} "${local_root}/" ./
 bye
 LFTP_COMMANDS
+
+if [[ -n "$dry_run_option" ]]; then
+    for relative_path in "${DEPLOY_EXPLICIT_FILES[@]}"; do
+        printf 'DRY RUN: se publicaría explícitamente %s.\n' "$relative_path"
+    done
+else
+    lftp <<LFTP_MIGRATION_COMMANDS
+set cmd:fail-exit yes
+set ftp:ssl-force true
+set ftp:ssl-auth TLS
+set ftp:ssl-protect-data true
+set ssl:verify-certificate true
+set ssl:check-hostname true
+open --env-password -u "${FTP_USER}" -p ${FTP_PORT} ftp://${FTP_HOST}
+cd scripts/migrations || mkdir -p scripts/migrations
+put "${local_root}/scripts/migrations/web-push-astronomy-config.sql" -o "/scripts/migrations/web-push-astronomy-config.sql"
+put "${local_root}/scripts/migrations/create-web-push-astronomy-config.php" -o "/scripts/migrations/create-web-push-astronomy-config.php"
+put "${local_root}/scripts/migrations/web-push-notification-types.sql" -o "/scripts/migrations/web-push-notification-types.sql"
+put "${local_root}/scripts/migrations/create-web-push-notification-types.php" -o "/scripts/migrations/create-web-push-notification-types.php"
+put "${local_root}/scripts/migrations/astronomy-request-log.sql" -o "/scripts/migrations/astronomy-request-log.sql"
+put "${local_root}/scripts/migrations/create-astronomy-request-log.php" -o "/scripts/migrations/create-astronomy-request-log.php"
+put "${local_root}/scripts/migrations/registry.php" -o "/scripts/migrations/registry.php"
+put "${local_root}/scripts/run-scheduled-tasks.php" -o "/scripts/run-scheduled-tasks.php"
+put "${local_root}/scripts/cleanup-astronomy-request-log.php" -o "/scripts/cleanup-astronomy-request-log.php"
+bye
+LFTP_MIGRATION_COMMANDS
+fi

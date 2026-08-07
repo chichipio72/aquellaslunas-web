@@ -9,7 +9,7 @@ require_once __DIR__ . '/includes/site-header.php';
 require_once __DIR__ . '/includes/site-footer.php';
 require_once __DIR__ . '/includes/contact.php';
 $aboutCurrentDateTime = get_current_datetime('America/Argentina/Buenos_Aires');
-$pageSeo = aquellasLunasSeoPage('Acerca de Aquellas Lunas', 'La historia y el propósito de Aquellas Lunas: acercar el cielo y sus fenómenos a todas las personas.', '/acerca-del-sitio.php', 'article');
+$pageSeo = aquellasLunasSeoPage('Acerca de Aquellas Lunas', 'La historia y el propósito de Aquellas Lunas: acercar el cielo y sus fenómenos a todas las personas.', '/acerca-del-sitio.php', 'webpage');
 ?>
 <!doctype html>
 <html lang="es">

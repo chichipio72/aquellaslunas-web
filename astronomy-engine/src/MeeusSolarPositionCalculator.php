@@ -17,6 +17,7 @@ use InvalidArgumentException;
 final class MeeusSolarPositionCalculator implements SolarPositionCalculator
 {
     private const EARTH_EQUATORIAL_RADIUS_METERS = 6_378_140.0;
+    private const SOLAR_RADIUS_KILOMETERS = 695_700.0;
 
     public function calculate(
         DateTimeImmutable $dateTime,
@@ -59,6 +60,16 @@ final class MeeusSolarPositionCalculator implements SolarPositionCalculator
         $obliquity = $meanObliquity + 0.00256 * cos(deg2rad($omega));
         $longitudeRadians = deg2rad($apparentLongitude);
         $obliquityRadians = deg2rad($obliquity);
+        $meanLongitudeRadians = deg2rad($meanLongitude);
+        $equationFactor = tan($obliquityRadians / 2.0) ** 2;
+        $equationOfTimeMinutes = 4.0 * rad2deg(
+            $equationFactor * sin(2.0 * $meanLongitudeRadians)
+            - 2.0 * $eccentricity * sin($anomalyRadians)
+            + 4.0 * $eccentricity * $equationFactor * sin($anomalyRadians)
+                * cos(2.0 * $meanLongitudeRadians)
+            - 0.5 * $equationFactor * $equationFactor * sin(4.0 * $meanLongitudeRadians)
+            - 1.25 * $eccentricity * $eccentricity * sin(2.0 * $anomalyRadians)
+        );
 
         $rightAscension = atan2(
             cos($obliquityRadians) * sin($longitudeRadians),
@@ -113,6 +124,12 @@ final class MeeusSolarPositionCalculator implements SolarPositionCalculator
         return new SolarPosition(
             altitudeDegrees: rad2deg($altitude),
             azimuthDegrees: $this->normalizeDegrees(rad2deg($azimuth) + 180.0),
+            earthSunDistanceAu: $earthSunDistanceAu,
+            apparentRadiusDegrees: rad2deg(asin(
+                self::SOLAR_RADIUS_KILOMETERS
+                / (SolarPosition::ASTRONOMICAL_UNIT_KILOMETERS * $earthSunDistanceAu)
+            )),
+            equationOfTimeMinutes: $equationOfTimeMinutes,
         );
     }
 

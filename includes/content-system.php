@@ -590,6 +590,7 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
                 $homeProfile['validación de artículos'] += (hrtime(true) - $profileStarted) / 1_000_000;
             }
             $article['source'] = 'mysql';
+            $article['metadata'] = is_array($loaded['metadata'] ?? null) ? $loaded['metadata'] : [];
             $catalog['articles'][$slug] = $article;
         }
     } catch (Throwable $exception) {
@@ -667,6 +668,108 @@ function astronomyLoadContentCatalogFromDatabase(?callable $connectionFactory = 
 function astronomyLoadContentCatalog(?callable $connectionFactory = null): array
 {
     return astronomyLoadContentCatalogFromDatabase($connectionFactory);
+}
+
+/**
+ * Carga exclusivamente las dos entidades que la portada puede publicar.
+ * Conserva la forma mínima del catálogo para reutilizar selección y render.
+ */
+function astronomyLoadHomeContentCatalog(
+    bool $triviaEnabled = true,
+    bool $factEnabled = true,
+    ?callable $connectionFactory = null
+): array {
+    $catalog = ['articles' => [], 'trivias' => [], 'facts' => [], 'diagnostics' => [], 'warnings' => []];
+    $profileEnabled = ($GLOBALS['home_page_profile_content_detail_enabled'] ?? false) === true;
+    $profile = ['conexión MySQL' => 0.0, 'consultas de portada' => 0.0, 'validación seleccionada' => 0.0];
+    $queryCount = 0;
+    if ((!isContentEnabled() && !astronomyContentAdminPreviewEnabled()) || (!$triviaEnabled && !$factEnabled)) {
+        return $catalog;
+    }
+    $connectionFactory ??= static fn(): PDO => getWebDatabaseConnection();
+    try {
+        $started = hrtime(true);
+        $connection = $connectionFactory();
+        $profile['conexión MySQL'] = (hrtime(true) - $started) / 1_000_000;
+        if (!$connection instanceof PDO) {
+            throw new RuntimeException('La conexión de contenidos no devolvió un objeto PDO válido.');
+        }
+
+        if ($triviaEnabled) {
+            $excluded = [];
+            while (true) {
+                $started = hrtime(true);
+                $row = astronomyContentDbRandomHomeTrivia($connection, $excluded);
+                $profile['consultas de portada'] += (hrtime(true) - $started) / 1_000_000;
+                $queryCount++;
+                if ($row === null) break;
+                $databaseId = (int) ($row['database_id'] ?? 0);
+                $excluded[] = $databaseId;
+                $started = hrtime(true);
+                $optionRows = astronomyContentDbHomeTriviaOptions($connection, $databaseId);
+                $profile['consultas de portada'] += (hrtime(true) - $started) / 1_000_000;
+                $queryCount++;
+                $options = [];
+                foreach ($optionRows as $optionRow) {
+                    $option = ['texto' => (string) ($optionRow['texto'] ?? '')];
+                    if ((int) ($optionRow['correcta'] ?? 0) === 1) {
+                        $option['explicacion'] = (string) ($optionRow['explicacion'] ?? '');
+                    }
+                    $options[] = $option;
+                }
+                $slug = (string) ($row['slug'] ?? '');
+                $started = hrtime(true);
+                $entry = astronomyContentValidateTrivia([
+                    'id' => (string) ($row['codigo'] ?? ''),
+                    'visible' => ((int) ($row['visible'] ?? 0)) === 1,
+                    'pregunta' => (string) ($row['pregunta'] ?? ''),
+                    'imagen' => astronomyContentDbNullableText($row['imagen'] ?? null),
+                    'opciones' => $options,
+                ], $slug, 0);
+                $profile['validación seleccionada'] += (hrtime(true) - $started) / 1_000_000;
+                if ($entry['valid'] === true && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1) {
+                    $catalog['trivias'][] = $entry;
+                    $catalog['articles'][$slug] = ['slug' => $slug, 'valid' => true, 'visible' => true];
+                    break;
+                }
+            }
+        }
+
+        if ($factEnabled) {
+            $excluded = [];
+            while (true) {
+                $started = hrtime(true);
+                $row = astronomyContentDbRandomHomeFact($connection, $excluded);
+                $profile['consultas de portada'] += (hrtime(true) - $started) / 1_000_000;
+                $queryCount++;
+                if ($row === null) break;
+                $slug = (string) ($row['slug'] ?? '');
+                $excluded[] = (int) ($row['database_id'] ?? 0);
+                $started = hrtime(true);
+                $entry = astronomyContentValidateFact([
+                    'id' => (string) ($row['codigo'] ?? ''),
+                    'visible' => ((int) ($row['visible'] ?? 0)) === 1,
+                    'titulo' => (string) ($row['frase'] ?? ''),
+                    'respuesta' => (string) ($row['detalle'] ?? ''),
+                    'imagen' => astronomyContentDbNullableText($row['imagen'] ?? null),
+                ], $slug, 0);
+                $profile['validación seleccionada'] += (hrtime(true) - $started) / 1_000_000;
+                if ($entry['valid'] === true && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) === 1) {
+                    $catalog['facts'][] = $entry;
+                    $catalog['articles'][$slug] = ['slug' => $slug, 'valid' => true, 'visible' => true];
+                    break;
+                }
+            }
+        }
+    } catch (Throwable $exception) {
+        error_log('Aquellas Lunas home content load error [mysql]: ' . $exception->getMessage());
+        $catalog['diagnostics'][] = ['type' => 'catalog', 'slug' => null, 'errors' => [astronomyContentError('mysql', 'No se pudieron cargar los contenidos en este momento.')]];
+    }
+    if ($profileEnabled) {
+        $GLOBALS['home_page_profile_content_detail'] = $profile;
+    }
+    $GLOBALS['home_content_query_count'] = $queryCount;
+    return $catalog;
 }
 
 function astronomyContentAdminPreviewEnabled(): bool
@@ -809,6 +912,78 @@ function astronomyContentArticleUrl(string $slug, string $anchor = ''): string
         'contenido.php?slug=' . rawurlencode($slug)
         . ($anchor !== '' ? '#' . rawurlencode($anchor) : '')
     );
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyContentRelatedArticles(array $catalog, array $article, int $limit = 3): array
+{
+    if ($limit < 1) {
+        return [];
+    }
+    $sourceSlug = (string) ($article['slug'] ?? '');
+    $relations = is_array($article['raw']['relaciones'] ?? null) ? $article['raw']['relaciones'] : [];
+    $related = [];
+    $seen = [];
+    foreach ($relations as $relatedSlug) {
+        $relatedSlug = trim((string) $relatedSlug);
+        if (
+            $relatedSlug === $sourceSlug
+            || isset($seen[$relatedSlug])
+            || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $relatedSlug) !== 1
+        ) {
+            continue;
+        }
+        $seen[$relatedSlug] = true;
+        $target = $catalog['articles'][$relatedSlug] ?? null;
+        if (
+            !is_array($target)
+            || ($target['valid'] ?? false) !== true
+            || ($target['visible'] ?? false) !== true
+        ) {
+            continue;
+        }
+        $related[] = $target;
+        if (count($related) >= $limit) {
+            break;
+        }
+    }
+    return $related;
+}
+
+function renderAstronomyContentIndexCard(array $article): void
+{
+    $raw = is_array($article['raw'] ?? null) ? $article['raw'] : [];
+    $articleUrl = astronomyContentArticleUrl((string) ($article['slug'] ?? ''));
+    ?>
+    <article class="card content-index-card<?= ($article['image']['url'] ?? null) !== null ? ' content-index-card--with-image' : '' ?>">
+        <?php if (($article['image']['url'] ?? null) !== null): ?>
+            <div class="content-index-card__media"><?= astronomyContentProtectedImageHtml(
+                $article['image'],
+                (string) ($raw['titulo'] ?? ''),
+                'content-index-card__image',
+                '--image-position-x: ' . ($article['image_position_x'] ?? 50) . '%; --image-position-y: ' . ($article['image_position_y'] ?? 50) . '%;'
+            ) ?></div>
+        <?php endif; ?>
+        <div class="content-index-card__body">
+            <h2><a class="content-card__title-link" href="<?= htmlspecialchars($articleUrl, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) ($raw['titulo'] ?? '')) ?></a></h2>
+            <p><?= htmlspecialchars((string) ($raw['resumen'] ?? '')) ?></p>
+            <a class="content-card__read-link" href="<?= htmlspecialchars($articleUrl, ENT_QUOTES, 'UTF-8') ?>">Leer artículo <span aria-hidden="true">→</span></a>
+        </div>
+    </article>
+    <?php
+}
+
+function renderAstronomyContentBreadcrumb(string $title): void
+{
+    ?>
+    <nav class="content-breadcrumb" aria-label="Ruta de navegación">
+        <ol>
+            <li><a href="<?= htmlspecialchars(astronomyInternalUrl('index.php'), ENT_QUOTES, 'UTF-8') ?>">Inicio</a></li>
+            <li><a href="<?= htmlspecialchars(astronomyInternalUrl('contenidos.php'), ENT_QUOTES, 'UTF-8') ?>">Contenidos</a></li>
+            <li aria-current="page"><?= htmlspecialchars($title) ?></li>
+        </ol>
+    </nav>
+    <?php
 }
 
 function astronomyContentEntryArticleUrl(array $catalog, array $entry): ?string

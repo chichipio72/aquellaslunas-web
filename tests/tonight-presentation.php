@@ -257,8 +257,8 @@ $cardData = [
         'end' => '2026-07-31T07:21:21-03:00',
     ],
     'planets' => [
-        ['name' => 'Venus', 'visibility_status' => 'visible_later'],
-        ['name' => 'Marte', 'visibility_status' => 'visible_later'],
+        ['name' => 'Venus', 'visibility_status' => 'visible_later', 'visibility_start' => '2026-07-30T18:40:00-03:00', 'visibility_end' => '2026-07-30T21:00:00-03:00'],
+        ['name' => 'Marte', 'visibility_status' => 'visible_later', 'visibility_start' => '2026-07-30T20:00:00-03:00', 'visibility_end' => '2026-07-31T02:00:00-03:00'],
     ],
 ];
 $cardEvent = [[
@@ -292,5 +292,25 @@ tonightAssert(
     astronomyTonightComparisonKey('Júpiter', false) === astronomyTonightComparisonKey('júpiter', false),
     'El fallback sin mbstring no conservó la comparación de nombres en español.'
 );
+
+$simulatedClockRegression = [
+    'night' => [
+        'start' => '2026-07-25T18:35:00-03:00',
+        'end' => '2026-07-26T07:25:00-03:00',
+    ],
+    'planets' => [
+        ['name' => 'Venus', 'visibility_status' => 'visible_earlier', 'visibility_start' => '2026-07-25T18:35:00-03:00', 'visibility_end' => '2026-07-25T20:50:00-03:00'],
+        ['name' => 'Saturno', 'visibility_status' => 'visible_earlier', 'visibility_start' => '2026-07-26T00:35:00-03:00', 'visibility_end' => '2026-07-26T07:25:00-03:00'],
+        ['name' => 'Marte', 'visibility_status' => 'visible_earlier', 'visibility_start' => '2026-07-26T04:00:00-03:00', 'visibility_end' => '2026-07-26T07:25:00-03:00'],
+    ],
+];
+$simulatedNow = new DateTimeImmutable('2026-07-25T18:00:00-03:00');
+$regressionPrepared = astronomyTonightPreparedSections($simulatedClockRegression, $simulatedNow, $timezone);
+$regressionCard = astronomyTonightCardText($simulatedClockRegression, [], $simulatedNow, $timezone);
+tonightAssert(array_column($regressionPrepared['planets'], 'name') === ['Venus', 'Saturno', 'Marte'],
+    'La preparación detallada no conservó los planetas de la noche simulada.');
+tonightAssert(is_string($regressionCard) && str_contains($regressionCard, 'Venus')
+    && !str_contains($regressionCard, 'no habrá planetas'),
+    'La tarjeta volvió a interpretar con el reloj real estados generados para una noche simulada.');
 
 echo "Presentación de esta noche: escenarios completos e incompletos OK\n";

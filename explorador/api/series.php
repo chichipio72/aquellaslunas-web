@@ -23,8 +23,12 @@ require_once dirname(__DIR__) . '/includes/JsonResponse.php';
 require_once dirname(__DIR__) . '/includes/ExtremaRequest.php';
 require_once dirname(__DIR__) . '/includes/LocalExtremaDetector.php';
 require_once dirname(__DIR__) . '/includes/ExtremaResponse.php';
+require_once dirname(__DIR__, 2) . '/includes/astronomy-trace.php';
 
 $requestStarted = JsonResponse::now();
+$astronomyTrace = astronomyTraceBegin();
+$traceLocation = ['latitude' => (float) ($_GET['lat'] ?? 0.0), 'longitude' => (float) ($_GET['lon'] ?? 0.0),
+    'elevation_meters' => 0.0, 'timezone' => is_string($_GET['timezone'] ?? null) ? $_GET['timezone'] : 'UTC'];
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
         JsonResponse::send(['error' => 'Método no permitido.'], $requestStarted, 405);
@@ -49,7 +53,10 @@ try {
             'detection_ms' => $detectionMs] + $result['metrics'] + [
                 'json_serialization_ms' => 0.0, 'total_ms' => 0.0, 'approximate_json_bytes' => 0,
             ];
-        JsonResponse::send(ExtremaResponse::build($extrema, $detected, $metrics), $requestStarted);
+        $payload = ExtremaResponse::build($extrema, $detected, $metrics);
+        astronomyTraceFinish($astronomyTrace, 'explorer_extrema', 'explorador/api/series.php', $_GET,
+            $traceLocation, $payload);
+        JsonResponse::send($payload, $requestStarted);
     }
     $request = SeriesRequest::fromParameters($_GET, $catalog);
     $selectedDates = null;
@@ -76,14 +83,23 @@ try {
         'planning_ms' => $planningMs] + $result['metrics'] + [
         'json_serialization_ms' => 0.0, 'total_ms' => 0.0, 'approximate_json_bytes' => 0,
     ];
-    JsonResponse::send(['columns' => array_merge(['date'], $request->fields), 'field_metadata' => $metadata,
+    $payload = ['columns' => array_merge(['date'], $request->fields), 'field_metadata' => $metadata,
         'request' => $request->data(), 'date_selection' => $dateSelection,
-        'metrics' => $metrics, 'rows' => $result['rows']], $requestStarted);
+        'metrics' => $metrics, 'rows' => $result['rows']];
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series.php', $_GET,
+        $traceLocation, $payload);
+    JsonResponse::send($payload, $requestStarted);
 } catch (PhaseSelectionException $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     JsonResponse::send(['error' => $exception->getMessage()], $requestStarted, 503);
 } catch (InvalidArgumentException $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     JsonResponse::send(['error' => $exception->getMessage()], $requestStarted, 400);
 } catch (Throwable $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     error_log('Explorador astronómico: ' . get_debug_type($exception) . ': ' . $exception->getMessage());
     JsonResponse::send(['error' => 'No fue posible calcular la serie.'], $requestStarted, 500);
 }

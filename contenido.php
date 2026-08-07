@@ -35,8 +35,31 @@ $location = astronomyLocationContext();
 $now = get_current_datetime($location['timezone']);
 $title = $article !== null && is_array($article['raw']) ? (string) ($article['raw']['titulo'] ?? 'Contenido con errores') : 'Contenido no encontrado';
 $summary = $article !== null && is_array($article['raw']) ? (string) ($article['raw']['resumen'] ?? '') : '';
-$pageSeo = aquellasLunasSeoPage($title . ' | Aquellas Lunas', $summary, '/contenido.php');
-$pageSeo['robots'] = 'noindex, nofollow';
+$articleIsPublic = $article !== null
+    && ($article['valid'] ?? false) === true
+    && ($article['visible'] ?? false) === true
+    && !$adminPreview;
+$articlePath = $articleIsPublic
+    ? '/contenido.php?slug=' . rawurlencode((string) $article['slug'])
+    : '/contenido.php';
+$pageSeo = aquellasLunasSeoPage($title . ' | Aquellas Lunas', $summary, $articlePath, $articleIsPublic ? 'article' : 'webpage');
+$pageSeo['robots'] = $articleIsPublic ? 'index, follow' : 'noindex, nofollow';
+$relatedArticles = $articleIsPublic ? astronomyContentRelatedArticles($catalog, $article, 3) : [];
+if ($articleIsPublic) {
+    $pageSeo['breadcrumbs'] = [
+        ['name' => 'Inicio', 'url' => aquellasLunasCanonicalUrl('/')],
+        ['name' => 'Contenidos', 'url' => aquellasLunasCanonicalUrl('/contenidos.php')],
+        ['name' => $title, 'url' => (string) $pageSeo['canonical_url']],
+    ];
+    $updatedAt = (string) ($article['metadata']['actualizado_en'] ?? '');
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $updatedAt, $updatedMatch) === 1) {
+        $pageSeo['date_modified'] = $updatedMatch[1];
+    }
+    $articleImagePath = (string) ($article['image']['url'] ?? '');
+    if ($articleImagePath !== '') {
+        $pageSeo['schema_image'] = aquellasLunasCanonicalUrl('/' . ltrim($articleImagePath, '/'));
+    }
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -63,6 +86,7 @@ $pageSeo['robots'] = 'noindex, nofollow';
         <?php else: ?>
             <?php if (astronomyContentDebugEnabled() && ($article['warnings'] ?? []) !== []): ?><?php renderAstronomyContentWarning(['slug' => $article['slug'], 'warnings' => $article['warnings']]); ?><?php endif; ?>
             <article class="content-article">
+                <?php if ($articleIsPublic): ?><?php renderAstronomyContentBreadcrumb((string) $article['raw']['titulo']); ?><?php endif; ?>
                 <header class="content-article__header">
                     <h1><?= htmlspecialchars((string) $article['raw']['titulo']) ?></h1>
                     <p><?= htmlspecialchars((string) $article['raw']['resumen']) ?></p>
@@ -85,6 +109,16 @@ $pageSeo['robots'] = 'noindex, nofollow';
                     ) ?></figure>
                 <?php endif; ?>
                 <div class="content-article__body"><?= astronomyContentRenderMarkdown(astronomyContentArticleBodyMarkdown((string) $article['raw']['articulo'])) ?></div>
+                <?php if ($relatedArticles !== []): ?>
+                    <section class="content-related" aria-labelledby="content-related-title">
+                        <h2 id="content-related-title">Contenidos relacionados</h2>
+                        <div class="content-index">
+                            <?php foreach ($relatedArticles as $relatedArticle): ?>
+                                <?php renderAstronomyContentIndexCard($relatedArticle); ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endif; ?>
                 <footer class="content-local-actions">
                     <a class="content-local-edit-link" href="contenidos.php"><span aria-hidden="true">←</span> Ver otros temas</a>
                 </footer>

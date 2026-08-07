@@ -22,6 +22,7 @@ const normalized = normalizeBrowserLocation(validMobilePosition, '');
 if (normalized === null
   || normalized.latitude !== -34.6037
   || normalized.longitude !== -58.3816
+  || normalized.elevation !== 0
   || normalized.timezone !== 'America/Argentina/Buenos_Aires') {
   throw new Error('Una posición móvil válida con campos opcionales nulos fue rechazada.');
 }

@@ -110,6 +110,16 @@ function astronomyWebPushNormalizeTargetUrl(mixed $value): string
     throw new InvalidArgumentException('La URL de apertura no es válida.');
 }
 
+function astronomyWebPushSanitizeError(?string $message): string
+{
+    $message = trim((string) $message);
+    $message = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $message) ?? '';
+    if ($message === '' || preg_match('/https?:\/\/|p256dh|auth|private.?key|vapid/i', $message) === 1) {
+        return 'Error de envío Web Push';
+    }
+    return substr($message, 0, 500);
+}
+
 function astronomyWebPushSanitizedFailure(object $report): array
 {
     $response = method_exists($report, 'getResponse') ? $report->getResponse() : null;

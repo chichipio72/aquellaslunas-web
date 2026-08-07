@@ -15,6 +15,11 @@ require_once __DIR__ . '/includes/explore-sky.php';
 sendDynamicNoCacheHeaders();
 
 $location = astronomyLocationContext();
+$plannerScriptPath = (string) ($_SERVER['SCRIPT_NAME'] ?? '/planificador.php');
+$plannerReturnPath = astronomyLocationReturnPath($plannerScriptPath, $plannerScriptPath) ?? '/planificador.php';
+$locationSelectionUrl = astronomyInternalUrl('ubicacion.php');
+$locationSelectionUrl .= (str_contains($locationSelectionUrl, '?') ? '&' : '?')
+    . 'return=' . rawurlencode($plannerReturnPath);
 $now = get_current_datetime($location['timezone']);
 $featuredDates = ['upcoming' => [], 'recent' => []];
 $featuredDatesAvailable = true;
@@ -65,6 +70,7 @@ $pageSeo = aquellasLunasSeoPage(
             </header>
             <section class="card planner-controls" aria-labelledby="planner-controls-title">
                 <h2 id="planner-controls-title" class="visually-hidden">Fecha y hora</h2>
+                <p class="planner-location"><span>Ubicación: <strong><?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?></strong></span><a class="planner-location__action" href="<?= htmlspecialchars($locationSelectionUrl, ENT_QUOTES, 'UTF-8') ?>">Seleccionar otra ubicación</a></p>
                 <form id="planner-form"
                     data-latitude="<?= htmlspecialchars((string) $location['latitude'], ENT_QUOTES, 'UTF-8') ?>"
                     data-longitude="<?= htmlspecialchars((string) $location['longitude'], ENT_QUOTES, 'UTF-8') ?>"

@@ -11,15 +11,22 @@ function astronomyHeaderLocalDate(DateTimeImmutable $date): string
     return (int) $date->format('j') . ' de ' . $months[(int) $date->format('n')] . ' de ' . $date->format('Y');
 }
 
-function renderAstronomySiteHeader(string $currentSectionId, ?array $location = null): void
+function renderAstronomySiteHeader(string $currentSectionId, ?array $location = null, string $rootPrefix = ''): void
 {
     $location ??= astronomyLocationContext();
     $locationConfirmed = ($location['confirmed'] ?? false) === true;
     $locationIsInitial = !$locationConfirmed && ($location['mode'] ?? 'default') === 'default';
     $showLocationIntro = $locationIsInitial
         && (!astronomyLocationIntroWasSeen() || ($location['stored_invalid'] ?? false) === true);
-    $locationUrl = astronomyInternalUrl('ubicacion.php');
     $returnPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+    $locationUrl = astronomyInternalUrl($rootPrefix . 'ubicacion.php');
+    if ($currentSectionId === 'notifications') {
+        $safeReturnPath = astronomyLocationReturnPath($returnPath);
+        if ($safeReturnPath !== null) {
+            $locationUrl .= (str_contains($locationUrl, '?') ? '&' : '?')
+                . 'return=' . rawurlencode($safeReturnPath);
+        }
+    }
     $localDate = get_current_datetime($location['timezone']);
     $simulationEnabled = astronomyLocalTimeSimulationEnabled();
     $simulationActive = astronomyCurrentDateTimeIsSimulated();
@@ -27,7 +34,7 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
     ?>
     <header class="site-header">
         <div class="container header-inner">
-            <a href="<?= htmlspecialchars(astronomySiteSectionUrl('home'), ENT_QUOTES, 'UTF-8') ?>" class="brand">
+            <a href="<?= htmlspecialchars(astronomySiteSectionUrl('home', $rootPrefix), ENT_QUOTES, 'UTF-8') ?>" class="brand">
                 <span class="brand-name">Aquellas Lunas</span>
                 <span class="brand-tagline">Una Luna diferente cada noche</span>
             </a>
@@ -97,7 +104,7 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
                 <input type="hidden" name="location_name" value="Buenos Aires">
                 <input type="hidden" name="latitude" value="<?= htmlspecialchars((string) ASTRONOMY_DEFAULT_LATITUDE, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="longitude" value="<?= htmlspecialchars((string) ASTRONOMY_DEFAULT_LONGITUDE, ENT_QUOTES, 'UTF-8') ?>">
-                <input type="hidden" name="timezone" value="<?= htmlspecialchars(ASTRONOMY_DEFAULT_TIMEZONE, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="elevation_meters" value="<?= htmlspecialchars((string) ASTRONOMY_DEFAULT_ELEVATION_METERS, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="location_mode" value="default">
                 <input type="hidden" name="return_to" value="<?= htmlspecialchars($returnPath, ENT_QUOTES, 'UTF-8') ?>">
                 <button class="location-intro__continue" type="submit">Continuar con Buenos Aires</button>
@@ -108,7 +115,7 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
     <div class="menu-backdrop" data-menu-close data-swipe-navigation-ignore hidden></div>
     <aside id="site-menu-panel" class="site-menu-panel" aria-label="Menú del sitio" aria-hidden="true" data-swipe-navigation-ignore>
         <button class="menu-close" type="button" data-menu-close aria-label="Cerrar menú">×</button>
-        <?php renderAstronomySiteNavigation($currentSectionId); ?>
+        <?php renderAstronomySiteNavigation($currentSectionId, $rootPrefix); ?>
     </aside>
     <script>window.siteTimeContext=<?= json_encode([
         'simulated' => $simulationActive,

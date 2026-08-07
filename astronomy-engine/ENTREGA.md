@@ -57,11 +57,11 @@ de Docker, Python, HTTP, PostgreSQL, MariaDB/MySQL, HTML ni del laboratorio.
 |---|---|
 | `SolarPositionCalculator.php` | Contrato de posición solar. |
 | `MeeusSolarPositionCalculator.php` | Posición solar geométrica topocéntrica. |
-| `SolarPosition.php` | Resultado de posición solar. |
+| `SolarPosition.php` | Resultado de posición solar; expone distancia Tierra–Sol en AU y kilómetros, radio aparente y ecuación del tiempo con signo aparente menos medio. |
 | `SolarDayCalculator.php` | Eventos y períodos de un día solar local. |
 | `SolarDay.php`, `SolarPeriod.php` | Resultados del bloque solar diario. |
 | `MeeusLunarCalculator.php` | Posición, distancia, iluminación y fase lunar instantánea. |
-| `LunarPosition.php` | Resultado lunar instantáneo. |
+| `LunarPosition.php` | Resultado lunar instantáneo; incluye elongación geocéntrica Sol–Luna y diámetro aparente geocéntrico derivado de la distancia. |
 | `LunarDayCalculator.php` | Salida, puesta e intervalos lunares de un día local. |
 | `LunarDay.php`, `LunarVisibilityInterval.php` | Resultados del bloque lunar diario. |
 | `PrincipalPhaseCalculator.php` | Instantes de las cuatro fases principales. |
@@ -97,6 +97,23 @@ de Docker, Python, HTTP, PostgreSQL, MariaDB/MySQL, HTML ni del laboratorio.
 | `MoonImageRenderResult.php` | PNG, metadatos, caché y tiempos del renderer. |
 | `TonightCatalog.php` | Veinte estrellas Hipparcos y tres centros de cúmulos usados por visibilidad nocturna. |
 | `TonightCalculator.php` | Noche civil, ventanas y visibilidad de planetas, Luna, estrellas y cúmulos. |
+| `Satellite/Tle.php`, `Satellite/TleParser.php` | TLE inmutable y parseo estricto con checksum. |
+| `Satellite/Sgp4/Sgp4Propagator.php` | Port controlado SGP4 near-earth WGS72 con salida TEME. |
+| `Satellite/TemeState.php` | Posición y velocidad TEME en km y km/s. |
+| `Satellite/SatelliteTopocentricCalculator.php` | TEME a terrestre, ECEF/ENU y posición local WGS84. |
+| `Satellite/SatelliteTopocentricPosition.php` | Altura y azimut geométricos y distancia al observador. |
+| `Satellite/SatelliteLunarTransitDetector.php` | Búsqueda gruesa/fina, mínimos, clasificación y contactos lunares. |
+| `Satellite/SatelliteLunarApproachEvent.php` | Evento tipado y serializable con geometría, TLE y contactos. |
+| `Satellite/SatelliteLunarSearchResult.php` | Ventana, observador, eventos y métricas instrumentadas. |
+| `Satellite/CachedCelesTrakTleProvider.php` | Descarga validada, caché JSON, TTL y fallback al último TLE válido. |
+| `Satellite/FixtureSatelliteTleProvider.php` | Proveedor offline validado para pruebas y reproducción histórica. |
+| `Satellite/SatelliteLunarTransitService.php` | Resolución de TLE y ejecución reutilizable del detector hasta 48 horas. |
+| `Satellite/SatelliteLunarTransitServiceResult.php` | Eventos, metadata TLE, métricas y advertencias serializables. |
+| `Satellite/SatelliteAngularTransitDetector.php` | Muestreo, geometría angular, refinamiento y contactos comunes para cuerpos aparentes. |
+| `Satellite/MoonTransitTargetProvider.php` | Posición y radio aparente topocéntricos de la Luna. |
+| `Satellite/SunTransitTargetProvider.php` | Posición topocéntrica y radio angular variable del Sol. |
+| `Satellite/SatelliteTransitEvent.php` | Evento solar o lunar tipado, con TLE y advertencias. |
+| `Satellite/SatelliteTransitService.php` | Servicio unificado para `moon`, `sun` o ambos, hasta 48 horas. |
 
 ## 2. Funciones astronómicas disponibles
 
@@ -326,6 +343,7 @@ use AstronomyEngine\Facade\AstronomyEventsFacade;
 use AstronomyEngine\Facade\AltitudeProfileFacade;
 use AstronomyEngine\Facade\EarthshineFacade;
 use AstronomyEngine\Facade\FullMoonObservationFacade;
+use AstronomyEngine\Satellite\SatelliteLunarTransitDetector;
 
 $solar = new MeeusSolarPositionCalculator();
 $solarPosition = $solar->calculate($instant, $latitude, $longitude, $elevation);
@@ -383,6 +401,13 @@ $moonAltitudeProfile = (new AltitudeProfileFacade())->calculate(
     $localDate,
     $observer,
     ['target' => 'moon', 'interval_minutes' => 15],
+);
+
+$satelliteLunarEvents = (new SatelliteLunarTransitDetector())->search(
+    $observer,
+    $startUtc,
+    24,
+    $satelliteTles, // array<string, Tle> cargado desde una fuente local
 );
 ```
 

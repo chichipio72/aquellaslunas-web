@@ -239,7 +239,7 @@ No se transfieren:
 
 Sí se transfieren:
 
-- `index.php`, `cielo-de-esta-noche.php`, `sol-y-luna.php`, `eventos.php`, `planificador.php`, `galeria.php`, `acerca.php`, `acerca-del-sitio.php`, `moon-image.php`, `altitude-profile.php`, `astronomy-directions.php`, `astronomy-featured-dates.php` y `sitemap.xml`;
+- `index.php`, `cielo-de-esta-noche.php`, `sol-y-luna.php`, `eventos.php`, `planificador.php`, `galeria.php`, `acerca.php`, `acerca-del-sitio.php`, `moon-image.php`, `altitude-profile.php`, `astronomy-directions.php`, `astronomy-featured-dates.php` y `sitemap.php`; Apache resuelve la URL pública `/astro/sitemap.xml` hacia este último;
 - `includes/`;
 - `assets/css/` y `assets/js/`;
 - previews públicas bajo `assets/images/tienda/previews/`;

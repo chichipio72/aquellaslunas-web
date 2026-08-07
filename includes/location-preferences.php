@@ -2,7 +2,9 @@
 
 const ASTRONOMY_DEFAULT_LATITUDE = -34.53;
 const ASTRONOMY_DEFAULT_LONGITUDE = -58.48;
+const ASTRONOMY_DEFAULT_ELEVATION_METERS = 0.0;
 const ASTRONOMY_DEFAULT_TIMEZONE = 'America/Argentina/Buenos_Aires';
+const ASTRONOMY_LOCATION_COOKIE_VERSION = '2';
 const ASTRONOMY_LOCATION_COOKIE_DAYS = 400;
 const ASTRONOMY_LOCATION_COOKIE_LIFETIME = 60 * 60 * 24 * ASTRONOMY_LOCATION_COOKIE_DAYS;
 
@@ -29,6 +31,17 @@ function astronomyLocationTimezone($value): ?string
     return $timezone === 'America/Buenos_Aires'
         ? 'America/Argentina/Buenos_Aires'
         : $timezone;
+}
+
+function astronomyLocationElevation($value): ?float
+{
+    if (!is_numeric($value)) {
+        return null;
+    }
+    $elevation = (float) $value;
+    return is_finite($elevation) && $elevation >= -500.0 && $elevation <= 10000.0
+        ? round($elevation, 1)
+        : null;
 }
 
 function astronomyLocationMode($value): ?string
@@ -85,9 +98,11 @@ function astronomyLocationHasCompleteCookies(): bool
 {
     return astronomyLocationCoordinate($_COOKIE['astro_latitude'] ?? null, -90, 90) !== null
         && astronomyLocationCoordinate($_COOKIE['astro_longitude'] ?? null, -180, 180) !== null
+        && astronomyLocationElevation($_COOKIE['astro_elevation'] ?? null) !== null
         && astronomyLocationTimezone($_COOKIE['astro_timezone'] ?? null) !== null
         && astronomyLocationMode($_COOKIE['astro_location_mode'] ?? null) !== null
-        && astronomyLocationName($_COOKIE['astro_location_name'] ?? null) !== null;
+        && astronomyLocationName($_COOKIE['astro_location_name'] ?? null) !== null
+        && ($_COOKIE['astro_location_version'] ?? null) === ASTRONOMY_LOCATION_COOKIE_VERSION;
 }
 
 function astronomyLocationIsConfirmed(): bool
@@ -115,7 +130,9 @@ function astronomyClearStoredLocation(bool $clearIntro = false): void
     foreach ([
         'astro_latitude',
         'astro_longitude',
+        'astro_elevation',
         'astro_timezone',
+        'astro_location_version',
         'astro_location_mode',
         'astro_location_name',
         'astro_location_confirmed',
@@ -220,18 +237,35 @@ function astronomyReverseGeocode(float $latitude, float $longitude): string
     return $name;
 }
 
-function astronomyStoreLocation(float $latitude, float $longitude, string $timezone, string $mode, ?string $name = null): void
+function astronomyStoreLocation(
+    float $latitude,
+    float $longitude,
+    float $elevationMeters,
+    string $timezone,
+    string $mode,
+    ?string $name = null,
+    bool $confirmed = true
+): void
 {
     $mode = astronomyLocationMode($mode) ?? 'default';
     $options = astronomyLocationCookieOptions();
-    setcookie('astro_latitude', (string) $latitude, $options);
-    setcookie('astro_longitude', (string) $longitude, $options);
-    setcookie('astro_timezone', $timezone, $options);
-    setcookie('astro_location_mode', $mode, $options);
-    setcookie('astro_location_name', astronomyLocationName($name)
-        ?? ($mode === 'default' ? 'Buenos Aires' : astronomyLocationCoordinateLabel($latitude, $longitude)), $options);
-    setcookie('astro_location_confirmed', '1', $options);
-    setcookie('astro_location_intro_seen', '1', $options);
+    $values = [
+        'astro_latitude' => (string) $latitude,
+        'astro_longitude' => (string) $longitude,
+        'astro_elevation' => (string) $elevationMeters,
+        'astro_timezone' => $timezone,
+        'astro_location_mode' => $mode,
+        'astro_location_name' => astronomyLocationName($name)
+            ?? ($mode === 'default' ? 'Buenos Aires' : astronomyLocationCoordinateLabel($latitude, $longitude)),
+        'astro_location_confirmed' => $confirmed ? '1' : '0',
+        'astro_location_intro_seen' => '1',
+        'astro_location_version' => ASTRONOMY_LOCATION_COOKIE_VERSION,
+    ];
+    foreach ($values as $cookie => $value) {
+        setcookie($cookie, $value, $options);
+        // La ubicación corregida debe ser la fuente de verdad en esta misma petición.
+        $_COOKIE[$cookie] = $value;
+    }
 }
 
 function astronomyStoreDefaultLocation(): void
@@ -239,6 +273,7 @@ function astronomyStoreDefaultLocation(): void
     astronomyStoreLocation(
         ASTRONOMY_DEFAULT_LATITUDE,
         ASTRONOMY_DEFAULT_LONGITUDE,
+        ASTRONOMY_DEFAULT_ELEVATION_METERS,
         ASTRONOMY_DEFAULT_TIMEZONE,
         'default',
         'Buenos Aires'

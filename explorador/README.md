@@ -13,6 +13,18 @@ administrativa `menu.explorer.enabled`, habilitada de manera predeterminada.
 Deshabilitarla oculta solamente la entrada del menú: la URL directa y sus
 endpoints continúan disponibles.
 
+La interfaz compacta es la presentación principal. Durante su período de prueba,
+la presentación anterior se conserva en `/explorador/clasico.php`, accesible sólo
+por URL directa y sin entrada propia en el menú. Ambas renderizan
+`interfaz-base.php` y comparten catálogo, formulario, ECharts, JavaScript
+funcional y endpoints; `pruebas-interfaz.css` y `pruebas-interfaz.js` contienen
+exclusivamente la presentación y la interacción compactas.
+
+Para revertir el intercambio basta con hacer que `index.php` cargue directamente
+`interfaz-base.php` y retirar su transformación compacta. `clasico.php` puede
+eliminarse después de verificar la reversión; no es necesario modificar endpoints,
+catálogo ni assets funcionales.
+
 Las descripciones del catálogo alimentan las ayudas accesibles de cada variable.
 El mismo componente contextual se usa en modos, períodos, fases, relación,
 ubicación y enlaces compartibles; funciona con hover, foco, teclado y toque.
@@ -28,7 +40,7 @@ unidad se muestra uniformemente entre paréntesis en el título del eje.
 ## Arquitectura del prototipo
 
 ```text
-index.php + assets/
+index.php / clasico.php → interfaz-base.php + assets/
         ↓ GET progresivo / fallback
 api/series-stream.php (NDJSON) / api/series.php (JSON)
         ↓
@@ -309,9 +321,11 @@ todavía podría agrupar la salida, limitación que debe comprobarse al desplega
 
 ## Variables implementadas
 
-- Luna instantánea: iluminación, ángulo de fase, distancias geocéntrica y
-  topocéntrica, latitud eclíptica, ascensión recta, declinación, altura y azimut.
-- Sol instantáneo: altura y azimut.
+- Luna instantánea: iluminación, ángulo de fase, elongación geocéntrica Sol–Luna,
+  diámetro aparente geocéntrico, distancias geocéntrica y topocéntrica, latitud
+  eclíptica, ascensión recta, declinación, altura y azimut.
+- Sol instantáneo: altura, azimut, distancia Tierra–Sol geocéntrica y ecuación
+  del tiempo (tiempo solar aparente menos tiempo solar medio).
 - Eventos lunares: salida, puesta, sus azimutes y tiempo sobre el horizonte.
 - Eventos solares: salida, puesta, sus azimutes, duración del día y de la noche.
 - Derivadas: amplitudes de salida y puesta y diferencias diarias de los cuatro

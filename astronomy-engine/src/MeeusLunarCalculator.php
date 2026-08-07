@@ -112,6 +112,9 @@ final class MeeusLunarCalculator
         [$sunLongitude,$sunDistanceAu] = $this->sunLongitudeAndDistance($t);
         $cycle = $this->normalize($moonLongitude-$sunLongitude);
         $elongation = deg2rad($cycle > 180.0 ? 360.0-$cycle : $cycle);
+        $solarElongation = rad2deg(acos(max(-1.0, min(1.0,
+            cos($beta) * cos(deg2rad($this->signed($moonLongitude - $sunLongitude)))
+        ))));
         $sunDistanceKm = $sunDistanceAu*149597870.7;
         $phaseAngle = atan2($sunDistanceKm*sin($elongation), $geocentricDistance-$sunDistanceKm*cos($elongation));
         $illumination = (1.0+cos($phaseAngle))/2.0;
@@ -119,7 +122,8 @@ final class MeeusLunarCalculator
         return new LunarPosition(
             rad2deg($altitude), $azimuth, $geocentricDistance, $topocentricDistance, $cycle,
             $illumination, $cycle/360.0*self::SYNODIC_MONTH_DAYS, $this->phaseName($cycle),
-            $moonLongitude, $moonLatitude, $this->normalize(rad2deg($ra)), rad2deg($declination)
+            $moonLongitude, $moonLatitude, $this->normalize(rad2deg($ra)), rad2deg($declination),
+            $solarElongation
         );
     }
 

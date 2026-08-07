@@ -76,11 +76,13 @@ try {
     $sections = astronomySiteSections();
     siteVisibilityAssert(($sections['today']['menu_enabled'] ?? false) === true, 'La entrada El cielo hoy no quedó habilitada por defecto.');
     siteVisibilityAssert(($sections['administration']['menu_enabled'] ?? false) === true, 'La entrada Administración no quedó habilitada por defecto.');
+    siteVisibilityAssert(($sections['explorer']['menu_enabled'] ?? false) === true, 'El Explorador no quedó habilitado por defecto.');
 
     astronomySiteConfigUpdate($connection, array_merge($allEnabled, [
         'menu.today.enabled' => false,
         'menu.about.enabled' => false,
         'menu.administration.enabled' => false,
+        'menu.explorer.enabled' => false,
         'home.today.enabled' => false,
         'home.install.enabled' => false,
     ]));
@@ -89,6 +91,7 @@ try {
     siteVisibilityAssert(($sectionsWithMenuDisabled['today']['menu_enabled'] ?? true) === false, 'El menú no ocultó El cielo hoy al deshabilitar su clave.');
     siteVisibilityAssert(($sectionsWithMenuDisabled['about']['menu_enabled'] ?? true) === false, 'El menú no ocultó Acerca del sitio al deshabilitar su clave.');
     siteVisibilityAssert(($sectionsWithMenuDisabled['administration']['menu_enabled'] ?? true) === false, 'El menú no ocultó Administración al deshabilitar su clave.');
+    siteVisibilityAssert(($sectionsWithMenuDisabled['explorer']['menu_enabled'] ?? true) === false, 'El menú no ocultó el Explorador al deshabilitar su clave.');
 
     ob_start();
     renderAstronomySiteNavigation('home');
@@ -96,6 +99,8 @@ try {
     siteVisibilityAssert(!str_contains($navigationHtml, '>El cielo hoy<'), 'La navegación siguió renderizando una entrada deshabilitada.');
     siteVisibilityAssert(!str_contains($navigationHtml, '>Acerca del sitio<'), 'La navegación siguió renderizando Acerca del sitio deshabilitado.');
     siteVisibilityAssert(!str_contains($navigationHtml, '>Administración<'), 'La navegación siguió renderizando Administración deshabilitada.');
+    siteVisibilityAssert(!str_contains($navigationHtml, '>Explorador astronómico<'), 'La navegación siguió renderizando el Explorador deshabilitado.');
+    siteVisibilityAssert(is_file(__DIR__ . '/../explorador/index.php'), 'Ocultar el menú afectó la disponibilidad de la URL directa.');
 
     siteVisibilityAssert(astronomySiteHomeBlockEnabled('today') === false, 'La tarjeta El cielo hoy no respetó su clave de portada.');
     siteVisibilityAssert(astronomySiteHomeBlockEnabled('install') === false, 'La tarjeta de instalación no respetó su clave de portada.');

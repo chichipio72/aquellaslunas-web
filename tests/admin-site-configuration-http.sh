@@ -19,7 +19,7 @@ fi
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/auth" -D "$work_dir/auth-headers" -w '%{http_code}' "$base_url/admin/configuracion-sitio/")"
 test "$status" = "200"
 grep -Eqi '^Cache-Control: no-store' "$work_dir/auth-headers"
-grep -q '<h1>Configuración del sitio</h1>' "$work_dir/auth"
+grep -q '<h1>Visibilidad de secciones</h1>' "$work_dir/auth"
 grep -q 'href="../configuracion-sitio/" aria-current="page"' "$work_dir/auth"
 grep -q '<strong>Visibilidad de secciones</strong>' "$work_dir/auth"
 grep -q 'href="../contenidos/"' "$work_dir/auth"
@@ -28,7 +28,9 @@ grep -q 'href="../laboratorio-astronomico.php"' "$work_dir/auth"
 grep -q 'name="settings\[content.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[menu.today.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[menu.administration.enabled\]"' "$work_dir/auth"
+grep -q 'name="settings\[menu.explorer.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[home.today.enabled\]"' "$work_dir/auth"
+grep -q 'name="settings\[home.satellite_transits.enabled\]"' "$work_dir/auth"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/csrf-invalid" -w '%{http_code}' -X POST \
   --data-urlencode 'csrf_token=token-invalido' \
@@ -50,6 +52,7 @@ status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/s
   --data-urlencode 'settings[menu.events.enabled]=1' \
   --data-urlencode 'settings[menu.eclipses.enabled]=1' \
   --data-urlencode 'settings[menu.planner.enabled]=1' \
+  --data-urlencode 'settings[menu.explorer.enabled]=1' \
   --data-urlencode 'settings[menu.content.enabled]=1' \
   --data-urlencode 'settings[menu.location.enabled]=1' \
   --data-urlencode 'settings[menu.capabilities.enabled]=1' \
@@ -59,6 +62,7 @@ status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/s
   --data-urlencode 'settings[home.tonight.enabled]=1' \
   --data-urlencode 'settings[home.phases.enabled]=1' \
   --data-urlencode 'settings[home.upcoming.enabled]=1' \
+  --data-urlencode 'settings[home.satellite_transits.enabled]=1' \
   --data-urlencode 'settings[home.explore_sky.enabled]=1' \
   --data-urlencode 'settings[home.trivia.enabled]=1' \
   --data-urlencode 'settings[home.sabias_que.enabled]=1' \

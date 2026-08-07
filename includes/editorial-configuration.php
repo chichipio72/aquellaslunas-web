@@ -288,39 +288,79 @@ function astronomyEditorialInitialize(PDO $connection): void
 
 function &astronomyEditorialCache(): array
 {
-    static $cache = ['loaded' => false, 'available' => false, 'parameters' => [], 'texts' => []];
+    static $cache = [
+        'loaded' => false, 'available' => false,
+        'parameters_loaded' => false, 'parameters_available' => false,
+        'texts_loaded' => false, 'texts_available' => false,
+        'parameters' => [], 'texts' => [],
+    ];
     return $cache;
 }
 
 function astronomyEditorialResetCache(): void
 {
     $cache = &astronomyEditorialCache();
-    $cache = ['loaded' => false, 'available' => false, 'parameters' => [], 'texts' => []];
+    $cache = [
+        'loaded' => false, 'available' => false,
+        'parameters_loaded' => false, 'parameters_available' => false,
+        'texts_loaded' => false, 'texts_available' => false,
+        'parameters' => [], 'texts' => [],
+    ];
 }
 
-function astronomyEditorialLoad(?callable $factory = null): array
+function astronomyEditorialLoadKind(string $kind, ?callable $factory = null): array
 {
+    if (!in_array($kind, ['parameters', 'texts'], true)) {
+        throw new InvalidArgumentException('El tipo de configuración editorial no está soportado.');
+    }
     $cache = &astronomyEditorialCache();
-    if ($factory === null && $cache['loaded']) return $cache;
-    $state = ['loaded' => true, 'available' => false, 'parameters' => [], 'texts' => []];
+    $loadedKey = $kind . '_loaded';
+    $availableKey = $kind . '_available';
+    if ($factory === null && $cache[$loadedKey]) {
+        $state = $cache;
+        $state['loaded'] = true;
+        $state['available'] = $cache[$availableKey];
+        return $state;
+    }
+    $state = $factory === null ? $cache : astronomyEditorialCache();
+    $state[$loadedKey] = true;
+    $state[$availableKey] = false;
+    $state[$kind] = [];
     try {
         $connection = $factory ? $factory() : getWebDatabaseConnection();
-        $state['parameters'] = $connection->query('SELECT clave,valor_decimal FROM admin_parametros_editoriales')->fetchAll(PDO::FETCH_KEY_PAIR);
-        $state['texts'] = $connection->query('SELECT clave,valor_texto FROM admin_textos_editoriales')->fetchAll(PDO::FETCH_KEY_PAIR);
-        $state['available'] = true;
+        $state[$kind] = $kind === 'parameters'
+            ? $connection->query('SELECT clave,valor_decimal FROM admin_parametros_editoriales')->fetchAll(PDO::FETCH_KEY_PAIR)
+            : $connection->query('SELECT clave,valor_texto FROM admin_textos_editoriales')->fetchAll(PDO::FETCH_KEY_PAIR);
+        $state[$availableKey] = true;
     } catch (Throwable) {
         static $reported = false;
         if (!$reported) { error_log('Aquellas Lunas editorial configuration unavailable.'); $reported = true; }
     }
-    if ($factory === null) $cache = $state;
+    $state['loaded'] = true;
+    $state['available'] = $state[$availableKey];
+    if ($factory === null) {
+        $cache = $state;
+    }
     return $state;
+}
+
+function astronomyEditorialLoad(?callable $factory = null): array
+{
+    $parameters = astronomyEditorialLoadKind('parameters', $factory);
+    $texts = astronomyEditorialLoadKind('texts', $factory);
+    $parameters['texts'] = $texts['texts'];
+    $parameters['texts_loaded'] = $texts['texts_loaded'];
+    $parameters['texts_available'] = $texts['texts_available'];
+    $parameters['loaded'] = true;
+    $parameters['available'] = $parameters['parameters_available'] && $texts['texts_available'];
+    return $parameters;
 }
 
 function astronomyEditorialNumber(string $key, ?callable $factory = null): float
 {
     $definition = astronomyEditorialDefinitions()['parameters'][$key] ?? null;
     if (!is_array($definition)) throw new InvalidArgumentException('Parámetro editorial desconocido.');
-    $state = astronomyEditorialLoad($factory);
+    $state = astronomyEditorialLoadKind('parameters', $factory);
     return isset($state['parameters'][$key]) ? (float) $state['parameters'][$key] : (float) $definition['default'];
 }
 
@@ -328,7 +368,7 @@ function astronomyEditorialValueState(string $kind, string $key, ?callable $fact
 {
     $definitions = astronomyEditorialDefinitions();
     if (!in_array($kind, ['parameters', 'texts'], true) || !isset($definitions[$kind][$key])) throw new InvalidArgumentException('Valor editorial desconocido.');
-    $state = astronomyEditorialLoad($factory);
+    $state = astronomyEditorialLoadKind($kind, $factory);
     $modified = $state['available'] && array_key_exists($key, $state[$kind]);
     $value = $modified ? $state[$kind][$key] : $definitions[$kind][$key]['default'];
     return ['value' => $kind === 'parameters' ? (float) $value : (string) $value, 'modified' => $modified, 'status' => $modified ? 'Modificado' : 'Predeterminado'];
@@ -338,7 +378,7 @@ function astronomyEditorialTemplate(string $key, ?callable $factory = null): str
 {
     $definition = astronomyEditorialDefinitions()['texts'][$key] ?? null;
     if (!is_array($definition)) throw new InvalidArgumentException('Texto editorial desconocido.');
-    $state = astronomyEditorialLoad($factory);
+    $state = astronomyEditorialLoadKind('texts', $factory);
     return isset($state['texts'][$key]) ? (string) $state['texts'][$key] : (string) $definition['default'];
 }
 

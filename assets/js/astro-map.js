@@ -1,4 +1,5 @@
 const AstronomyMap = (() => {
+  const placementBindings = new WeakMap();
   const createObserverMap = (element, latitude, longitude, options = {}) => {
     if (!element || typeof L === 'undefined') return null;
     const initial = [Number(latitude), Number(longitude)];
@@ -49,11 +50,13 @@ const AstronomyMap = (() => {
     } = {},
   ) => {
     if (!map || typeof map.on !== 'function' || typeof onConfirm !== 'function') return null;
+    const beganOnInteractiveElement = (event) => event?.originalEvent?.target
+      ?.closest?.('.leaflet-control, .leaflet-marker-icon, .leaflet-marker-shadow');
     const confirm = (event) => {
       // Leaflet marca así el contextmenu que genera su TapHold tras validar
-      // un solo dedo, tolerancia, touchend/touchcancel y movimiento.
-      if (event?.originalEvent?._simulated !== true || !event.latlng) return;
-      onConfirm(event.latlng);
+      // un solo dedo durante 600 ms, tolerancia, touchend/touchcancel y movimiento.
+      if (event?.originalEvent?._simulated !== true || !event.latlng || beganOnInteractiveElement(event)) return;
+      onConfirm(event.latlng, 'longpress');
       vibrate();
     };
     map.on('contextmenu', confirm);
@@ -65,7 +68,39 @@ const AstronomyMap = (() => {
     };
   };
 
-  return { bindLongPress, createObserverMap, destinationPoint };
+  const bindPlacementInteractions = (map, marker, onConfirm) => {
+    if (!map || typeof map.on !== 'function' || !marker || typeof onConfirm !== 'function') return null;
+    placementBindings.get(map)?.destroy();
+    let lastTouchAt = 0;
+    const rememberTouch = () => { lastTouchAt = Date.now(); };
+    const isTouchGenerated = (event) => event?.originalEvent?.sourceCapabilities?.firesTouchEvents === true
+      || event?.originalEvent?.pointerType === 'touch'
+      || Date.now() - lastTouchAt < 1200;
+    const beganOnInteractiveElement = (event) => event?.originalEvent?.target
+      ?.closest?.('.leaflet-control, .leaflet-marker-icon, .leaflet-marker-shadow');
+    const placeOnDoubleClick = (event) => {
+      if (!event?.latlng || isTouchGenerated(event) || beganOnInteractiveElement(event)) return;
+      onConfirm(event.latlng, 'doubleclick');
+    };
+
+    map.doubleClickZoom?.disable();
+    map.on('touchstart', rememberTouch);
+    map.on('dblclick', placeOnDoubleClick);
+    const longPress = bindLongPress(map, onConfirm);
+
+    const binding = {
+      destroy() {
+        map.off('touchstart', rememberTouch);
+        map.off('dblclick', placeOnDoubleClick);
+        longPress?.destroy();
+        if (placementBindings.get(map) === binding) placementBindings.delete(map);
+      },
+    };
+    placementBindings.set(map, binding);
+    return binding;
+  };
+
+  return { bindLongPress, bindPlacementInteractions, createObserverMap, destinationPoint };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -73,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('global-location-form');
   if (!mapElement || !form || typeof L === 'undefined') return;
 
-  const fields = Object.fromEntries(['location_name', 'latitude', 'longitude', 'timezone', 'location_mode']
+  const fields = Object.fromEntries(['location_name', 'latitude', 'longitude', 'elevation_meters', 'resolved_timezone', 'location_mode']
     .map((name) => [name, form.elements.namedItem(name)]));
   const status = document.getElementById('location-map-status');
   const observerMap = AstronomyMap.createObserverMap(
@@ -84,10 +119,27 @@ document.addEventListener('DOMContentLoaded', () => {
   );
   if (!observerMap) return;
   const { map, marker: observerMarker } = observerMap;
+  let statusTimer = null;
 
-  const message = (text, error = false) => {
+  const message = (text, error = false, temporarySelection = false) => {
+    window.clearTimeout(statusTimer);
     status.textContent = text;
     status.classList.toggle('is-error', error);
+    status.classList.toggle('is-selection', temporarySelection);
+    if (temporarySelection) {
+      statusTimer = window.setTimeout(() => {
+        status.textContent = '';
+        status.classList.remove('is-selection');
+      }, 4000);
+    }
+  };
+  const highlightMarker = () => {
+    const element = observerMarker.getElement?.();
+    if (!element) return;
+    element.classList.remove('location-marker--selected');
+    void element.offsetWidth;
+    element.classList.add('location-marker--selected');
+    window.setTimeout(() => element.classList.remove('location-marker--selected'), 900);
   };
   const reverse = async (latitude, longitude) => {
     const url = new URL('https://nominatim.openstreetmap.org/reverse');
@@ -101,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return address.city || address.municipality || address.locality || address.town || address.village
       || address.county || data.display_name?.split(',')[0] || 'Ubicación seleccionada';
   };
-  const setObserver = async ({ latitude, longitude, name = null, mode = 'manual', timezone = null }) => {
+  const setObserver = async ({ latitude, longitude, elevation = 0, name = null, mode = 'manual', timezone = null }) => {
     const lat = Number(latitude);
     const lon = Number(longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -109,19 +161,29 @@ document.addEventListener('DOMContentLoaded', () => {
     map.setView([lat, lon], Math.max(map.getZoom(), 11));
     fields.latitude.value = lat.toFixed(6);
     fields.longitude.value = lon.toFixed(6);
+    fields.elevation_meters.value = Number.isFinite(Number(elevation)) ? Number(elevation).toFixed(1) : '0.0';
     fields.location_mode.value = mode;
-    if (timezone) fields.timezone.value = timezone;
+    fields.resolved_timezone.value = timezone || 'Automática al guardar';
     fields.location_name.value = name || await reverse(lat, lon);
     message('Posición actualizada. Guardá para aplicarla a todo el sitio.');
   };
+  ['latitude', 'longitude'].forEach((name) => fields[name]?.addEventListener('input', () => {
+    fields.resolved_timezone.value = 'Automática al guardar';
+  }));
 
-  const applyMarkerPosition = async (point) => {
+  const applyMarkerPosition = async (point, interaction = 'drag') => {
     message('Resolviendo localidad…');
+    if (interaction === 'doubleclick' || interaction === 'longpress') highlightMarker();
     try {
       await setObserver({ latitude: point.lat, longitude: point.lng, mode: 'map' });
+      if (interaction === 'doubleclick' || interaction === 'longpress') {
+        message('Ubicación seleccionada. Confirmala para guardarla.', false, true);
+      }
     } catch (error) {
       fields.latitude.value = point.lat.toFixed(6);
       fields.longitude.value = point.lng.toFixed(6);
+      fields.elevation_meters.value = '0.0';
+      fields.resolved_timezone.value = 'Automática al guardar';
       fields.location_name.value = 'Ubicación seleccionada';
       fields.location_mode.value = 'map';
       message(error.message, true);
@@ -131,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   observerMarker.on('dragend', () => {
     applyMarkerPosition(observerMarker.getLatLng());
   });
-  AstronomyMap.bindLongPress(map, applyMarkerPosition);
+  AstronomyMap.bindPlacementInteractions(map, observerMarker, applyMarkerPosition);
 
   document.getElementById('location-search-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -163,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
       await setObserver({
         ...coordinates,
         mode: 'geolocation',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || fields.timezone.value,
       });
     } catch (error) {
       message(error.message, true);

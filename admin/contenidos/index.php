@@ -438,7 +438,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
         <section class="editor-panel">
             <h2>Artículo</h2>
             <div class="editor-meta-row">
-                <label>Slug<input name="slug" value="<?= editorHtml($slug) ?>" required></label>
+                <label>Slug<input name="slug" value="<?= editorHtml($slug) ?>" required><?php if (!$isNewArticle): ?><small class="editor-slug-warning">Si este artículo ya fue publicado, cambiar el slug modifica su URL pública y puede romper enlaces externos e indexación.</small><?php endif; ?></label>
                 <label>Versión<input type="number" name="version" value="<?= editorHtml($raw['version'] ?? 1) ?>" min="1" required><?php editorFieldErrors($errors, 'version'); ?></label>
                 <label class="editor-check"><input type="checkbox" name="visible"<?= ($raw['visible'] ?? false) ? ' checked' : '' ?>> Visible</label>
             </div>

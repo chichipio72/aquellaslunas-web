@@ -25,6 +25,8 @@ require_once __DIR__ . '/includes/moon-phase-presentation.php';
 require_once __DIR__ . '/includes/moon-images.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/home-upcoming-events.php';
+require_once __DIR__ . '/includes/home-satellite-context.php';
+require_once __DIR__ . '/includes/home-satellite-local-test.php';
 require_once __DIR__ . '/includes/content-system.php';
 sendDynamicNoCacheHeaders();
 
@@ -98,11 +100,19 @@ function homeV2TonightText(?array $data, array $events, DateTimeImmutable $now, 
 
 $homePageProfileLocationStarted = hrtime(true);
 $location = astronomyLocationContext();
+$homeSatelliteLocalMode = homeSatelliteLocalTestMode($_GET['satellite_test'] ?? null);
+$initialTimezoneName = (string) $location['timezone'];
+$homeSatelliteLocalSetup = homeSatelliteLocalTestSetup(
+    $homeSatelliteLocalMode,
+    $location,
+    get_current_datetime($initialTimezoneName)
+);
+$location = $homeSatelliteLocalSetup['location'];
 $timezoneName = $location['timezone'];
 $latitude = $location['latitude'];
 $longitude = $location['longitude'];
 $locationLabel = $location['name'];
-$now = get_current_datetime($timezoneName);
+$now = $homeSatelliteLocalSetup['now'];
 $dateParam = $now->format('Y-m-d');
 $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName];
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
@@ -131,16 +141,26 @@ try {
     ] + $common, 'home v2 phases', 35);
     $homePageProfileAstronomyDetails['phases'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
     $homePageProfileOperationStarted = hrtime(true);
+    $GLOBALS['home_upcoming_profile_enabled'] = astronomyTimingsEnabled();
+    homeUpcomingProfileReset();
     $upcomingSearch = homeUpcomingProgressiveSearch(
         $now,
         $timezoneName,
         static function (string $startDate, int $days, string $segmentLabel) use ($common): ?array {
+            $typesStarted = hrtime(true);
+            $publicTypes = astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING);
+            homeUpcomingProfileAdd('preparación de tipos solicitados · ' . $segmentLabel, (hrtime(true) - $typesStarted) / 1_000_000);
+            homeUpcomingProfileCount('lecturas de tipos para superficie');
+            $editorialStarted = hrtime(true);
+            $maxDifferenceMinutes = (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes');
+            homeUpcomingProfileAdd('preparación editorial de solicitud · ' . $segmentLabel, (hrtime(true) - $editorialStarted) / 1_000_000);
+            homeUpcomingProfileCount('lecturas de parámetro editorial por segmento');
             return astronomyEvents(
                 [
                     'start_date' => $startDate,
                     'days' => $days,
-                    'types' => implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING)),
-                    'max_difference_minutes' => (int) astronomyEditorialNumber('event.full_moon.max_difference_minutes'),
+                    'types' => implode(',', $publicTypes),
+                    'max_difference_minutes' => $maxDifferenceMinutes,
                 ] + $common,
                 'home v2 upcoming ' . $segmentLabel,
                 20
@@ -148,13 +168,42 @@ try {
         }
     );
     $homePageProfileAstronomyDetails['upcoming'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+    $upcomingVisibilityStarted = hrtime(true);
     $upcomingEvents = astronomyFilterEventsForSurface($upcomingSearch['events'], ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING);
+    homeUpcomingProfileAdd('enriquecimiento local/visibilidad', (hrtime(true) - $upcomingVisibilityStarted) / 1_000_000);
+    homeUpcomingProfileCount('eventos descartados por superficie', count($upcomingSearch['events']) - count($upcomingEvents));
     $homePageProfileOperationStarted = hrtime(true);
     $tonightData = astronomyTonightRequest(null, $location, $dateParam, 'summary', 'home v2 tonight', 8);
     $homePageProfileAstronomyDetails['tonight'] = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas home v2 astronomy error: ' . $exception->getMessage());
 }
+$homePageProfileOperationStarted = hrtime(true);
+$satelliteTransitsEnabled = astronomySiteConfigBool('home.satellite_transits.enabled', true);
+$homeSatelliteContext = homeSatelliteContext(
+    $location,
+    $now,
+    $tonightData,
+    $homeSatelliteLocalSetup['runner'],
+    $homeSatelliteLocalMode !== null ? true : $satelliteTransitsEnabled
+);
+$homeSatelliteTotalMilliseconds = (hrtime(true) - $homePageProfileOperationStarted) / 1_000_000;
+$homePageProfileAstronomyDetails['satellite transits'] = $homeSatelliteTotalMilliseconds;
+$GLOBALS['home_satellite_diagnostic'] = homeSatelliteDiagnostic($homeSatelliteContext, $homeSatelliteTotalMilliseconds, $location);
+$GLOBALS['home_satellite_local_test_reference'] = homeSatelliteLocalTestReference();
+$homePageContext = [
+    'location' => $location,
+    'now' => $now,
+    'satellite' => $homeSatelliteContext,
+    'sections' => [
+        'tonight' => ['satellite_events' => $homeSatelliteContext['tonight_events']],
+        'upcoming' => ['satellite_events' => $homeSatelliteContext['upcoming_events']],
+    ],
+];
+$tonightSatelliteEvents = $homePageContext['sections']['tonight']['satellite_events'];
+$upcomingSatelliteEvents = $homePageContext['sections']['upcoming']['satellite_events'];
+$visibleTonightSatelliteEvents = homeSatelliteDisplayEvents($tonightSatelliteEvents);
+$visibleUpcomingSatelliteEvents = homeSatelliteDisplayEvents($upcomingSatelliteEvents);
 homePageProfileRecord('Astronomía', $homePageProfileAstronomyStarted, $homePageProfileAstronomyDetails);
 
 $homePageProfileCardsStarted = hrtime(true);
@@ -277,6 +326,9 @@ $homePageProfileContentMilliseconds = 0.0;
         <article class="home-v2-card home-v2-tonight atmosphere-card--night" aria-labelledby="v2-tonight-title">
             <div class="home-v2-card__heading"><h2 id="v2-tonight-title">El cielo esta noche</h2></div>
             <p class="home-v2-tonight__summary"><?= htmlspecialchars($tonightText ?? 'La información de esta noche no está disponible por el momento.') ?></p>
+            <?php if ($visibleTonightSatelliteEvents !== []): ?><div class="home-v2-upcoming home-v2-satellite-events home-v2-satellite-events--tonight">
+                <?php renderHomeSatelliteEventItems($visibleTonightSatelliteEvents, $timezoneName, true); ?>
+            </div><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('cielo-de-esta-noche.php'), ENT_QUOTES, 'UTF-8') ?>">Explorar esta noche <span aria-hidden="true">→</span></a>
         </article>
         <?php endif; ?>
@@ -301,24 +353,47 @@ $homePageProfileContentMilliseconds = 0.0;
         <?php if ($showHomeUpcomingCard): ?>
         <article class="home-v2-card home-v2-upcoming-card atmosphere-card--night" aria-labelledby="v2-upcoming-title">
             <div class="home-v2-card__heading"><h2 id="v2-upcoming-title">Lo próximo</h2></div>
-            <?php if ($upcomingEvents !== []): ?><div class="home-v2-upcoming">
-                <?php foreach ($upcomingEvents as $index => $event): $date = homeV2Date($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $horizonDetail = astronomyFullMoonObservationMoment($event, $timezoneName); $observation = is_array($presentation['observation'] ?? null) ? $presentation['observation'] : null; $calendarEvent = astronomyCalendarEventData($event, $presentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eventos.php')); ?>
+            <?php if ($upcomingEvents !== [] || $visibleUpcomingSatelliteEvents !== []): ?><div class="home-v2-upcoming">
+                <?php foreach ($upcomingEvents as $index => $event): ?><?php
+                    $cardPreparationStarted = hrtime(true);
+                    $date = homeV2Date($event['datetime'] ?? null, $timezoneName);
+                    $presentation = astronomyEventPresentation($event, $timezoneName);
+                    $horizonDetail = astronomyFullMoonObservationMoment($event, $timezoneName);
+                    $observation = is_array($presentation['observation'] ?? null) ? $presentation['observation'] : null;
+                    homeUpcomingProfileAdd('presentación y enriquecimiento de tarjetas', (hrtime(true) - $cardPreparationStarted) / 1_000_000);
+                    $cloudPreparationStarted = hrtime(true);
+                    $cloudDate = $observation['cloud_time'] ?? $horizonDetail['date'] ?? $date;
+                    homeUpcomingProfileAdd('preparación de nubosidad', (hrtime(true) - $cloudPreparationStarted) / 1_000_000);
+                    $calendarPreparationStarted = hrtime(true);
+                    $calendarEvent = astronomyCalendarEventData($event, $presentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eventos.php'));
+                    homeUpcomingProfileAdd('preparación de acciones de tarjetas', (hrtime(true) - $calendarPreparationStarted) / 1_000_000);
+                    $cardRenderStarted = hrtime(true);
+                ?>
                 <section class="<?= $index === 0 ? 'home-v2-event home-v2-event--featured' : 'home-v2-event' ?>">
                     <?php renderAstronomyIcon($event, $latitude, 'home-v2-event__icon'); ?>
                     <?php if ($date !== null): ?><?php renderAstronomyEventDateHeader($date, $now, astronomyNearbyEventDate($date), ['class' => 'home-v2-event__date']); ?><?php endif; ?>
-                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if ($observation !== null): ?><p class="home-v2-event__times"><?= htmlspecialchars($observation['first_label']) ?> <?= htmlspecialchars($observation['first_time']->format('H:i')) ?> · <?= htmlspecialchars($observation['second_label']) ?> <?= htmlspecialchars($observation['second_time']->format('H:i')) ?> · Intervalo <?= htmlspecialchars($observation['start']->format('H:i')) ?>–<?= htmlspecialchars($observation['end']->format('H:i')) ?></p><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($observation['cloud_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span>Nubosidad prevista</span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php elseif ($horizonDetail !== null): ?><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span><?= htmlspecialchars($horizonDetail['label']) ?> · <time datetime="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($horizonDetail['date']->format('H:i')) ?></time></span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php endif; ?><?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--home'); ?></div>
+                    <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if ($observation !== null): ?><p class="home-v2-event__times"><?= htmlspecialchars($observation['first_label']) ?> <?= htmlspecialchars($observation['first_time']->format('H:i')) ?> · <?= htmlspecialchars($observation['second_label']) ?> <?= htmlspecialchars($observation['second_time']->format('H:i')) ?> · Intervalo <?= htmlspecialchars($observation['start']->format('H:i')) ?>–<?= htmlspecialchars($observation['end']->format('H:i')) ?></p><?php elseif ($horizonDetail !== null): ?><p class="home-v2-event__horizon"><span><?= htmlspecialchars($horizonDetail['label']) ?> · <time datetime="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($horizonDetail['date']->format('H:i')) ?></time></span></p><?php endif; ?><?php if ($cloudDate !== null): ?><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($cloudDate->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span>Nubosidad prevista</span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php endif; ?><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--home'); ?></div>
                 </section>
+                <?php homeUpcomingProfileAdd('armado final de tarjetas', (hrtime(true) - $cardRenderStarted) / 1_000_000); ?>
                 <?php endforeach; ?>
+                <?php renderHomeSatelliteEventItems($visibleUpcomingSatelliteEvents, $timezoneName, $upcomingEvents === []); ?>
             </div><?php else: ?><p class="home-v2-unavailable">No hay eventos cercanos para mostrar.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('eventos.php'), ENT_QUOTES, 'UTF-8') ?>">Ver todos los eventos <span aria-hidden="true">→</span></a>
         </article>
+        <?php if (astronomyTimingsEnabled()): ?><?php
+            $homeUpcomingProfile = is_array($GLOBALS['home_upcoming_profile'] ?? null) ? $GLOBALS['home_upcoming_profile'] : [];
+            foreach (($homeUpcomingProfile['timings'] ?? []) as $profileLabel => $profileMilliseconds) {
+                $GLOBALS['home_page_profile']['details']['Astronomía']['upcoming · ' . $profileLabel] = (float) $profileMilliseconds;
+            }
+            $GLOBALS['home_page_profile']['upcoming'] = $homeUpcomingProfile;
+        ?><?php endif; ?>
         <?php endif; ?>
 
         <?php if ($contentEnabled && ($showHomeTriviaCard || $showHomeFactCard)): ?><?php
             $homePageProfileContentStarted = hrtime(true);
             $homePageProfileContentLoadStarted = hrtime(true);
             $GLOBALS['home_page_profile_content_detail_enabled'] = astronomyTimingsEnabled();
-            $homeContentCatalog = astronomyLoadContentCatalog();
+            $homeContentCatalog = astronomyLoadHomeContentCatalog($showHomeTriviaCard, $showHomeFactCard);
             unset($GLOBALS['home_page_profile_content_detail_enabled']);
             $homePageProfileContentLoadMilliseconds = (hrtime(true) - $homePageProfileContentLoadStarted) / 1_000_000;
             $homePageProfileContentRenderStarted = hrtime(true);
@@ -327,9 +402,10 @@ $homePageProfileContentMilliseconds = 0.0;
             $homePageProfileContentMilliseconds = (hrtime(true) - $homePageProfileContentStarted) / 1_000_000;
             homePageProfileSet('Contenido/trivias', $homePageProfileContentMilliseconds);
             if (astronomyTimingsEnabled()) {
-                $GLOBALS['home_page_profile']['details']['Contenido/trivias'] = ['carga de catálogo' => $homePageProfileContentLoadMilliseconds]
+                $GLOBALS['home_page_profile']['details']['Contenido/trivias'] = ['carga focalizada' => $homePageProfileContentLoadMilliseconds]
                     + (is_array($GLOBALS['home_page_profile_content_detail'] ?? null) ? $GLOBALS['home_page_profile_content_detail'] : [])
                     + ['render de tarjetas' => $homePageProfileContentRenderMilliseconds];
+                $GLOBALS['home_page_profile']['counts']['Contenido/trivias queries'] = (int) ($GLOBALS['home_content_query_count'] ?? 0);
             }
         ?><?php else: ?><?php homePageProfileSet('Contenido/trivias', 0.0); ?><?php endif; ?>
         <?php if ($showHomeExploreCard): ?><?php renderAstronomyExploreSky(); ?><?php endif; ?>

@@ -418,6 +418,22 @@
   line-height: 1.45;
 }
 
+.home-v2-satellite-events--tonight {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  max-width: 54rem;
+}
+
+.home-v2-event--satellite {
+  border-color: rgba(169, 196, 245, .24);
+  background: linear-gradient(145deg, rgba(103, 132, 183, .09), rgba(255, 255, 255, .025));
+}
+
+.home-v2-satellite-event__safety {
+  color: #e4d5a7 !important;
+  border-left: 2px solid rgba(228, 213, 167, .55);
+  padding-left: .55rem;
+}
+
 .home-v2-unavailable {
   color: var(--muted);
 }

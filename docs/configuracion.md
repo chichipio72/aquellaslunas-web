@@ -76,6 +76,11 @@ Los cálculos generales se guardan en `admin_configuracion_sitio` con claves
 `.altitude_profile` y `.tonight`; aceptan `api` o `php`, y la no elegida queda
 como fallback. `astronomy.data_source.moon_image` acepta `static` o `api`.
 
+La entrada pública **Explorador astronómico** usa la clave
+`menu.explorer.enabled`, administrada en **Visibilidad de secciones**. Su valor
+predeterminado es `true`. Desactivarla oculta sólo el enlace del menú y no
+bloquea `/explorador/` ni sus endpoints.
+
 `MERCADO_PAGO_NOTIFICATION_URL` documenta y valida la URL registrada centralmente en **Tus integraciones → Webhooks**. No se incluye como `notification_url` al crear preferencias, para no reemplazar el canal firmado configurado en el panel.
 
 Los tiempos de API se renderizan automáticamente para `canUseSiteDebugTools()`. `LOCAL_TIME_SIMULATION_ENABLED` es el interruptor técnico local; en producción la sesión admin válida autoriza el simulador. No existe una opción para Analytics: el ID `G-GFZJ3D3MF3` está definido en `includes/analytics.php` y se carga también en local.
@@ -257,3 +262,9 @@ la única puerta. La fecha se guarda en `aquellas_lunas_local`, separada de
 `aquellas_lunas_admin`, y los POST usan CSRF. **Usar hora real** elimina la simulación.
 
 Con simulación, consultas, fechas predeterminadas, selección editorial y marcadores usan el instante indicado. Los perfiles se solicitan una vez y el marcador no crea temporizador. Cachés, logs, sesiones y expiraciones de seguridad conservan el reloj real.
+
+## Trazabilidad astronómica
+
+La opción `astronomy.trace.enabled` de Configuración del sitio habilita el registro reproducible de consultas de alto nivel en `astronomy_request_log`. Está deshabilitada por defecto. El navegador recibe una cookie de sesión HttpOnly con un identificador aleatorio, sin reutilizar IDs reales de sesión ni guardar IP, user-agent o identidad.
+
+La retención predeterminada es de 30 días. La limpieza se ejecuta manualmente con `php scripts/cleanup-astronomy-request-log.php --days=30`; `ASTRONOMY_TRACE_RETENTION_DAYS` permite cambiar ese valor para la invocación CLI. No existe cron automático para esta limpieza.

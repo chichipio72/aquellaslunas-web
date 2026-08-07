@@ -23,6 +23,10 @@ function astronomyTonightRequest(
         error_log('Aquellas Lunas tonight invalid response.');
         return null;
     }
+    if ($detail === 'full' && (!is_array($decoded['stars'] ?? null) || !is_array($decoded['deep_sky_objects'] ?? null))) {
+        error_log('Aquellas Lunas tonight invalid full response: detailed object collections are missing.');
+        return null;
+    }
     return $decoded;
 }
 
@@ -96,10 +100,8 @@ function astronomyTonightCardText(
     }
     $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
     $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
-    $planets = astronomyTonightVisibleObjects(
-        is_array($data['planets'] ?? null) ? $data['planets'] : [],
-        astronomyTonightNightIsCurrent($data, $now, $timezone)
-    );
+    $preparedSections = astronomyTonightPreparedSections($data, $now, $timezone);
+    $planets = $preparedSections['planets'] ?? [];
 
     $encounterSentence = '';
     $encounterObjects = [];
@@ -151,10 +153,7 @@ function astronomyTonightCardText(
         return trim($encounterSentence . ' ' . $visibleSentence);
     }
 
-    $stars = astronomyTonightVisibleObjects(
-        is_array($data['stars'] ?? null) ? $data['stars'] : [],
-        astronomyTonightNightIsCurrent($data, $now, $timezone)
-    );
+    $stars = $preparedSections['stars'] ?? [];
     if ($stars !== [] && astronomyEditorialNumber('tonight.card.stars_max') > 0) {
         $names = array_slice(array_column($stars, 'name'), 0, (int) astronomyEditorialNumber('tonight.card.stars_max'));
         $starMessage = count($names) === 1 ? 'tonight.card.star_one' : (count($names) === 2 ? 'tonight.card.star_two' : 'tonight.card.star_many');

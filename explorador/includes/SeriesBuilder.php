@@ -148,6 +148,8 @@ final class SeriesBuilder
                     'moon_declination' => $position->declinationDegrees,
                     'moon_altitude' => $position->altitudeDegrees,
                     'moon_azimuth' => $position->azimuthDegrees,
+                    'sun_moon_angular_distance' => $position->solarElongationDegrees,
+                    'moon_apparent_diameter_arcmin' => $position->geocentricApparentDiameterArcminutes(),
                 ];
                 $processed++;
                 self::reportProgress($progress, 'lunar_instant', $processed, $workCount, $lastProgressAt, $processed === $workCount);
@@ -162,7 +164,12 @@ final class SeriesBuilder
                 $started = self::now();
                 $position = $sun->calculate($instant, $request->latitude, $request->longitude);
                 $astronomyMs += self::elapsed($started);
-                $sunInstantItems[] = ['sun_altitude' => $position->altitudeDegrees, 'sun_azimuth' => $position->azimuthDegrees];
+                $sunInstantItems[] = [
+                    'sun_altitude' => $position->altitudeDegrees,
+                    'sun_azimuth' => $position->azimuthDegrees,
+                    'sun_distance_km' => $position->earthSunDistanceKilometers(),
+                    'sun_equation_of_time_minutes' => $position->equationOfTimeMinutes,
+                ];
                 $processed++;
                 self::reportProgress($progress, 'solar_instant', $processed, $workCount, $lastProgressAt, $processed === $workCount);
             }

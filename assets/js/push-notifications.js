@@ -16,8 +16,15 @@
   const workerScope = root.dataset.pushWorkerScope || './';
   const subscribeUrl = root.dataset.pushSubscribeUrl || '';
   const unsubscribeUrl = root.dataset.pushUnsubscribeUrl || '';
+  const locationRequired = root.dataset.requiresLocation === 'true';
+  const locationReady = !locationRequired || root.dataset.locationReady === 'true';
   const serviceWorkerSupported = 'serviceWorker' in navigator;
   const pushSupported = serviceWorkerSupported && 'PushManager' in window && 'Notification' in window;
+  const workerActivationTimeoutMs = 15000;
+  const controllerTimeoutMs = 4000;
+  const reloadMarker = 'aquellas_lunas_push_worker_reload';
+  let activationInProgress = false;
+  let activeWorkerPromise = null;
 
   const permissionLabel = () => ({default: 'Pendiente', granted: 'Concedido', denied: 'Denegado'}[Notification.permission] || 'Desconocido');
 
@@ -30,6 +37,10 @@
     root.classList.toggle('is-active', active);
     if (action) action.textContent = active ? 'Notificaciones activadas' : 'Activar notificaciones en este dispositivo';
     if (deactivateAction) deactivateAction.disabled = !active;
+    if (action && !active) {
+      action.disabled = !locationReady;
+      action.setAttribute('aria-disabled', locationReady ? 'false' : 'true');
+    }
   };
 
   const updateCapabilityState = () => {
@@ -58,16 +69,92 @@
     }
   };
 
-  const registration = () => navigator.serviceWorker.register(workerUrl, {scope: workerScope});
+  const timeoutError = () => new Error('El Service Worker no se activó dentro del tiempo esperado.');
+
+  const waitForActiveWorker = (registration, timeoutMs = workerActivationTimeoutMs) => new Promise((resolve, reject) => {
+    if (registration.active?.state === 'activated') {
+      resolve(registration);
+      return;
+    }
+    let worker = registration.installing || registration.waiting || registration.active;
+    let finished = false;
+    let timer = null;
+    const finish = (callback, value) => {
+      if (finished) return;
+      finished = true;
+      if (timer !== null) window.clearTimeout(timer);
+      worker?.removeEventListener('statechange', checkState);
+      registration.removeEventListener('updatefound', handleUpdateFound);
+      callback(value);
+    };
+    const checkState = () => {
+      if (registration.active?.state === 'activated' || worker?.state === 'activated') {
+        finish(resolve, registration);
+      } else if (worker?.state === 'redundant') {
+        finish(reject, new Error('El Service Worker quedó inactivo durante la instalación.'));
+      }
+    };
+    const watchWorker = (candidate) => {
+      worker?.removeEventListener('statechange', checkState);
+      worker = candidate;
+      worker?.addEventListener('statechange', checkState);
+      checkState();
+    };
+    const handleUpdateFound = () => watchWorker(registration.installing || registration.waiting || registration.active);
+    timer = window.setTimeout(() => finish(reject, timeoutError()), timeoutMs);
+    registration.addEventListener('updatefound', handleUpdateFound);
+    watchWorker(worker);
+  });
+
+  const waitForController = (timeoutMs = controllerTimeoutMs) => new Promise((resolve) => {
+    if (navigator.serviceWorker.controller) {
+      resolve(true);
+      return;
+    }
+    let finished = false;
+    const finish = (controlled) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      resolve(controlled);
+    };
+    const handleControllerChange = () => finish(navigator.serviceWorker.controller !== null);
+    const timer = window.setTimeout(() => finish(false), timeoutMs);
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+  });
+
+  const ensureActiveServiceWorker = async () => {
+    if (!serviceWorkerSupported) throw new Error('Este navegador no admite Service Worker.');
+    if (!activeWorkerPromise) {
+      activeWorkerPromise = (async () => {
+        const registration = await navigator.serviceWorker.register(workerUrl, {scope: workerScope});
+        await waitForActiveWorker(registration);
+        if (!registration.active || registration.active.state !== 'activated') throw timeoutError();
+        const controlled = navigator.serviceWorker.controller !== null || await waitForController();
+        return {registration, controlled};
+      })().catch((error) => {
+        activeWorkerPromise = null;
+        throw error;
+      });
+    }
+    return activeWorkerPromise;
+  };
+
+  window.AstronomyPushServiceWorker = Object.freeze({ensureActiveServiceWorker});
   const reloadPanel = () => window.setTimeout(() => window.location.reload(), 650);
 
   const currentSubscription = async () => {
     if (!pushSupported || Notification.permission !== 'granted') return null;
-    const worker = await registration();
-    return worker.pushManager.getSubscription();
+    const {registration} = await ensureActiveServiceWorker();
+    return registration.pushManager.getSubscription();
   };
 
   const activate = async () => {
+    if (!locationReady) {
+      setStatus('Elegí una ubicación para continuar.');
+      return;
+    }
     if (!pushSupported) {
       setStatus('Este navegador no admite notificaciones Web Push.');
       return;
@@ -77,9 +164,28 @@
       return;
     }
 
+    if (activationInProgress) return;
+    activationInProgress = true;
+    let reloadPending = false;
     action.disabled = true;
-    setStatus('Preparando las notificaciones…');
     try {
+      setStatus('Activando el servicio de notificaciones…');
+      const {registration, controlled} = await ensureActiveServiceWorker();
+      if (!registration.active || registration.active.state !== 'activated') throw timeoutError();
+      if (!controlled) {
+        if (sessionStorage.getItem(reloadMarker) !== '1') {
+          sessionStorage.setItem(reloadMarker, '1');
+          setStatus('El servicio quedó activo. Recargando una vez para terminar la preparación…');
+          reloadPending = true;
+          reloadPanel();
+          return;
+        }
+        throw new Error('El Service Worker está activo, pero todavía no controla esta página.');
+      }
+      sessionStorage.removeItem(reloadMarker);
+      setStatus(Notification.permission === 'granted'
+        ? 'Permiso concedido. Creando la suscripción…'
+        : 'Solicitando permiso para mostrar notificaciones…');
       const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
       updateCapabilityState();
       if (permission !== 'granted') {
@@ -87,10 +193,10 @@
         setStatus(permission === 'denied' ? 'Las notificaciones quedaron bloqueadas en el navegador.' : 'No se activaron las notificaciones.');
         return;
       }
-      const worker = await registration();
-      let subscription = await worker.pushManager.getSubscription();
+      setStatus('Creando la suscripción…');
+      let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
-        subscription = await worker.pushManager.subscribe({
+        subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
@@ -98,11 +204,20 @@
       await jsonRequest(subscribeUrl, subscription.toJSON());
       setSubscriptionState(true);
       setStatus('Notificaciones activadas en este dispositivo.');
+      reloadPending = true;
       reloadPanel();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'No pudimos activar las notificaciones.');
+      console.error('Web Push activation failed:', error);
+      const technicalMessage = error instanceof Error ? error.message : '';
+      const workerFailure = /active Service Worker|Service Worker|activ/i.test(technicalMessage);
+      setStatus(workerFailure
+        ? 'No se pudo activar el servicio de notificaciones. Recargá la página e intentá nuevamente.'
+        : 'No pudimos activar las notificaciones. Intentá nuevamente.');
     } finally {
-      action.disabled = false;
+      if (!reloadPending) {
+        activationInProgress = false;
+        action.disabled = !locationReady;
+      }
     }
   };
 
@@ -128,6 +243,17 @@
   deactivateAction?.addEventListener('click', deactivate);
   updateCapabilityState();
 
+  if (!locationReady) {
+    action.disabled = true;
+    action.setAttribute('aria-disabled', 'true');
+    setStatus('Elegí una ubicación para continuar.');
+  }
+
+  if (sessionStorage.getItem(reloadMarker) === '1' && navigator.serviceWorker.controller) {
+    sessionStorage.removeItem(reloadMarker);
+    setStatus('El servicio de notificaciones está listo. Podés continuar con la activación.');
+  }
+
   if (!pushSupported) {
     if (action) action.disabled = true;
     setSubscriptionState(false);
@@ -137,7 +263,14 @@
     setStatus('Las notificaciones están bloqueadas. Podés habilitarlas desde la configuración del navegador.');
   } else if (Notification.permission === 'granted') {
     currentSubscription()
-      .then((subscription) => setSubscriptionState(subscription !== null))
+      .then((subscription) => {
+        setSubscriptionState(subscription !== null);
+        if (subscription === null) {
+          setStatus(locationReady
+            ? 'Permiso concedido. Falta activar el servicio de notificaciones.'
+            : 'Elegí una ubicación para continuar.');
+        }
+      })
       .catch(() => {
         setSubscriptionState(false);
         setStatus('No pudimos comprobar la suscripción de este dispositivo.');

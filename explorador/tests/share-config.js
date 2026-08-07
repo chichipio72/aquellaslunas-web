@@ -4,8 +4,10 @@ global.window = global;
 require('../assets/share-config.js');
 const tools = global.ExplorerShareConfig;
 const schema = {
-    modes: ['diario', 'extremos'], fields: ['moon_illumination', 'moon_distance_geocentric', 'sun_altitude'],
-    numericFields: ['moon_illumination', 'moon_distance_geocentric', 'sun_altitude'],
+    modes: ['diario', 'extremos'], fields: ['moon_illumination', 'moon_distance_geocentric', 'sun_altitude', 'sun_distance_km',
+        'sun_equation_of_time_minutes', 'sun_moon_angular_distance', 'moon_apparent_diameter_arcmin'],
+    numericFields: ['moon_illumination', 'moon_distance_geocentric', 'sun_altitude', 'sun_distance_km',
+        'sun_equation_of_time_minutes', 'sun_moon_angular_distance', 'moon_apparent_diameter_arcmin'],
     phases: ['new_moon', 'first_quarter', 'full_moon', 'last_quarter'], methods: ['product', 'average'],
     extremaFields: ['moon_distance_geocentric'], extremaTypes: ['maximo', 'minimo', 'ambos'], maximumDays: 73050,
     validTimezone: value => ['UTC', 'America/Argentina/Buenos_Aires'].includes(value),
@@ -21,6 +23,22 @@ const dailyUrl = tools.build({...defaults, fields: ['moon_illumination', 'moon_d
 const daily = tools.parse(new URL(dailyUrl).search, schema, defaults);
 check(daily.valid && daily.config.phases.length === 4 && daily.config.methods.length === 2, 'daily round trip');
 check(daily.config.a === 'moon_illumination' && daily.config.locationLabel === 'CABA', 'relation and label');
+
+const solarDistanceUrl = tools.build({...defaults, fields: ['sun_altitude', 'sun_azimuth', 'sun_distance_km'],
+    phases: ['full_moon'], methods: ['product'], a: 'sun_altitude', b: 'sun_distance_km'},
+    'https://example.test/explorador/');
+const solarDistance = tools.parse(new URL(solarDistanceUrl).search, schema, defaults);
+check(solarDistance.valid && solarDistance.config.fields.includes('sun_distance_km'), 'solar distance round trip');
+check(solarDistance.config.phases[0] === 'full_moon' && solarDistance.config.b === 'sun_distance_km',
+    'solar distance phase and relation');
+
+const geometryUrl = tools.build({...defaults,
+    fields: ['sun_equation_of_time_minutes', 'sun_moon_angular_distance', 'moon_apparent_diameter_arcmin'],
+    phases: ['full_moon'], methods: ['average'], a: 'sun_moon_angular_distance', b: 'moon_apparent_diameter_arcmin'},
+    'https://example.test/explorador/');
+const geometry = tools.parse(new URL(geometryUrl).search, schema, defaults);
+check(geometry.valid && geometry.config.fields.length === 3 && geometry.config.methods[0] === 'average',
+    'new instant variables round trip');
 
 const extremaUrl = tools.build({...defaults, mode: 'extremos', locationLabel: '', extremaField: 'moon_distance_geocentric',
     extremaType: 'ambos'}, 'https://example.test/explorador/');

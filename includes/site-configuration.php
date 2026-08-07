@@ -19,6 +19,13 @@ function astronomySiteConfigCatalog(): array
             'description' => 'Habilita el acceso público a contenidos editoriales.',
         ],
 
+        'astronomy.trace.enabled' => [
+            'group' => 'diagnostics',
+            'label' => 'Trazabilidad de consultas astronómicas',
+            'default' => false,
+            'description' => 'Registra entradas y respuestas finales para reproducir consultas astronómicas. No guarda identidad personal, IP ni user-agent.',
+        ],
+
         'menu.home.enabled' => [
             'group' => 'menu',
             'label' => 'Inicio',
@@ -61,6 +68,12 @@ function astronomySiteConfigCatalog(): array
             'default' => true,
             'description' => 'Muestra la entrada Planificador en el menú principal.',
         ],
+        'menu.explorer.enabled' => [
+            'group' => 'menu',
+            'label' => 'Explorador astronómico',
+            'default' => true,
+            'description' => 'Muestra la entrada Explorador astronómico en el menú principal; la URL directa continúa disponible al ocultarla.',
+        ],
         'menu.gallery.enabled' => [
             'group' => 'menu',
             'label' => 'Galería',
@@ -78,6 +91,12 @@ function astronomySiteConfigCatalog(): array
             'label' => 'Ubicación',
             'default' => true,
             'description' => 'Muestra la entrada Ubicación en el menú principal.',
+        ],
+        'menu.notifications.enabled' => [
+            'group' => 'menu',
+            'label' => 'Configurar notificaciones',
+            'default' => true,
+            'description' => 'Muestra el acceso público a las preferencias de notificaciones de este dispositivo.',
         ],
         'menu.capabilities.enabled' => [
             'group' => 'menu',
@@ -122,6 +141,12 @@ function astronomySiteConfigCatalog(): array
             'default' => true,
             'description' => 'Muestra la tarjeta Lo próximo en la portada.',
         ],
+        'home.satellite_transits.enabled' => [
+            'group' => 'home',
+            'label' => 'Cálculo de tránsitos satelitales',
+            'default' => true,
+            'description' => 'Calcula y muestra acercamientos y tránsitos de ISS y Tiangong frente al Sol y la Luna en la portada.',
+        ],
         'home.explore_sky.enabled' => [
             'group' => 'home',
             'label' => 'Bloque Explorá el cielo',
@@ -155,6 +180,7 @@ function astronomySiteConfigGroups(): array
 {
     return [
         'content' => 'Contenido',
+        'diagnostics' => 'Diagnóstico y trazabilidad',
         'menu' => 'Menú principal',
         'home' => 'Portada',
     ];
@@ -170,9 +196,11 @@ function astronomySiteMenuConfigBySectionId(): array
         'events' => 'menu.events.enabled',
         'eclipses' => 'menu.eclipses.enabled',
         'planner' => 'menu.planner.enabled',
+        'explorer' => 'menu.explorer.enabled',
         'gallery' => 'menu.gallery.enabled',
         'content' => 'menu.content.enabled',
         'location' => 'menu.location.enabled',
+        'notifications' => 'menu.notifications.enabled',
         'capabilities' => 'menu.capabilities.enabled',
         'about' => 'menu.about.enabled',
         'administration' => 'menu.administration.enabled',

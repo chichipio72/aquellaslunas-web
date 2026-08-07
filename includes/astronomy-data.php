@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/api-client.php';
 require_once __DIR__ . '/web-database.php';
+require_once __DIR__ . '/astronomy-trace.php';
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use AstronomyEngine\Facade\AltitudeProfileFacade;
@@ -134,13 +135,16 @@ function astronomyDataApiFallback(string $path, array $parameters, string $label
 }
 
 /** @return array<string,mixed> */
-function astronomyDataResolve(string $functionality, callable $phpCalculation, string $path, array $parameters, string $label, int $timeout): array
+function astronomyDataResolveUntraced(string $functionality, callable $phpCalculation, string $path, array $parameters, string $label, int $timeout, ?callable $validator = null): array
 {
     $requestedSource = astronomyDataSourceFor($functionality);
     $operationStarted = hrtime(true);
     if ($requestedSource === 'api') {
         try {
             $result = astronomyDataApiFallback($path, $parameters, $label, $timeout);
+            if ($validator !== null) {
+                $validator($result);
+            }
             astronomyAnnotateLastDiagnostic($label, [
                 'requested_source' => 'api',
                 'used_source' => 'api',
@@ -154,6 +158,9 @@ function astronomyDataResolve(string $functionality, callable $phpCalculation, s
             $result = $phpCalculation();
             if (!is_array($result)) {
                 throw new UnexpectedValueException('El motor PHP devolvió un contrato inválido.', 0, $apiException);
+            }
+            if ($validator !== null) {
+                $validator($result);
             }
             astronomyRecordDiagnostic([
                 'label' => $label . ' PHP fallback',
@@ -175,6 +182,9 @@ function astronomyDataResolve(string $functionality, callable $phpCalculation, s
         if (!is_array($result)) {
             throw new UnexpectedValueException('El motor PHP devolvió un contrato inválido.');
         }
+        if ($validator !== null) {
+            $validator($result);
+        }
         $elapsed = (hrtime(true) - $phpStarted) / 1_000_000;
         astronomyRecordDiagnostic([
             'label' => $label,
@@ -189,6 +199,9 @@ function astronomyDataResolve(string $functionality, callable $phpCalculation, s
         error_log('Aquellas Lunas PHP astronomy ' . $label . ' error; using API fallback: ' . $exception->getMessage());
         $fallbackLabel = $label . ' API fallback';
         $result = astronomyDataApiFallback($path, $parameters, $fallbackLabel, $timeout);
+        if ($validator !== null) {
+            $validator($result);
+        }
         astronomyAnnotateLastDiagnostic($fallbackLabel, [
             'requested_source' => 'php',
             'used_source' => 'api',
@@ -200,6 +213,23 @@ function astronomyDataResolve(string $functionality, callable $phpCalculation, s
         ]);
         return $result;
     }
+}
+
+/** @return array<string,mixed> */
+function astronomyDataResolve(string $functionality, callable $phpCalculation, string $path, array $parameters,
+    string $label, int $timeout, ?callable $validator = null): array
+{
+    $location = [
+        'latitude' => (float) ($parameters['latitude'] ?? 0.0),
+        'longitude' => (float) ($parameters['longitude'] ?? 0.0),
+        'elevation_meters' => (float) ($parameters['elevation_meters'] ?? $parameters['elevation'] ?? 0.0),
+        'timezone' => (string) ($parameters['timezone'] ?? 'UTC'),
+    ];
+    return astronomyTraceExecute($functionality, $label, [
+        'endpoint' => $path, 'parameters' => $parameters, 'timeout_seconds' => $timeout,
+    ], $location, static fn(): array => astronomyDataResolveUntraced(
+        $functionality, $phpCalculation, $path, $parameters, $label, $timeout, $validator
+    ));
 }
 
 function astronomyDataResultCount(array $result): ?int
@@ -283,6 +313,14 @@ function astronomyDataTonight(array $location, string $date, string $detail, str
             astronomyDataObserver($location),
             $detail
         ),
-        '/v1/astronomy/tonight', $parameters, $label, $timeout
+        '/v1/astronomy/tonight', $parameters, $label, $timeout,
+        static function (array $result) use ($detail): void {
+            if (!is_array($result['night'] ?? null) || !is_array($result['planets'] ?? null)) {
+                throw new UnexpectedValueException('La fuente de Tonight devolvió un contrato inválido.');
+            }
+            if ($detail === 'full' && (!is_array($result['stars'] ?? null) || !is_array($result['deep_sky_objects'] ?? null))) {
+                throw new UnexpectedValueException('La fuente de Tonight devolvió una respuesta summary para una solicitud full.');
+            }
+        }
     );
 }

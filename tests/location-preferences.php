@@ -15,6 +15,8 @@ locationAssert(astronomyLocationCoordinate(91, -90, 90) === null, 'Aceptó una l
 locationAssert(astronomyLocationTimezone('America/Argentina/Buenos_Aires') !== null, 'Rechazó una zona IANA válida.');
 locationAssert(astronomyLocationTimezone('America/Buenos_Aires') === 'America/Argentina/Buenos_Aires', 'No canonicalizó el alias IANA de Buenos Aires.');
 locationAssert(astronomyLocationTimezone('Invalid/Zone') === null, 'Aceptó una zona inexistente.');
+locationAssert(astronomyLocationElevation('28.04') === 28.0, 'No normalizó una elevación válida.');
+locationAssert(astronomyLocationElevation(10001) === null, 'Aceptó una elevación fuera de rango.');
 locationAssert(astronomyLocationMode('custom') === 'manual', 'No migró el modo custom histórico.');
 locationAssert(astronomyLocationMode('geolocation') === 'geolocation', 'Rechazó el modo geolocation.');
 locationAssert(astronomyLocationMode('other') === null, 'Aceptó un modo desconocido.');
@@ -29,7 +31,9 @@ locationAssert(!astronomyLocationIntroWasSeen(), 'Una visita nueva apareció con
 $_COOKIE = [
     'astro_latitude' => '-34.499',
     'astro_longitude' => '-58.5751',
+    'astro_elevation' => '0',
     'astro_timezone' => 'America/Argentina/Buenos_Aires',
+    'astro_location_version' => ASTRONOMY_LOCATION_COOKIE_VERSION,
     'astro_location_mode' => 'manual',
     'astro_location_name' => 'Boulogne Sur Mer',
 ];

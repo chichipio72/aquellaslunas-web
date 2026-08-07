@@ -1,5 +1,7 @@
 'use strict';
 
+const notificationAssetUrl = (path) => new URL(path, self.registration.scope).href;
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -10,8 +12,8 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(self.registration.showNotification(payload.title || 'Aquellas Lunas', {
     body: payload.body || 'Tenés una nueva notificación.',
-    icon: 'assets/images/favicon/icon-192.png',
-    badge: 'assets/images/favicon/favicon-32x32.png',
+    icon: notificationAssetUrl('assets/images/favicon/icon-192.png'),
+    badge: notificationAssetUrl('assets/images/favicon/badge-96.png'),
     data: {url: payload.url || './'},
   }));
 });

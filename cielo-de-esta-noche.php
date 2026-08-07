@@ -89,7 +89,7 @@ $pageSeo = aquellasLunasSeoPage(
     'El cielo esta noche | Aquellas Lunas',
     'Planetas, Luna, estrellas y otros objetos visibles esta noche desde tu ubicación.',
     '/cielo-de-esta-noche.php',
-    'article'
+    'webpage'
 );
 ?>
 <!doctype html>

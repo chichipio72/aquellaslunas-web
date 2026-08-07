@@ -70,6 +70,65 @@ function astronomyContentDbNullableText(mixed $value): ?string
     return $text === '' ? null : $text;
 }
 
+/** @return array<string,mixed>|null */
+function astronomyContentDbRandomHomeTrivia(PDO $connection, array $excludedIds = []): ?array
+{
+    $parameters = [];
+    $excludedSql = '';
+    if ($excludedIds !== []) {
+        $placeholders = [];
+        foreach (array_values($excludedIds) as $index => $id) {
+            $key = ':excluded_' . $index;
+            $placeholders[] = $key;
+            $parameters[$key] = (int) $id;
+        }
+        $excludedSql = ' AND t.id NOT IN (' . implode(',', $placeholders) . ')';
+    }
+    $statement = $connection->prepare(
+        'SELECT t.id AS database_id,t.codigo,t.pregunta,t.imagen,t.visible,a.slug '
+        . 'FROM contenido_trivias t INNER JOIN contenido_articulos a ON a.id=t.articulo_id '
+        . 'WHERE t.visible=1 AND a.visible=1' . $excludedSql . ' ORDER BY RAND() LIMIT 1'
+    );
+    $statement->execute($parameters);
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    return is_array($row) ? $row : null;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyContentDbHomeTriviaOptions(PDO $connection, int $triviaId): array
+{
+    $statement = $connection->prepare(
+        'SELECT texto,correcta,explicacion FROM contenido_trivia_opciones '
+        . 'WHERE trivia_id=:trivia_id ORDER BY orden ASC,id ASC'
+    );
+    $statement->execute(['trivia_id' => $triviaId]);
+    return array_values(array_filter($statement->fetchAll(PDO::FETCH_ASSOC), 'is_array'));
+}
+
+/** @return array<string,mixed>|null */
+function astronomyContentDbRandomHomeFact(PDO $connection, array $excludedIds = []): ?array
+{
+    $parameters = [];
+    $excludedSql = '';
+    if ($excludedIds !== []) {
+        $placeholders = [];
+        foreach (array_values($excludedIds) as $index => $id) {
+            $key = ':excluded_' . $index;
+            $placeholders[] = $key;
+            $parameters[$key] = (int) $id;
+        }
+        $excludedSql = ' AND s.id NOT IN (' . implode(',', $placeholders) . ')';
+    }
+    $statement = $connection->prepare(
+        'SELECT s.id AS database_id,s.codigo,s.frase,s.detalle,s.imagen,s.visible,a.slug '
+        . 'FROM contenido_sabias_que s INNER JOIN contenido_articulos a ON a.id=s.articulo_id '
+        . 'WHERE s.visible=1 AND a.visible=1' . $excludedSql . ' ORDER BY RAND() LIMIT 1'
+    );
+    $statement->execute($parameters);
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    return is_array($row) ? $row : null;
+}
+
 /**
  * @return array{raw:array,metadata:array{slug:string,actualizado_en:string,article_id:int}}|null
  */

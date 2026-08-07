@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/includes/web-push.php';
+require_once dirname(__DIR__) . '/includes/location-context.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -47,6 +48,15 @@ if (!is_array($payload) || json_last_error() !== JSON_ERROR_NONE) {
 }
 
 try {
+    $location = astronomyLocationContext();
+    $locationIsValid = ($location['confirmed'] ?? false) === true
+        && astronomyLocationName($location['name'] ?? null) !== null
+        && astronomyLocationCoordinate($location['latitude'] ?? null, -90, 90) !== null
+        && astronomyLocationCoordinate($location['longitude'] ?? null, -180, 180) !== null
+        && astronomyLocationTimezone($location['timezone'] ?? null) !== null;
+    if (!$locationIsValid) {
+        throw new InvalidArgumentException('Elegí una ubicación válida antes de activar las notificaciones.');
+    }
     $subscription = astronomyWebPushValidateSubscription($payload);
     astronomyWebPushSaveSubscription(
         getWebDatabaseConnection(),

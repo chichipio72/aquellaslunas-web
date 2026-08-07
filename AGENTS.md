@@ -220,6 +220,23 @@ No asumir estructuras antiguas basadas en archivos PHP si la implementación act
 
 Antes de modificar el sistema de contenidos, revisar el esquema y repositorios actuales.
 
+El sitemap público conserva la URL `/astro/sitemap.xml`, resuelta por Apache
+hacia `sitemap.php`. Las entradas de artículos se generan desde el catálogo
+MySQL validado: sólo se publican artículos válidos y visibles, con la misma
+canonical individual usada por `contenido.php`. No volver a mantener una lista
+estática de artículos en XML.
+
+Las relaciones de `contenido_articulos_relaciones` son editoriales, dirigidas
+y ordenadas desde el artículo origen hacia un `slug_relacionado`. La vista
+pública sólo convierte en enlaces los valores que coinciden con otro artículo
+válido y visible; no debe inferir la relación inversa ni generar relaciones a
+partir de palabras clave.
+
+El slug de un artículo que ya fue publicado se considera una URL pública
+estable y no debe modificarse normalmente. El editor conserva por ahora la
+edición técnica del campo con una advertencia explícita; no existe todavía
+historial de slugs ni redirección automática desde valores anteriores.
+
 ---
 
 ## 10. Texto y controles fuera de tarjetas
@@ -246,6 +263,12 @@ El sitio posee un sistema centralizado para ubicación y contexto temporal.
 No implementar mecanismos paralelos para obtener, guardar o mostrar ubicación, fecha u hora sin revisar primero ese sistema.
 
 La fecha y la ubicación general del usuario deben mantenerse centralizadas en el encabezado cuando corresponda, evitando repeticiones innecesarias en el cuerpo de las páginas.
+
+La ubicación persistida es un bloque atómico de latitud, longitud, elevación y
+zona horaria. La zona IANA se resuelve siempre en el servidor desde coordenadas
+mediante `includes/timezone-resolver.php`; no aceptar como autoridad el timezone
+del navegador ni conservar el de una ubicación anterior. Las cookies heredadas
+se validan y migran al construir `astronomyLocationContext()`.
 
 En entorno local existe además simulación temporal para pruebas.
 
@@ -390,10 +413,14 @@ El MVP Web Push conserva estas separaciones:
 - las suscripciones anónimas viven en `WEB_DB`;
 - el navegador recibe únicamente la clave VAPID pública;
 - la clave VAPID privada queda fuera de Git y se usa sólo en procesos server-side;
-- el piloto se administra desde `/admin/notificaciones-prueba.php`; no exponer todavía controles públicos de suscripción;
+- el piloto permite que cada navegador gestione su propia suscripción y preferencias desde `/notificaciones.php`; la identificación pública se basa en la `PushSubscription` completa y nunca en un ID numérico; `/admin/notificaciones-prueba.php` y `/admin/notificaciones-astronomicas.php` se conservan para pruebas, supervisión y correcciones;
 - el envío administrativo del hosting usa `minishlink/web-push` mediante Composer y `symfony/polyfill-mbstring`; `vendor/` generado desde `composer.lock` se excluye del despliegue normal y sólo se transfiere usando `scripts/desplegar.sh --include-vendor`;
 - el script Python con `pywebpush` se conserva como alternativa manual de la Mini PC;
 - `service-worker.js` atiende solamente `push` y `notificationclick`; no agregar caché u offline como efecto colateral de cambios en notificaciones.
+- el único cron permanente del hosting invoca `scripts/run-scheduled-tasks.php`; los scripts de salida lunar y recordatorios generales quedan como wrappers CLI de diagnóstico, no como cron separados;
+- las migraciones automáticas compatibles se incorporan mediante la lista explícita y ordenada de `scripts/migrations/registry.php`; las destructivas o irreversibles deben marcarse manuales y nunca ejecutarse automáticamente.
+- los tipos, disponibilidad global, plantillas, URL y valores predeterminados de avisos astronómicos viven en `web_push_notification_types`; `moonrise` y `test` deben renderizarse con los marcadores controlados del módulo común, sin volver a fijar textos o destinos en los procesadores;
+- `available`, la preferencia `enabled`, la habilitación general del dispositivo y el estado técnico de la suscripción son capas independientes; desactivar un tipo global nunca debe borrar preferencias existentes.
 
 ---
 
@@ -433,3 +460,60 @@ de caché debe distinguir la combinación exacta de grupos.
 La cobertura contractual de `astronomical_events` es 1900–2050. En `auto`, MariaDB se usa sólo cuando cubre por completo el intervalo pedido y PHP resuelve lo que quede fuera. Para eclipses recuperados de MariaDB, la geometría global persistida se conserva y las circunstancias locales faltantes se completan con los calculadores PHP validados.
 
 `satellite-lunar-transits` no forma parte de esta migración; no trasladarlo a estas fachadas sin una tarea específica.
+
+---
+
+## 23. Motor satelital PHP
+
+El primer bloque satelital vive bajo `AstronomyEngine\Satellite`: TLE local,
+SGP4 near-earth WGS72, estado TEME y transformación topocéntrica WGS84. Se
+carga con el mismo autoloader manual del motor y no depende de Python, red ni
+extensiones nativas. No confundir TEME con las coordenadas aparentes/de fecha
+de `EclipseTopocentricGeometry`, ni reutilizar esa clase para satélites.
+
+La reducción usa DUT1 explícito y configurable, cero por defecto, y movimiento
+polar cero. Una futura incorporación de EOP debe ser explícita y validada
+contra los fixtures; no agregar correcciones ocultas. Los fixtures fijos viven
+en `tests/fixtures/satellite/`.
+
+`SatelliteLunarTransitDetector` busca acercamientos y tránsitos lunares con
+esos TLE locales, `AstronomyObserver` y `MeeusLunarCalculator`. Es una pieza
+portable del motor con CLI y benchmark propios: no conectarla a fachadas,
+endpoints, almacenamiento, descargas, caché, “Esta noche”, “Lo próximo” ni
+notificaciones sin una tarea específica.
+
+La operación con TLE recientes entra por `SatelliteTransitService` (o por el
+adaptador lunar legado `SatelliteLunarTransitService`) y
+`CachedCelesTrakTleProvider`: sólo admite ISS 25544 y Tiangong 48274, consulta
+CelesTrak con `FORMAT=TLE`, valida checksum y NORAD antes de publicar un valor,
+y usa `astronomy-engine/cache/satellite/tle-cache.json` con TTL predeterminado
+de seis horas. El caché es estado de ejecución excluido de Git y despliegues.
+Ante una descarga fallida se conserva exclusivamente el último TLE que vuelva
+a superar la validación local; sin descarga ni caché válida debe fallar de
+forma explícita. El modo offline usa `FixtureSatelliteTleProvider`.
+
+La entrada unificada para búsquedas nuevas es `SatelliteTransitService`, con
+objetivos `moon`, `sun` o ambos. `SatelliteAngularTransitDetector` concentra
+muestreo, separación, clasificación, refinamiento y contactos; Luna y Sol
+mantienen proveedores geométricos separados. No volver a bifurcar un detector
+completo por cuerpo. Para el Sol la grilla fina adaptativa es de dos segundos
+sólo dentro de pasos preseleccionados, con refinamiento continuo y contactos a
+alta resolución. Toda salida solar, especialmente una futura salida pública,
+debe incluir que nunca se observe el Sol directamente ni con instrumentos sin
+un filtro solar certificado.
+
+En la portada, `includes/home-satellite-context.php` es la única entrada al
+servicio satelital. Si `home.satellite_transits.enabled` está activa, se ejecuta
+una vez después de resolver ubicación, reloj y ventana de `tonight`, y conserva
+el resultado combinado ISS + Tiangong / Sol + Luna en
+`$homePageContext['satellite']`; desactivada debe cortar antes de resolver TLE.
+La vista de `tonight` recibe sólo los eventos lunares cuyo máximo cae dentro de
+la noche civil local; la vista de `upcoming` recibe el resto dentro de 48 horas.
+Ambas presentan sólo `transit` y `very_close`. No invocar nuevamente
+`SatelliteTransitService` desde tarjetas, helpers de presentación ni secciones.
+
+---
+
+## 24. Trazabilidad astronómica
+
+La trazabilidad reproducible entra exclusivamente por `includes/astronomy-trace.php` y se habilita con `astronomy.trace.enabled`. Las fachadas generales, eventos, contexto satelital y series del Explorador generan una fila por operación de alto nivel en `astronomy_request_log`; no instrumentar muestras, días, refinamientos ni calculadores internos. `request_id` puede vincularse en el futuro con reportes, mientras `session_trace_id` es anónimo y no debe derivarse de IDs reales, IP o user-agent. Una falla del log nunca debe interrumpir la consulta astronómica.

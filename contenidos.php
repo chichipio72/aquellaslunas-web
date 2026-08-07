@@ -30,9 +30,9 @@ $pageSeo = aquellasLunasSeoPage(
     'Contenidos | Aquellas Lunas',
     'Artículos para comprender y disfrutar la Luna y el cielo.',
     '/contenidos.php',
-    'article'
+    'collection'
 );
-$pageSeo['robots'] = 'noindex, nofollow';
+$pageSeo['robots'] = $searchQuery === '' ? 'index, follow' : 'noindex, follow';
 ?>
 <!doctype html>
 <html lang="es">
@@ -68,22 +68,7 @@ $pageSeo['robots'] = 'noindex, nofollow';
         </form>
         <section class="content-index" aria-label="Artículos">
             <?php foreach ($articles as $article): ?>
-                <?php $articleUrl = astronomyContentArticleUrl($article['slug']); ?>
-                <article class="card content-index-card<?= ($article['image']['url'] ?? null) !== null ? ' content-index-card--with-image' : '' ?>">
-                    <?php if (($article['image']['url'] ?? null) !== null): ?>
-                        <div class="content-index-card__media"><?= astronomyContentProtectedImageHtml(
-                            $article['image'],
-                            (string) $article['raw']['titulo'],
-                            'content-index-card__image',
-                            '--image-position-x: ' . $article['image_position_x'] . '%; --image-position-y: ' . $article['image_position_y'] . '%;'
-                        ) ?></div>
-                    <?php endif; ?>
-                    <div class="content-index-card__body">
-                        <h2><a class="content-card__title-link" href="<?= htmlspecialchars($articleUrl, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $article['raw']['titulo']) ?></a></h2>
-                        <p><?= htmlspecialchars((string) $article['raw']['resumen']) ?></p>
-                        <a class="content-card__read-link" href="<?= htmlspecialchars($articleUrl, ENT_QUOTES, 'UTF-8') ?>">Leer artículo <span aria-hidden="true">→</span></a>
-                    </div>
-                </article>
+                <?php renderAstronomyContentIndexCard($article); ?>
             <?php endforeach; ?>
             <?php if ($articles === [] && $searchQuery !== '' && !astronomyContentDebugEnabled()): ?><div class="card content-search-empty"><p>No encontramos contenidos relacionados con “<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') ?>”.</p></div><?php endif; ?>
             <?php if ($articles === [] && $searchQuery === '' && !astronomyContentDebugEnabled()): ?><div class="card content-search-empty"><p>No hay artículos disponibles por el momento.</p></div><?php endif; ?>

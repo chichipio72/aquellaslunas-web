@@ -1,0 +1,28 @@
+CREATE TABLE IF NOT EXISTS astronomy_request_log (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    request_id CHAR(32) NOT NULL,
+    session_trace_id CHAR(32) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    source VARCHAR(190) NOT NULL,
+    operation VARCHAR(100) NOT NULL,
+    latitude DECIMAL(10,6) NOT NULL,
+    longitude DECIMAL(10,6) NOT NULL,
+    elevation_meters DECIMAL(10,2) NOT NULL DEFAULT 0,
+    timezone VARCHAR(64) NOT NULL,
+    effective_clock VARCHAR(40) NOT NULL,
+    clock_simulated TINYINT(1) NOT NULL DEFAULT 0,
+    input_json JSON NOT NULL,
+    response_json JSON NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    total_ms DECIMAL(14,3) NOT NULL DEFAULT 0,
+    code_version VARCHAR(32) NOT NULL,
+    technical_error TEXT NULL,
+    is_admin_session TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_astronomy_request_log_request (request_id),
+    KEY idx_astronomy_request_log_session (session_trace_id, created_at),
+    KEY idx_astronomy_request_log_created (created_at),
+    KEY idx_astronomy_request_log_operation (operation, created_at),
+    KEY idx_astronomy_request_log_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

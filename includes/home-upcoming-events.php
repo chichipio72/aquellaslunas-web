@@ -2,6 +2,32 @@
 
 require_once __DIR__ . '/editorial-configuration.php';
 
+function homeUpcomingProfileReset(): void
+{
+    $GLOBALS['home_upcoming_profile'] = ['timings' => [], 'counts' => [], 'segments' => []];
+}
+
+function homeUpcomingProfileAdd(string $key, float $milliseconds): void
+{
+    if (($GLOBALS['home_upcoming_profile_enabled'] ?? false) !== true) return;
+    $GLOBALS['home_upcoming_profile']['timings'][$key] =
+        (float) ($GLOBALS['home_upcoming_profile']['timings'][$key] ?? 0.0) + max(0.0, $milliseconds);
+}
+
+function homeUpcomingProfileCount(string $key, int $amount = 1): void
+{
+    if (($GLOBALS['home_upcoming_profile_enabled'] ?? false) !== true) return;
+    $GLOBALS['home_upcoming_profile']['counts'][$key] =
+        (int) ($GLOBALS['home_upcoming_profile']['counts'][$key] ?? 0) + $amount;
+}
+
+function homeUpcomingProfileSegment(string $label, array $data): void
+{
+    if (($GLOBALS['home_upcoming_profile_enabled'] ?? false) === true) {
+        $GLOBALS['home_upcoming_profile']['segments'][$label] = $data;
+    }
+}
+
 function homeUpcomingEventDateTime($value, string $timezoneName): ?DateTimeImmutable
 {
     if (!is_string($value) || trim($value) === '') {
@@ -60,29 +86,61 @@ function homeUpcomingProgressiveSearch(
     callable $fetchSegment,
     ?int $limit = null
 ): array {
-    $limit ??= (int) astronomyEditorialNumber('home.upcoming.max_items');
+    if ($limit === null) {
+        $editorialStarted = hrtime(true);
+        $limit = (int) astronomyEditorialNumber('home.upcoming.max_items');
+        homeUpcomingProfileAdd('preparación editorial de búsqueda · max_items', (hrtime(true) - $editorialStarted) / 1_000_000);
+        homeUpcomingProfileCount('lecturas editoriales de búsqueda');
+    }
     $initialDate = new DateTimeImmutable($now->format('Y-m-d'), new DateTimeZone($timezoneName));
     $collected = [];
     $queries = [];
     $valid = [];
+    $editorialStarted = hrtime(true);
     $maxDays = (int) astronomyEditorialNumber('home.upcoming.max_days');
+    homeUpcomingProfileAdd('preparación editorial de búsqueda · max_days', (hrtime(true) - $editorialStarted) / 1_000_000);
+    homeUpcomingProfileCount('lecturas editoriales de búsqueda');
     $segments = [
         ['offset_days' => 0, 'days' => 7, 'label' => '1-7'],
         ['offset_days' => 7, 'days' => 7, 'label' => '8-14'],
         ['offset_days' => 14, 'days' => $maxDays - 14, 'label' => '15-' . $maxDays],
     ];
     foreach ($segments as $segment) {
+        $rangeStarted = hrtime(true);
         $startDate = $initialDate->modify('+' . $segment['offset_days'] . ' days')->format('Y-m-d');
         $days = (int) $segment['days'];
+        homeUpcomingProfileAdd('resolución de rangos', (hrtime(true) - $rangeStarted) / 1_000_000);
         $queries[] = ['start_date' => $startDate, 'days' => $days, 'label' => $segment['label']];
+        $fetchStarted = hrtime(true);
         $response = $fetchSegment($startDate, $days, (string) $segment['label']);
+        $fetchMilliseconds = (hrtime(true) - $fetchStarted) / 1_000_000;
+        homeUpcomingProfileAdd('resolución segmento ' . $segment['label'], $fetchMilliseconds);
+        $receivedCount = is_array($response['items'] ?? null) ? count($response['items']) : 0;
+        $combineStarted = hrtime(true);
         if (is_array($response['items'] ?? null)) {
             array_push($collected, ...$response['items']);
         }
+        homeUpcomingProfileAdd('combinación de segmentos', (hrtime(true) - $combineStarted) / 1_000_000);
+        $selectionStarted = hrtime(true);
         $valid = homeUpcomingValidEvents($collected, $now, $timezoneName);
+        $selectionMilliseconds = (hrtime(true) - $selectionStarted) / 1_000_000;
+        homeUpcomingProfileAdd('deduplicación, ordenamiento y selección', $selectionMilliseconds);
+        homeUpcomingProfileSegment((string) $segment['label'], [
+            'start_date' => $startDate,
+            'days' => $days,
+            'fetch_ms' => $fetchMilliseconds,
+            'received' => $receivedCount,
+            'collected' => count($collected),
+            'valid_after_merge' => count($valid),
+            'discarded_after_merge' => count($collected) - count($valid),
+        ]);
         if (count($valid) >= $limit) {
             break;
         }
     }
-    return ['events' => array_slice($valid, 0, $limit), 'queries' => $queries];
+    $sliceStarted = hrtime(true);
+    $selected = array_slice($valid, 0, $limit);
+    homeUpcomingProfileAdd('selección final', (hrtime(true) - $sliceStarted) / 1_000_000);
+    homeUpcomingProfileCount('eventos seleccionados', count($selected));
+    return ['events' => $selected, 'queries' => $queries];
 }

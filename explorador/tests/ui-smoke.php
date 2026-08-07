@@ -50,8 +50,18 @@ if (substr_count($html, 'id="help-variable-') !== count($catalog->all())
     throw new RuntimeException('Las ayudas contextuales no cubren variables y controles principales.');
 }
 preg_match_all('/<div class="variable-pair(?: variable-pair--single)?">/', $html, $pairMatches);
-if (count($pairMatches[0]) !== 16) {
+if (count($pairMatches[0]) !== 20) {
     throw new RuntimeException('La cantidad de parejas semánticas no coincide con el diseño esperado.');
+}
+foreach (['Ecuación del tiempo', 'Distancia angular Sol–Luna', 'Diámetro aparente de la Luna'] as $newVariableText) {
+    if (!str_contains($html, $newVariableText)) {
+        throw new RuntimeException('Falta la nueva variable instantánea: ' . $newVariableText);
+    }
+}
+foreach (['Distancia Tierra–Sol', 'Distancia entre el centro de la Tierra y el Sol en la fecha indicada.'] as $solarDistanceText) {
+    if (!str_contains($html, $solarDistanceText)) {
+        throw new RuntimeException('Falta la presentación de distancia solar: ' . $solarDistanceText);
+    }
 }
 foreach (['process-panel', 'process-track', 'process-stage', 'process-days', 'process-percent',
     'process-elapsed', 'cancel-calculation', 'all-days', 'relation-help', 'relation-selectors',

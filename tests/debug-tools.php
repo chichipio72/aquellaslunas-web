@@ -76,10 +76,35 @@ try {
         'server_timing' => null, 'attempts' => 1, 'retried' => false,
         'curl_error' => false, 'curl_errno' => 0, 'json_valid' => true, 'outcome' => 'success',
     ]];
+    $GLOBALS['home_page_profile'] = [
+        'blocks' => ['Bloque desplegable' => 600.0, 'Hoja' => 25.0],
+        'details' => ['Bloque desplegable' => ['Detalle uno' => 400.0, 'Detalle dos' => 200.0]],
+        'total_ms' => 625.0,
+    ];
+    $GLOBALS['home_satellite_diagnostic'] = [
+        'status' => 'ejecutado correctamente', 'total_ms' => 630.2,
+        'tle_resolution_ms' => 0.2, 'calculation_ms' => 629.9,
+    ];
     ob_start();
     renderAstronomyTimings();
     $adminTimings = (string) ob_get_clean();
     debugToolsAssert(str_contains($adminTimings, 'api-diagnostics'), 'El admin no recibió los tiempos de API.');
+    debugToolsAssert(str_contains($adminTimings, '<h2 id="api-diagnostics-title">Diagnóstico</h2>'), 'Falta el título visible del diagnóstico.');
+    debugToolsAssert(str_contains($adminTimings, 'Tiempo total de generación de la página:'), 'Falta el tiempo total visible.');
+    debugToolsAssert(str_contains($adminTimings, 'data-satellite-diagnostic')
+        && str_contains($adminTimings, 'Satélites: ejecutado correctamente')
+        && str_contains($adminTimings, 'Resolución TLE 0,2 ms')
+        && str_contains($adminTimings, 'Cálculo 629,9 ms'), 'Falta el diagnóstico satelital visible o sus subtareas.');
+    debugToolsAssert(str_contains($adminTimings, '<details class="api-diagnostics__page-profile">'), 'El perfil no quedó contraído inicialmente.');
+    debugToolsAssert(!str_contains($adminTimings, '<details class="api-diagnostics__page-profile" open'), 'El perfil se abrió inicialmente.');
+    debugToolsAssert(substr_count($adminTimings, 'api-diagnostics__page-profile-group') === 1, 'La jerarquía no distingue el único grupo desplegable.');
+    debugToolsAssert(str_contains($adminTimings, 'Hoja</span><span>25,0 ms'), 'La hoja perdió su texto, orden o tiempo.');
+    debugToolsAssert(!str_contains($adminTimings, '<summary><span>Hoja'), 'Una hoja recibió un expansor.');
+    debugToolsAssert(str_contains($adminTimings, 'api-diagnostics__bar'), 'Las barras quedaron fuera del diagnóstico visible.');
+    debugToolsAssert(
+        strrpos($adminTimings, '</details>') < strpos($adminTimings, '<ul>'),
+        'Las barras quedaron dentro del Perfil de página contraído.'
+    );
 
     unset($_COOKIE['aquellas_lunas_admin']);
     ob_start();

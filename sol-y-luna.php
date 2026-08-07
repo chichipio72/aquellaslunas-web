@@ -157,7 +157,7 @@ if ($apiErrorMessage === null && empty($rows)) {
     astronomyApiRecordValidation('range', true, false);
     error_log('Aquellas Lunas API invalid response: range contains no items.');
 }
-$pageSeo = aquellasLunasSeoPage('Calendario solar y lunar | Aquellas Lunas', 'Calendario solar y lunar con horarios, fases e intervalos de visibilidad para varios días.', '/sol-y-luna.php', 'article');
+$pageSeo = aquellasLunasSeoPage('Calendario solar y lunar | Aquellas Lunas', 'Calendario solar y lunar con horarios, fases e intervalos de visibilidad para varios días.', '/sol-y-luna.php', 'webpage');
 if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));
     header('X-Astronomy-Geocoder-Status: ' . (string) ($GLOBALS['astronomy_location_geocoder_status'] ?? 'not_requested'));

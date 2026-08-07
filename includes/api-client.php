@@ -182,22 +182,94 @@ function renderAstronomyTimings(): void
     <aside class="api-diagnostics" aria-labelledby="api-diagnostics-title">
         <h2 id="api-diagnostics-title">Diagnóstico</h2>
         <p class="api-diagnostics__page-time">Tiempo total de generación de la página: <?= htmlspecialchars(number_format($pageGenerationMilliseconds, 1, ',', '.')) ?> ms</p>
+        <?php $satelliteDiagnostic = is_array($GLOBALS['home_satellite_diagnostic'] ?? null) ? $GLOBALS['home_satellite_diagnostic'] : []; ?>
+        <?php if ($satelliteDiagnostic !== []): ?>
+            <p class="api-diagnostics__page-time" data-satellite-diagnostic>
+                Satélites: <?= htmlspecialchars((string) ($satelliteDiagnostic['status'] ?? 'fallido')) ?>
+                · Total <?= htmlspecialchars(number_format((float) ($satelliteDiagnostic['total_ms'] ?? 0.0), 1, ',', '.')) ?> ms
+                <?php if (is_numeric($satelliteDiagnostic['tle_resolution_ms'] ?? null)): ?>
+                    · Resolución TLE <?= htmlspecialchars(number_format((float) $satelliteDiagnostic['tle_resolution_ms'], 1, ',', '.')) ?> ms
+                <?php endif; ?>
+                <?php if (is_numeric($satelliteDiagnostic['calculation_ms'] ?? null)): ?>
+                    · Cálculo <?= htmlspecialchars(number_format((float) $satelliteDiagnostic['calculation_ms'], 1, ',', '.')) ?> ms
+                <?php endif; ?>
+            </p>
+            <?php $satelliteLocation = is_array($satelliteDiagnostic['location'] ?? null) ? $satelliteDiagnostic['location'] : []; ?>
+            <details class="api-diagnostics__page-profile" data-satellite-request-diagnostic>
+                <summary>Solicitud satelital efectiva</summary>
+                <div class="api-diagnostics__page-profile-tree">
+                    <div class="api-diagnostics__page-profile-row"><span>Solicitud</span><span><?= htmlspecialchars((string) ($satelliteDiagnostic['request_id'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <div class="api-diagnostics__page-profile-row"><span>Generada</span><span><?= htmlspecialchars((string) ($satelliteDiagnostic['generated_at_utc'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <div class="api-diagnostics__page-profile-row"><span>Resultado</span><span><?= htmlspecialchars((string) ($satelliteDiagnostic['result_source'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php if (is_string($satelliteDiagnostic['error'] ?? null) && $satelliteDiagnostic['error'] !== ''): ?>
+                        <div class="api-diagnostics__page-profile-row"><span>Error</span><span><?= htmlspecialchars($satelliteDiagnostic['error'], ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php endif; ?>
+                    <?php if ($satelliteLocation !== []): ?>
+                        <div class="api-diagnostics__page-profile-row"><span>Ubicación</span><span><?= htmlspecialchars(number_format((float) ($satelliteLocation['latitude'] ?? 0.0), 4, '.', '') . ', ' . number_format((float) ($satelliteLocation['longitude'] ?? 0.0), 4, '.', ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+                        <div class="api-diagnostics__page-profile-row"><span>Elevación / zona / modo</span><span><?= htmlspecialchars(number_format((float) ($satelliteLocation['elevation_meters'] ?? 0.0), 1, ',', '.') . ' m · ' . (string) ($satelliteLocation['timezone'] ?? '') . ' · ' . (string) ($satelliteLocation['mode'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php endif; ?>
+                    <?php foreach (($satelliteDiagnostic['tle_sources'] ?? []) as $satellite => $source): ?>
+                        <div class="api-diagnostics__page-profile-row"><span>TLE <?= htmlspecialchars((string) $satellite, ENT_QUOTES, 'UTF-8') ?></span><span><?= htmlspecialchars((string) $source, ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php endforeach; ?>
+                    <?php if (($satelliteDiagnostic['events'] ?? []) === []): ?>
+                        <div class="api-diagnostics__page-profile-row"><span>Eventos</span><span>ninguno</span></div>
+                    <?php else: ?>
+                        <?php foreach ($satelliteDiagnostic['events'] as $event): ?>
+                            <div class="api-diagnostics__page-profile-row"><span><?= htmlspecialchars((string) ($event['satellite'] ?? '') . '/' . (string) ($event['target'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span><span><?= htmlspecialchars((string) ($event['maximum'] ?? '') . ' · ' . (string) ($event['classification'] ?? '') . ' · TLE ' . (string) ($event['tle_epoch'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </details>
+        <?php endif; ?>
+        <?php $traceDiagnostics = is_array($GLOBALS['astronomy_trace_diagnostics'] ?? null)
+            ? $GLOBALS['astronomy_trace_diagnostics'] : []; ?>
+        <?php if ($traceDiagnostics !== []): ?>
+            <details class="api-diagnostics__page-profile" data-astronomy-trace-diagnostic>
+                <summary>Trazas astronómicas</summary>
+                <div class="api-diagnostics__page-profile-tree">
+                    <?php foreach ($traceDiagnostics as $trace): ?>
+                        <?php $traceRequestId = (string) ($trace['request_id'] ?? ''); ?>
+                        <div class="api-diagnostics__page-profile-row"><span><?= htmlspecialchars((string) ($trace['operation'] ?? 'consulta'), ENT_QUOTES, 'UTF-8') ?></span><span>request <a href="admin/trazabilidad-astronomica.php?detail=<?= rawurlencode($traceRequestId) ?>"><?= htmlspecialchars($traceRequestId, ENT_QUOTES, 'UTF-8') ?></a> · sesión <?= htmlspecialchars((string) ($trace['session_trace_id'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php endforeach; ?>
+                </div>
+            </details>
+        <?php endif; ?>
+        <?php $satelliteTestReference = is_array($GLOBALS['home_satellite_local_test_reference'] ?? null)
+            ? $GLOBALS['home_satellite_local_test_reference'] : []; ?>
+        <?php if ($satelliteTestReference !== []): ?>
+            <details class="api-diagnostics__page-profile" data-satellite-test-reference>
+                <summary>Modos satelitales locales</summary>
+                <div class="api-diagnostics__page-profile-tree">
+                    <?php foreach ($satelliteTestReference as $mode => $description): ?>
+                        <div class="api-diagnostics__page-profile-row"><span>?satellite_test=<?= htmlspecialchars($mode, ENT_QUOTES, 'UTF-8') ?></span><span><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></span></div>
+                    <?php endforeach; ?>
+                </div>
+            </details>
+        <?php endif; ?>
         <?php $pageProfile = is_array($GLOBALS['home_page_profile'] ?? null) ? $GLOBALS['home_page_profile'] : []; ?>
         <?php if (is_array($pageProfile['blocks'] ?? null) && $pageProfile['blocks'] !== []): ?>
-            <section class="api-diagnostics__page-profile" aria-labelledby="page-profile-title">
-                <h3 id="page-profile-title">Perfil de página</h3>
-                <dl>
+            <details class="api-diagnostics__page-profile">
+                <summary id="page-profile-title">Perfil de página</summary>
+                <div class="api-diagnostics__page-profile-tree" aria-labelledby="page-profile-title">
                     <?php foreach ($pageProfile['blocks'] as $label => $milliseconds): ?>
-                        <div><dt><?= htmlspecialchars((string) $label) ?></dt><dd><?= htmlspecialchars(number_format((float) $milliseconds, 1, ',', '.')) ?> ms</dd></div>
-                        <?php if ((float) $milliseconds > 500.0 && is_array($pageProfile['details'][$label] ?? null)): ?>
-                            <?php foreach ($pageProfile['details'][$label] as $detailLabel => $detailMilliseconds): ?>
-                                <div class="api-diagnostics__page-profile-detail"><dt>↳ <?= htmlspecialchars((string) $detailLabel) ?></dt><dd><?= htmlspecialchars(number_format((float) $detailMilliseconds, 1, ',', '.')) ?> ms</dd></div>
-                            <?php endforeach; ?>
+                        <?php $profileDetails = (float) $milliseconds > 500.0 && is_array($pageProfile['details'][$label] ?? null)
+                            ? $pageProfile['details'][$label] : []; ?>
+                        <?php if ($profileDetails !== []): ?>
+                            <details class="api-diagnostics__page-profile-group">
+                                <summary><span><?= htmlspecialchars((string) $label) ?></span><span><?= htmlspecialchars(number_format((float) $milliseconds, 1, ',', '.')) ?> ms</span></summary>
+                                <div class="api-diagnostics__page-profile-children">
+                                    <?php foreach ($profileDetails as $detailLabel => $detailMilliseconds): ?>
+                                        <div class="api-diagnostics__page-profile-row api-diagnostics__page-profile-detail"><span>↳ <?= htmlspecialchars((string) $detailLabel) ?></span><span><?= htmlspecialchars(number_format((float) $detailMilliseconds, 1, ',', '.')) ?> ms</span></div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </details>
+                        <?php else: ?>
+                            <div class="api-diagnostics__page-profile-row"><span><?= htmlspecialchars((string) $label) ?></span><span><?= htmlspecialchars(number_format((float) $milliseconds, 1, ',', '.')) ?> ms</span></div>
                         <?php endif; ?>
                     <?php endforeach; ?>
-                    <div><dt>Total medido</dt><dd><?= htmlspecialchars(number_format((float) ($pageProfile['total_ms'] ?? 0.0), 1, ',', '.')) ?> ms</dd></div>
-                </dl>
-            </section>
+                    <div class="api-diagnostics__page-profile-row"><span>Total medido</span><span><?= htmlspecialchars(number_format((float) ($pageProfile['total_ms'] ?? 0.0), 1, ',', '.')) ?> ms</span></div>
+                </div>
+            </details>
         <?php endif; ?>
         <ul>
             <?php foreach ($timings as $timing): ?>

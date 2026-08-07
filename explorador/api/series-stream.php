@@ -23,6 +23,7 @@ require_once dirname(__DIR__) . '/includes/JsonResponse.php';
 require_once dirname(__DIR__) . '/includes/ExtremaRequest.php';
 require_once dirname(__DIR__) . '/includes/LocalExtremaDetector.php';
 require_once dirname(__DIR__) . '/includes/ExtremaResponse.php';
+require_once dirname(__DIR__, 2) . '/includes/astronomy-trace.php';
 
 /** @param array<string,mixed> $message */
 function explorerStreamEmit(array $message): void
@@ -59,6 +60,9 @@ function explorerStreamLabel(string $stage): string
 }
 
 $requestStarted = JsonResponse::now();
+$astronomyTrace = astronomyTraceBegin();
+$traceLocation = ['latitude' => (float) ($_GET['lat'] ?? 0.0), 'longitude' => (float) ($_GET['lon'] ?? 0.0),
+    'elevation_meters' => 0.0, 'timezone' => is_string($_GET['timezone'] ?? null) ? $_GET['timezone'] : 'UTC'];
 if (function_exists('ini_set')) {
     @ini_set('zlib.output_compression', '0');
     @ini_set('output_buffering', '0');
@@ -173,14 +177,22 @@ try {
     $payload['metrics']['approximate_json_bytes'] = strlen($normalJson);
     $normalJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     $payload['metrics']['approximate_json_bytes'] = strlen($normalJson);
+    astronomyTraceFinish($astronomyTrace, $extrema !== null ? 'explorer_extrema' : 'explorer_series',
+        'explorador/api/series-stream.php', $_GET, $traceLocation, $payload);
     explorerStreamEmit(['type' => 'complete', 'result' => $payload]);
 } catch (PhaseSelectionException $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series-stream.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     http_response_code(503);
     explorerStreamEmit(['type' => 'error', 'message' => $exception->getMessage()]);
 } catch (InvalidArgumentException $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series-stream.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     http_response_code(400);
     explorerStreamEmit(['type' => 'error', 'message' => $exception->getMessage()]);
 } catch (Throwable $exception) {
+    astronomyTraceFinish($astronomyTrace, 'explorer_series', 'explorador/api/series-stream.php', $_GET,
+        $traceLocation, [], 'failed', $exception);
     if (!connection_aborted()) {
         error_log('Explorador astronómico stream: ' . get_debug_type($exception) . ': ' . $exception->getMessage());
         explorerStreamEmit(['type' => 'error', 'message' => 'No fue posible calcular la serie.']);

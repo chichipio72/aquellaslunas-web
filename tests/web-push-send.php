@@ -32,12 +32,15 @@ try {
         'auth' => webPushSendBase64Url(random_bytes(16)),
     ];
     astronomyWebPushSaveSubscription($connection, $subscription, 'Aquellas Lunas integration test');
+    $testSubscription = $connection->prepare('SELECT id FROM web_push_subscriptions WHERE endpoint_hash = ?');
+    $testSubscription->execute([hash('sha256', $endpoint, true)]);
+    $testSubscriptionId = (int) $testSubscription->fetchColumn();
     $keys = Minishlink\WebPush\VAPID::createVapidKeys();
     $result = astronomyWebPushSend($connection, [
         'subject' => 'mailto:pruebas@example.com',
         'public_key' => $keys['publicKey'],
         'private_key' => $keys['privateKey'],
-    ], null, 'Aquellas Lunas', 'Esta es una notificación de prueba.', './');
+    ], $testSubscriptionId, 'Aquellas Lunas', 'Esta es una notificación de prueba.', './');
 
     webPushSendAssert($result['sent'] === 1, 'El emisor no procesó la suscripción de prueba.');
     webPushSendAssert($result['success'] === 0 && $result['failed'] === 1, 'El fallo controlado no se contabilizó correctamente.');

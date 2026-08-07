@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/api-client.php';
 require_once __DIR__ . '/web-database.php';
+require_once __DIR__ . '/astronomy-trace.php';
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use AstronomyEngine\Facade\AstronomyEventsFacade;
@@ -48,51 +49,105 @@ function astronomyEventSourceCatalog(): array
     ];
 }
 
+/** @return array<string,string> */
+function &astronomyEventSourceRequestCache(): array
+{
+    static $cache = [];
+    return $cache;
+}
+
+function astronomyEventSourceResetRequestCache(): void
+{
+    $cache = &astronomyEventSourceRequestCache();
+    $cache = [];
+}
+
+function astronomyEventSourceFallback(array $definition): string
+{
+    $environmentName = $definition['environment'] ?? null;
+    if (is_string($environmentName)) {
+        $environmentSource = getenv($environmentName);
+        $environmentSource = is_string($environmentSource) ? strtolower(trim($environmentSource)) : '';
+        if ($environmentSource !== '') {
+            if (!in_array($environmentSource, $definition['sources'], true)) {
+                throw new RuntimeException('La fuente astronómica configurada en el entorno no es válida.');
+            }
+            return $environmentSource;
+        }
+    }
+    return 'api';
+}
+
+/** @return array<string,string> */
+function astronomyEventSourcesForGroups(array $eventGroups): array
+{
+    $catalog = astronomyEventSourceCatalog();
+    $eventGroups = array_values(array_unique(array_map('strval', $eventGroups)));
+    foreach ($eventGroups as $eventGroup) {
+        if (!is_array($catalog[$eventGroup] ?? null)) {
+            throw new InvalidArgumentException('El grupo de eventos astronómicos no está soportado.');
+        }
+    }
+    $cache = &astronomyEventSourceRequestCache();
+    $missing = array_values(array_filter($eventGroups, static fn(string $group): bool => !array_key_exists($group, $cache)));
+    if ($missing !== []) {
+        $parameters = [];
+        $placeholders = [];
+        foreach ($missing as $index => $eventGroup) {
+            $placeholder = ':key_' . $index;
+            $placeholders[] = $placeholder;
+            $parameters[$placeholder] = 'astronomy.event_source.' . $eventGroup;
+        }
+        $persisted = [];
+        try {
+            $statement = getWebDatabaseConnection()->prepare(
+                'SELECT clave,valor FROM admin_configuracion_sitio WHERE clave IN (' . implode(',', $placeholders) . ')'
+            );
+            $statement->execute($parameters);
+            $persisted = $statement->fetchAll(PDO::FETCH_KEY_PAIR);
+        } catch (Throwable $exception) {
+            // La configuración persistida es opcional; cada grupo conserva entorno/default.
+        }
+        if (($GLOBALS['home_upcoming_profile_enabled'] ?? false) === true) {
+            homeUpcomingProfileCount('consulta por lote de resolución de fuentes');
+        }
+        foreach ($missing as $eventGroup) {
+            $definition = $catalog[$eventGroup];
+            $configurationKey = 'astronomy.event_source.' . $eventGroup;
+            $persistedSource = $persisted[$configurationKey] ?? null;
+            $cache[$eventGroup] = is_string($persistedSource) && in_array($persistedSource, $definition['sources'], true)
+                ? $persistedSource
+                : astronomyEventSourceFallback($definition);
+        }
+    }
+    $resolved = [];
+    foreach ($eventGroups as $eventGroup) {
+        $resolved[$eventGroup] = $cache[$eventGroup];
+    }
+    return $resolved;
+}
+
 function astronomyEventSourceFor(string $eventGroup, ?string $productionConfigPath = null): string
 {
     $definition = astronomyEventSourceCatalog()[$eventGroup] ?? null;
     if (!is_array($definition)) {
         throw new InvalidArgumentException('El grupo de eventos astronómicos no está soportado.');
     }
-    $supportedSources = $definition['sources'];
-    $configurationKey = 'astronomy.event_source.' . $eventGroup;
-
-    try {
-        $statement = getWebDatabaseConnection()->prepare(
-            'SELECT valor FROM admin_configuracion_sitio WHERE clave=:clave LIMIT 1'
-        );
-        $statement->execute(['clave' => $configurationKey]);
-        $persistedSource = $statement->fetchColumn();
-        if (is_string($persistedSource) && in_array($persistedSource, $supportedSources, true)) {
-            return $persistedSource;
+    $cache = &astronomyEventSourceRequestCache();
+    if (array_key_exists($eventGroup, $cache)) {
+        if (($GLOBALS['home_upcoming_profile_enabled'] ?? false) === true) {
+            homeUpcomingProfileCount('resolución de fuente reutilizada: ' . $eventGroup);
         }
-    } catch (Throwable $exception) {
-        // La configuración persistida es opcional; se continúa con entorno/default.
+        return $cache[$eventGroup];
     }
-
-    $environmentName = $definition['environment'] ?? null;
-    if (is_string($environmentName)) {
-        $environmentSource = getenv($environmentName);
-        $environmentSource = is_string($environmentSource) ? strtolower(trim($environmentSource)) : '';
-        if ($environmentSource !== '') {
-            if (!in_array($environmentSource, $supportedSources, true)) {
-                throw new RuntimeException('La fuente astronómica configurada en el entorno no es válida.');
-            }
-            return $environmentSource;
-        }
-    }
-
-    return 'api';
+    astronomyEventSourcesForGroups([$eventGroup]);
+    return $cache[$eventGroup];
 }
 
 /** @return array<string,string> */
 function astronomyEventSourceSettings(): array
 {
-    $settings = [];
-    foreach (array_keys(astronomyEventSourceCatalog()) as $eventGroup) {
-        $settings[$eventGroup] = astronomyEventSourceFor($eventGroup);
-    }
-    return $settings;
+    return astronomyEventSourcesForGroups(array_keys(astronomyEventSourceCatalog()));
 }
 
 function astronomyEventSourceUpdate(PDO $connection, array $updates): void
@@ -122,6 +177,7 @@ function astronomyEventSourceUpdate(PDO $connection, array $updates): void
             ]);
         }
         $connection->commit();
+        astronomyEventSourceResetRequestCache();
     } catch (Throwable $exception) {
         if ($connection->inTransaction()) {
             $connection->rollBack();
@@ -136,22 +192,38 @@ function astronomyEventSourceUpdate(PDO $connection, array $updates): void
  * @param array<string,mixed> $request Contrato compatible con /v1/astronomy/events.
  * @return array{items:list<array<string,mixed>>}
  */
-function astronomyEvents(array $request, string $context = 'events', int $timeout = 35): array
+function astronomyEventsUntraced(array $request, string $context = 'events', int $timeout = 35): array
 {
+    $upcomingProfile = str_starts_with($context, 'home v2 upcoming ');
+    $rangeStarted = hrtime(true);
     [$startUtc, $endUtc] = astronomyEventsUtcRange($request);
     $requestedTypes = astronomyEventsRequestedTypes($request['types'] ?? '');
+    if ($upcomingProfile) homeUpcomingProfileAdd('normalización de rango y tipos', (hrtime(true) - $rangeStarted) / 1_000_000);
     $apiTypes = [];
     $apiGroups = [];
     $apiTypesWithoutFallback = [];
     $localGroups = [];
     $phpFacadeTypes = [];
+    $requestedEventGroups = [];
+    foreach ($requestedTypes as $publicType) {
+        $eventGroup = astronomyEventGroupFromPublicType($publicType);
+        if ($eventGroup !== null) {
+            $requestedEventGroups[] = $eventGroup;
+        }
+    }
+    astronomyEventSourcesForGroups($requestedEventGroups);
     foreach ($requestedTypes as $publicType) {
         if (in_array($publicType, ['earthshine', 'full_moon_observation'], true)) {
             $phpFacadeTypes[] = $publicType;
             continue;
         }
         $eventGroup = astronomyEventGroupFromPublicType($publicType);
+        $sourceStarted = hrtime(true);
         $source = $eventGroup !== null ? astronomyEventSourceFor($eventGroup) : 'api';
+        if ($upcomingProfile) {
+            homeUpcomingProfileAdd('resolución de fuentes por grupo · ' . $context, (hrtime(true) - $sourceStarted) / 1_000_000);
+            homeUpcomingProfileCount('fuente resuelta: ' . ($eventGroup ?? $publicType));
+        }
         if ($eventGroup === null || $source === 'api') {
             $apiTypes[] = $publicType;
             if ($eventGroup === null) {
@@ -168,6 +240,7 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
     if ($phpFacadeTypes !== []) {
         try {
             $derivedLabel = implode(',', $phpFacadeTypes);
+            $derivedStarted = hrtime(true);
             $items = astronomyEventsTimedSource(
                 $context,
                 $derivedLabel,
@@ -175,6 +248,10 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
                 'php',
                 static fn(): array => astronomyEventsFromPhpFacade($request, $phpFacadeTypes)
             );
+            if ($upcomingProfile) {
+                homeUpcomingProfileAdd('eventos derivados · ' . $context, (hrtime(true) - $derivedStarted) / 1_000_000);
+                homeUpcomingProfileCount('eventos derivados obtenidos', count($items));
+            }
         } catch (Throwable $phpException) {
             error_log('Aquellas Lunas PHP derived events error; using API fallback: ' . $phpException->getMessage());
             $apiTypes = array_merge($apiTypes, $phpFacadeTypes);
@@ -185,7 +262,12 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
         $apiRequest = $request;
         $apiRequest['types'] = implode(',', $apiTypes);
         try {
+            $apiStarted = hrtime(true);
             $items = astronomyEventsFromApi($apiRequest, $context . ' API groups', $timeout);
+            if ($upcomingProfile) {
+                homeUpcomingProfileAdd('llamada grupos API · ' . $context, (hrtime(true) - $apiStarted) / 1_000_000);
+                homeUpcomingProfileCount('eventos API obtenidos', count($items));
+            }
         } catch (Throwable $apiException) {
             if ($apiGroups === []) {
                 throw $apiException;
@@ -214,6 +296,7 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
         }
     }
     foreach ($localGroups as $eventGroup => $source) {
+        $localStarted = hrtime(true);
         $items = array_merge($items, astronomyEventsForGroup(
             $eventGroup,
             $source,
@@ -224,9 +307,11 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
             (string) ($request['timezone'] ?? 'UTC'),
             $context
         ));
+        if ($upcomingProfile) homeUpcomingProfileAdd('llamada grupo local: ' . $eventGroup . ' · ' . $context, (hrtime(true) - $localStarted) / 1_000_000);
     }
 
     if (in_array('eclipse', $requestedTypes, true)) {
+        $normalizationStarted = hrtime(true);
         $items = astronomyNormalizeEclipseItems(
             $items,
             $startUtc,
@@ -235,10 +320,30 @@ function astronomyEvents(array $request, string $context = 'events', int $timeou
             (float) ($request['longitude'] ?? 0.0),
             (string) ($request['timezone'] ?? 'UTC')
         );
+        if ($upcomingProfile) homeUpcomingProfileAdd('normalización y enriquecimiento local de eclipses', (hrtime(true) - $normalizationStarted) / 1_000_000);
     }
 
+    $sortStarted = hrtime(true);
     usort($items, 'astronomyEventsChronologicalComparison');
+    if ($upcomingProfile) {
+        homeUpcomingProfileAdd('ordenamiento por operación', (hrtime(true) - $sortStarted) / 1_000_000);
+        homeUpcomingProfileCount('eventos devueltos por operaciones', count($items));
+    }
     return ['items' => $items];
+}
+
+/** Punto de entrada trazado para una consulta completa de eventos. */
+function astronomyEvents(array $request, string $context = 'events', int $timeout = 35): array
+{
+    $location = [
+        'latitude' => (float) ($request['latitude'] ?? 0.0),
+        'longitude' => (float) ($request['longitude'] ?? 0.0),
+        'elevation_meters' => (float) ($request['elevation_meters'] ?? $request['elevation'] ?? 0.0),
+        'timezone' => (string) ($request['timezone'] ?? 'UTC'),
+    ];
+    return astronomyTraceExecute('events', $context, [
+        'parameters' => $request, 'timeout_seconds' => $timeout,
+    ], $location, static fn(): array => astronomyEventsUntraced($request, $context, $timeout));
 }
 
 /** @param list<string> $types @return list<array<string,mixed>> */
@@ -618,8 +723,44 @@ function astronomyNormalizeEclipseItems(
             ? $item
             : astronomyClosestEclipseItem($item, $portableItems);
         $items[$index] = astronomyNormalizeEclipseItemContract($item, $portable);
+        $items[$index] = astronomyResolveLocalEclipseVisibilityMap($items[$index]);
     }
     return $items;
+}
+
+/** @return array<string,mixed> */
+function astronomyResolveLocalEclipseVisibilityMap(array $item): array
+{
+    $subtype = (string) ($item['subtype'] ?? '');
+    $globalKey = $subtype === 'solar_eclipse' ? 'solar_eclipse_global' : 'eclipse_global';
+    $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+    $global = is_array($details[$globalKey] ?? null) ? $details[$globalKey] : [];
+    $map = is_array($global['visibility_map'] ?? null) ? $global['visibility_map'] : [];
+    $existingFilename = is_string($map['local_filename'] ?? null) ? trim($map['local_filename']) : '';
+    if (($map['available'] ?? null) === true && $existingFilename !== '') {
+        return $item;
+    }
+
+    $timestamp = astronomyEventTimestamp($item['datetime'] ?? null);
+    if ($timestamp === null || !in_array($subtype, ['lunar_eclipse', 'solar_eclipse'], true)) {
+        return $item;
+    }
+    $date = (new DateTimeImmutable('@' . (string) (int) $timestamp))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d');
+    $filename = ($subtype === 'solar_eclipse' ? 'solar-eclipse-' : 'lunar-eclipse-') . $date . '.png';
+    if (!is_file(dirname(__DIR__) . '/assets/images/eclipses/' . $filename)) {
+        return $item;
+    }
+
+    $global['visibility_map'] = [
+        'source' => 'NASA/GSFC Five Millennium Eclipse Catalog',
+        'status' => 'available',
+        'available' => true,
+        'local_filename' => $filename,
+        'attribution' => 'Eclipse map/figure/table/predictions courtesy of Fred Espenak, NASA/Goddard Space Flight Center, from eclipse.gsfc.nasa.gov.',
+    ];
+    $details[$globalKey] = $global;
+    $item['details'] = $details;
+    return $item;
 }
 
 function astronomyClosestEclipseItem(array $item, array $candidates): ?array

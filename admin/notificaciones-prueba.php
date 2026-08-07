@@ -26,6 +26,33 @@ function pushAdminUserAgent(mixed $value): string
     return strlen($value) > 120 ? substr($value, 0, 117) . '…' : $value;
 }
 
+function pushAdminFullUserAgent(mixed $value): string
+{
+    $value = preg_replace('/\s+/', ' ', trim((string) $value));
+    return is_string($value) && $value !== '' ? $value : 'No informado';
+}
+
+function pushAdminDeviceSummary(mixed $value): string
+{
+    $agent = pushAdminFullUserAgent($value);
+    if ($agent === 'No informado') return $agent;
+
+    if (stripos($agent, 'Android') !== false) $platform = 'Android';
+    elseif (stripos($agent, 'iPhone') !== false || stripos($agent, 'iPad') !== false) $platform = 'iPhone / iPad';
+    elseif (stripos($agent, 'Windows') !== false) $platform = 'Windows';
+    elseif (stripos($agent, 'Macintosh') !== false || stripos($agent, 'Mac OS') !== false) $platform = 'macOS';
+    elseif (stripos($agent, 'Linux') !== false) $platform = 'Linux';
+    else $platform = 'Dispositivo';
+
+    if (stripos($agent, 'Edg/') !== false || stripos($agent, 'EdgiOS/') !== false || stripos($agent, 'EdgA/') !== false) $browser = 'Edge';
+    elseif (stripos($agent, 'Firefox/') !== false || stripos($agent, 'FxiOS/') !== false) $browser = 'Firefox';
+    elseif (stripos($agent, 'CriOS/') !== false || stripos($agent, 'Chrome/') !== false) $browser = 'Chrome';
+    elseif (stripos($agent, 'Safari/') !== false) $browser = 'Safari';
+    else $browser = 'Navegador no identificado';
+
+    return $platform . ' · ' . $browser;
+}
+
 $title = 'Aquellas Lunas';
 $body = 'Esta es una notificación de prueba.';
 $targetUrl = './';
@@ -103,10 +130,71 @@ $activeRows = array_values(array_filter($rows, static fn(array $row): bool => (i
     <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= pushAdminHtml('../' . versionedAssetUrl('assets/css/styles.css')) ?>">
     <?php if ($publicConfig !== null): ?><script src="<?= pushAdminHtml('../' . versionedAssetUrl('assets/js/push-notifications.js')) ?>" defer></script><?php endif; ?>
+    <style>
+        .push-test-admin { display: grid; gap: 1.15rem; max-width: 96rem; }
+        .push-test-admin > :is(.store-admin-alert, .store-admin-success) { margin: 0; }
+        .push-test-admin__top { display: grid; grid-template-columns: minmax(20rem, .62fr) minmax(0, 1fr); gap: 1.15rem; align-items: stretch; }
+        .push-test-admin__panel { display: grid; align-content: start; gap: 1rem; min-width: 0; padding: clamp(1rem, 2vw, 1.35rem); }
+        .push-test-admin__heading :is(h2, p) { margin: 0; }
+        .push-test-admin__heading h2 { margin-top: .2rem; }
+        .push-test-admin__status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+        .push-test-admin__status-grid div {
+            min-width: 0; padding: .72rem .78rem; border: 1px solid rgba(151, 172, 213, .2);
+            border-radius: .62rem; background: rgba(5, 10, 21, .38);
+        }
+        .push-test-admin__status-grid dt { color: #9facbf; font-size: .72rem; line-height: 1.3; }
+        .push-test-admin__status-grid dd { margin: .24rem 0 0; color: #dce3f0; font-size: .88rem; font-weight: 750; line-height: 1.35; }
+        .push-test-admin__status.is-active .push-test-admin__status-grid [data-push-subscription] { color: #b9d7ac; }
+        .push-test-admin__device-actions { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; }
+        .push-test-admin__device-actions .button { min-height: 2.45rem; padding: .48rem .72rem; font-size: .8rem; }
+        .push-test-admin__device-message { min-height: 1.35em; margin: 0; color: #aeb9ce; font-size: .8rem; }
+        .push-test-admin__note { margin: -.35rem 0 0; color: #8997af; font-size: .78rem; line-height: 1.45; }
+        .push-test-admin__send-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem 1rem; align-items: end; }
+        .push-test-admin__field { display: grid; align-content: start; gap: .4rem; min-width: 0; color: #cbd3e2; font-size: .84rem; font-weight: 680; }
+        .push-test-admin__field--full { grid-column: 1 / -1; }
+        .push-test-admin__field :is(input, select, textarea) {
+            width: 100%; min-width: 0; min-height: 2.75rem; margin: 0; padding: .62rem .72rem;
+            border: 1px solid rgba(151, 172, 213, .34); border-radius: .62rem;
+            background: #09111f; color: #eef2fa; font: inherit;
+        }
+        .push-test-admin__field textarea { line-height: 1.45; resize: vertical; }
+        .push-test-admin__field :is(input, select, textarea):focus-visible { border-color: #e2bd5f; outline: 2px solid #e2bd5f; outline-offset: 2px; }
+        .push-test-admin__field small { color: #8997af; font-size: .74rem; font-weight: 450; line-height: 1.4; }
+        .push-test-admin__send-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; grid-column: 1 / -1; }
+        .push-test-admin__send-button { min-width: 12rem; min-height: 2.75rem; align-self: start; padding-block: .62rem; white-space: nowrap; }
+        .push-test-admin__subscriptions { width: 100%; }
+        .push-test-admin__table-wrap { max-width: 100%; overflow-x: auto; scrollbar-color: #465676 #0b1323; }
+        .push-test-admin__table { table-layout: auto; }
+        .push-test-admin__table :is(th, td) { white-space: nowrap; }
+        .push-test-admin__table th:last-child,
+        .push-test-admin__table td:last-child { width: 20rem; white-space: normal; }
+        .push-test-admin__date { color: #c4cede; font-variant-numeric: tabular-nums; font-size: .78rem; }
+        .push-test-admin__empty-value { color: #738099; }
+        .push-test-admin__device { min-width: 0; }
+        .push-test-admin__device strong { display: block; color: #e6ebf5; font-size: .82rem; }
+        .push-test-admin__device small {
+            display: block; max-width: 24rem; margin-top: .25rem; color: #8997af;
+            font-size: .7rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        @media (max-width: 64rem) {
+            .push-test-admin__top { grid-template-columns: minmax(0, 1fr); }
+        }
+        @media (max-width: 42rem) {
+            .push-test-admin__status-grid,
+            .push-test-admin__send-form,
+            .push-test-admin__send-row { grid-template-columns: minmax(0, 1fr); }
+            .push-test-admin__field--full { grid-column: auto; }
+            .push-test-admin__send-row { grid-column: auto; }
+            .push-test-admin__send-button { width: 100%; min-width: 0; }
+            .push-test-admin__device-actions { display: grid; }
+            .push-test-admin__device-actions .button { width: 100%; }
+            .push-test-admin__table { min-width: 48rem; }
+        }
+    </style>
 </head>
 <body class="store-admin">
 <?php renderStoreAdminNavigation('notifications', 'Notificaciones de prueba'); ?>
-<main class="store-admin-main push-admin">
+<main class="store-admin-main push-test-admin">
     <?php if ($errors !== []): ?><section class="store-admin-alert" role="alert"><strong>No se pudo completar todo</strong><ul><?php foreach (array_unique($errors) as $error): ?><li><?= pushAdminHtml($error) ?></li><?php endforeach; ?></ul></section><?php endif; ?>
     <?php if ($sendResult !== null): ?>
     <section class="store-admin-success push-admin__result" role="status">
@@ -116,39 +204,43 @@ $activeRows = array_values(array_filter($rows, static fn(array $row): bool => (i
     </section>
     <?php endif; ?>
 
-    <section class="card push-admin__panel"<?= $publicConfig !== null ? ' data-push-notifications data-push-public-key="' . pushAdminHtml($publicConfig['public_key']) . '" data-push-worker-url="../service-worker.js" data-push-worker-scope="../" data-push-subscribe-url="../web-push/subscribe.php" data-push-unsubscribe-url="../web-push/unsubscribe.php"' : '' ?>>
-        <div><p class="eyebrow">Dispositivo actual</p><h2>Estado de Web Push</h2></div>
-        <dl class="push-admin__device-state">
+    <div class="push-test-admin__top">
+    <section class="card push-test-admin__panel push-test-admin__status"<?= $publicConfig !== null ? ' data-push-notifications data-push-public-key="' . pushAdminHtml($publicConfig['public_key']) . '" data-push-worker-url="../service-worker.js" data-push-worker-scope="../" data-push-subscribe-url="../web-push/subscribe.php" data-push-unsubscribe-url="../web-push/unsubscribe.php"' : '' ?>>
+        <div class="push-test-admin__heading"><p class="eyebrow">Dispositivo actual</p><h2>Estado de Web Push</h2></div>
+        <dl class="push-test-admin__status-grid">
             <div><dt>Service Worker</dt><dd data-push-support-worker><?= $publicConfig !== null ? 'Comprobando…' : 'Sin configurar' ?></dd></div>
             <div><dt>Push API</dt><dd data-push-support-api><?= $publicConfig !== null ? 'Comprobando…' : 'Sin configurar' ?></dd></div>
             <div><dt>Permiso</dt><dd data-push-permission><?= $publicConfig !== null ? 'Comprobando…' : 'Sin configurar' ?></dd></div>
             <div><dt>Suscripción</dt><dd data-push-subscription><?= $publicConfig !== null ? 'Comprobando…' : 'Sin configurar' ?></dd></div>
         </dl>
-        <div class="push-admin__actions">
+        <div class="push-test-admin__device-actions">
             <button type="button" class="button button-primary" data-push-action<?= $publicConfig === null ? ' disabled' : '' ?>>Activar notificaciones en este dispositivo</button>
             <button type="button" class="button compact-secondary-button" data-push-deactivate<?= $publicConfig === null ? ' disabled' : '' ?>>Desactivar notificaciones</button>
         </div>
-        <p class="push-admin__device-status" role="status" aria-live="polite" data-push-status></p>
+        <p class="push-test-admin__device-message" role="status" aria-live="polite" data-push-status></p>
     </section>
 
-    <section class="card push-admin__panel">
-        <div><p class="eyebrow">Envío manual</p><h2>Enviar notificación de prueba</h2></div>
-        <p class="push-admin__note">El envío se cifra en el hosting. La clave VAPID privada no se entrega al navegador.</p>
-        <form method="post" class="push-admin__send-form">
+    <section class="card push-test-admin__panel">
+        <div class="push-test-admin__heading"><p class="eyebrow">Envío manual</p><h2>Enviar notificación de prueba</h2></div>
+        <p class="push-test-admin__note">El envío se cifra en el hosting. La clave VAPID privada no se entrega al navegador.</p>
+        <form method="post" class="push-test-admin__send-form">
             <input type="hidden" name="csrf_token" value="<?= pushAdminHtml(storeAdminCsrfToken()) ?>">
-            <label>Destino<select name="destination" required><option value="all"<?= $selectedDestination === 'all' ? ' selected' : '' ?>>Todas las suscripciones activas</option><?php foreach ($activeRows as $row): $id = (int) $row['id']; ?><option value="<?= $id ?>"<?= $selectedDestination === (string) $id ? ' selected' : '' ?>>Suscripción <?= $id ?> · <?= pushAdminHtml(pushAdminUserAgent($row['user_agent'])) ?></option><?php endforeach; ?></select></label>
-            <label>Título<input type="text" name="title" maxlength="120" value="<?= pushAdminHtml($title) ?>" required></label>
-            <label class="push-admin__send-form-message">Mensaje<textarea name="body" maxlength="500" rows="3" required><?= pushAdminHtml($body) ?></textarea></label>
-            <label>URL a abrir<input type="text" name="target_url" maxlength="2048" value="<?= pushAdminHtml($targetUrl) ?>" required><small><code>./</code> abre la portada de Aquellas Lunas, también bajo <code>/astro/</code>.</small></label>
-            <button type="submit" class="button button-primary"<?= !$serverConfigAvailable || $activeRows === [] ? ' disabled' : '' ?>>Enviar notificación</button>
+            <label class="push-test-admin__field">Destino<select name="destination" required><option value="all"<?= $selectedDestination === 'all' ? ' selected' : '' ?>>Todas las suscripciones activas</option><?php foreach ($activeRows as $row): $id = (int) $row['id']; ?><option value="<?= $id ?>"<?= $selectedDestination === (string) $id ? ' selected' : '' ?>>Suscripción <?= $id ?> · <?= pushAdminHtml(pushAdminUserAgent($row['user_agent'])) ?></option><?php endforeach; ?></select></label>
+            <label class="push-test-admin__field">Título<input type="text" name="title" maxlength="120" value="<?= pushAdminHtml($title) ?>" required></label>
+            <label class="push-test-admin__field push-test-admin__field--full">Mensaje<textarea name="body" maxlength="500" rows="3" required><?= pushAdminHtml($body) ?></textarea></label>
+            <div class="push-test-admin__send-row">
+                <label class="push-test-admin__field">URL a abrir<input type="text" name="target_url" maxlength="2048" value="<?= pushAdminHtml($targetUrl) ?>" required><small><code>./</code> abre la portada de Aquellas Lunas, también bajo <code>/astro/</code>.</small></label>
+                <button type="submit" class="button button-primary push-test-admin__send-button"<?= !$serverConfigAvailable || $activeRows === [] ? ' disabled' : '' ?>>Enviar notificación</button>
+            </div>
         </form>
     </section>
+    </div>
 
-    <section class="card push-admin__panel">
-        <div><p class="eyebrow">WEB_DB</p><h2>Suscripciones guardadas</h2></div>
+    <section class="card push-test-admin__panel push-test-admin__subscriptions">
+        <div class="push-test-admin__heading"><p class="eyebrow">WEB_DB</p><h2>Suscripciones guardadas</h2></div>
         <?php if ($rows === []): ?><p class="store-admin-empty">No hay suscripciones guardadas.</p><?php else: ?>
-        <div class="push-admin__table-wrap"><table class="push-admin__table"><thead><tr><th>ID</th><th>Estado</th><th>Creada</th><th>Actualizada</th><th>Último éxito</th><th>Último error</th><th>Dispositivo</th></tr></thead><tbody>
-        <?php foreach ($rows as $row): ?><tr><td><?= (int) $row['id'] ?></td><td><span class="push-admin__state <?= (int) $row['active'] === 1 ? 'is-active' : 'is-inactive' ?>"><?= (int) $row['active'] === 1 ? 'Activa' : 'Inactiva' ?></span></td><td><?= pushAdminHtml($row['created_at']) ?></td><td><?= pushAdminHtml($row['updated_at']) ?></td><td><?= pushAdminHtml($row['last_success_at'] ?: '—') ?></td><td><?php if ($row['last_error_at']): ?><span><?= pushAdminHtml($row['last_error_at']) ?></span><?php if ($row['last_error_message']): ?><small><?= pushAdminHtml($row['last_error_message']) ?></small><?php endif; ?><?php else: ?>—<?php endif; ?></td><td class="push-admin__user-agent"><?= pushAdminHtml(pushAdminUserAgent($row['user_agent'])) ?></td></tr><?php endforeach; ?>
+        <div class="push-test-admin__table-wrap"><table class="push-admin__table push-test-admin__table"><thead><tr><th>ID</th><th>Estado</th><th>Creada</th><th>Actualizada</th><th>Último éxito</th><th>Último error</th><th>Dispositivo</th></tr></thead><tbody>
+        <?php foreach ($rows as $row): $fullAgent = pushAdminFullUserAgent($row['user_agent']); ?><tr><td><?= (int) $row['id'] ?></td><td><span class="push-admin__state <?= (int) $row['active'] === 1 ? 'is-active' : 'is-inactive' ?>"><?= (int) $row['active'] === 1 ? 'Activa' : 'Inactiva' ?></span></td><td class="push-test-admin__date"><?= pushAdminHtml($row['created_at']) ?></td><td class="push-test-admin__date"><?= pushAdminHtml($row['updated_at']) ?></td><td class="push-test-admin__date<?= $row['last_success_at'] ? '' : ' push-test-admin__empty-value' ?>"><?= pushAdminHtml($row['last_success_at'] ?: '—') ?></td><td class="push-test-admin__date"><?php if ($row['last_error_at']): ?><span><?= pushAdminHtml($row['last_error_at']) ?></span><?php if ($row['last_error_message']): ?><small><?= pushAdminHtml($row['last_error_message']) ?></small><?php endif; ?><?php else: ?><span class="push-test-admin__empty-value">—</span><?php endif; ?></td><td class="push-test-admin__device" title="<?= pushAdminHtml($fullAgent) ?>"><strong><?= pushAdminHtml(pushAdminDeviceSummary($row['user_agent'])) ?></strong><small><?= pushAdminHtml($fullAgent) ?></small></td></tr><?php endforeach; ?>
         </tbody></table></div>
         <?php endif; ?>
     </section>

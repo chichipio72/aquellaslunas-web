@@ -1,6 +1,9 @@
 RewriteEngine On
 Options -Indexes
 
+# El sitemap público conserva una URL XML estable y se genera desde MySQL.
+RewriteRule ^sitemap\.xml$ sitemap.php [L,NC]
+
 # Protección disuasoria contra hotlinking de previews públicas de contenidos.
 # Se permiten solicitudes sin Referer, el dominio público y entornos locales.
 RewriteCond %{HTTP_REFERER} !^$ [NC]

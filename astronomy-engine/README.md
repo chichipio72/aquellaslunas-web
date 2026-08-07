@@ -78,5 +78,27 @@ modos `summary` y `full`. Los datos Hipparcos/SIMBAD están separados en
 `TonightCatalog`. El contrato y sus diferencias de modelo están en
 [`../docs/php-tonight.md`](../docs/php-tonight.md).
 
+El subnamespace `AstronomyEngine\Satellite` contiene el primer bloque orbital
+portable: parseo estricto de TLE, propagación SGP4 near-earth con WGS72 y
+reducción TEME a altura, azimut y distancia mediante observador WGS84. El port
+SGP4 controlado conserva la licencia MIT de `satellite-js` en
+`src/Satellite/Sgp4/LICENSE-satellite-js.txt`. `SatelliteLunarTransitDetector`
+busca acercamientos y tránsitos lunares de ISS y Tiangong con los TLE locales,
+grilla adaptativa y refinamiento de contactos. La búsqueda común vive en
+`SatelliteAngularTransitDetector`: conserva proveedores geométricos separados
+para Luna y Sol y evita duplicar propagación, clasificación, mínimos y
+contactos. El Sol usa posición aparente topocéntrica, radio angular variable y
+una grilla fina de dos segundos limitada a pasos visibles. El CLI unificado es
+`scripts/find-satellite-transits.php`. `SatelliteTransitService`
+resuelve ISS 25544 y Tiangong 48274 mediante CelesTrak y un caché JSON local
+con TTL de seis horas, conserva el último TLE válido ante fallos y expone edad,
+confianza, advertencias y contadores. `--offline-fixtures` evita toda descarga.
+La transformación terrestre usa DUT1 configurable (cero por defecto) y
+movimiento polar cero; una futura incorporación de EOP debe hacerse
+explícitamente, sin alterar silenciosamente este contrato reproducible.
+
+Toda salida solar debe conservar la advertencia: nunca observar el Sol
+directamente ni con instrumentos sin un filtro solar certificado.
+
 La guía de traslado, dependencias, inventario y estado de validación está en
 [`ENTREGA.md`](ENTREGA.md).

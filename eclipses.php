@@ -562,7 +562,7 @@ $pageSeo = aquellasLunasSeoPage(
     'Eclipses | Aquellas Lunas',
     'Listado de eclipses solares y lunares para tu ubicación, con filtros por tipo y visibilidad.',
     '/eclipses.php',
-    'article'
+    'webpage'
 );
 if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '1') {
     header('X-Astronomy-Location-Name: ' . rawurlencode($locationLabel));

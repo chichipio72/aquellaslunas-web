@@ -44,6 +44,8 @@ grep -q 'data-image-selector data-image-filter="vertical"' "$work_dir/edit-image
 grep -q 'data-image-hero="\(true\|false\)"' "$work_dir/edit-images"
 grep -q 'data-image-vertical="\(true\|false\)"' "$work_dir/edit-images"
 grep -q 'data-image-filter-empty hidden' "$work_dir/edit-images"
+grep -q 'class="editor-slug-warning"' "$work_dir/edit-images"
+grep -q 'cambiar el slug modifica su URL pública' "$work_dir/edit-images"
 grep -q "option.dataset.imageHero === 'true'" /var/www/html/admin/contenidos/editor.js
 grep -q "option.dataset.imageVertical === 'true'" /var/www/html/admin/contenidos/editor.js
 grep -Fq '.editor-image-option[hidden] { display: none; }' /var/www/html/admin/contenidos/editor.css

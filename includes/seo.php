@@ -64,6 +64,7 @@ if (!function_exists('renderSeoHead')) {
         $title = $page['title'] ?? $siteName;
         $description = $page['description'] ?? '';
         $type = $page['type'] ?? 'website';
+        $openGraphType = $type === 'article' ? 'article' : 'website';
         $path = $page['path'] ?? '/';
         $url = $canonicalUrl;
         $socialImage = array_replace(aquellasLunasDefaultSocialImage(), $page['image'] ?? []);
@@ -75,7 +76,7 @@ if (!function_exists('renderSeoHead')) {
         echo '    <link rel="canonical" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:title" content="' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:description" content="' . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
-        echo '    <meta property="og:type" content="' . htmlspecialchars($type, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
+        echo '    <meta property="og:type" content="' . htmlspecialchars($openGraphType, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:url" content="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:site_name" content="' . htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
         echo '    <meta property="og:image" content="' . htmlspecialchars($socialImage['url'], ENT_QUOTES, 'UTF-8') . '">' . PHP_EOL;
@@ -92,6 +93,7 @@ if (!function_exists('renderSeoHead')) {
         $schemaOrgType = match ($type) {
             'website' => 'WebSite',
             'article' => 'Article',
+            'collection' => 'CollectionPage',
             default => 'WebPage',
         };
         $schemaOrgName = $type === 'website' ? $siteName : $title;
@@ -101,7 +103,8 @@ if (!function_exists('renderSeoHead')) {
         $schemaOrgJson = [
             '@context' => 'https://schema.org',
             '@type' => $schemaOrgType,
-            'name' => $schemaOrgName,
+            '@id' => $schemaOrgUrl,
+            $schemaOrgType === 'Article' ? 'headline' : 'name' => $schemaOrgName,
             'url' => $schemaOrgUrl,
             'inLanguage' => $schemaOrgLanguage,
             'description' => $schemaOrgDescription,
@@ -120,8 +123,46 @@ if (!function_exists('renderSeoHead')) {
             ];
         }
 
+        if ($schemaOrgType === 'Article' && isset($page['date_modified']) && is_string($page['date_modified'])) {
+            $schemaOrgJson['dateModified'] = $page['date_modified'];
+        }
+        if ($schemaOrgType === 'Article' && isset($page['schema_image']) && is_string($page['schema_image'])) {
+            $schemaOrgJson['image'] = $page['schema_image'];
+        }
+
+        $structuredData = $schemaOrgJson;
+        $breadcrumbs = is_array($page['breadcrumbs'] ?? null) ? $page['breadcrumbs'] : [];
+        if ($breadcrumbs !== []) {
+            $breadcrumbItems = [];
+            foreach (array_values($breadcrumbs) as $index => $breadcrumb) {
+                if (!is_array($breadcrumb) || !isset($breadcrumb['name'], $breadcrumb['url'])) {
+                    continue;
+                }
+                $breadcrumbItems[] = [
+                    '@type' => 'ListItem',
+                    'position' => $index + 1,
+                    'name' => (string) $breadcrumb['name'],
+                    'item' => (string) $breadcrumb['url'],
+                ];
+            }
+            if ($breadcrumbItems !== []) {
+                unset($schemaOrgJson['@context']);
+                $structuredData = [
+                    '@context' => 'https://schema.org',
+                    '@graph' => [
+                        $schemaOrgJson,
+                        [
+                            '@type' => 'BreadcrumbList',
+                            '@id' => $url . '#breadcrumb',
+                            'itemListElement' => $breadcrumbItems,
+                        ],
+                    ],
+                ];
+            }
+        }
+
         echo '    <script type="application/ld+json">' . PHP_EOL;
-        echo '        ' . json_encode($schemaOrgJson, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL;
+        echo '        ' . json_encode($structuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL;
         echo '    </script>' . PHP_EOL;
     }
 }

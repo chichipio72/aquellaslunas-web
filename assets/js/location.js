@@ -3,6 +3,7 @@ const AstronomyLocation = (() => {
     name: 'Buenos Aires',
     latitude: -34.53,
     longitude: -58.48,
+    elevation: 0,
     timezone: 'America/Argentina/Buenos_Aires',
     mode: 'default',
   };
@@ -12,9 +13,12 @@ const AstronomyLocation = (() => {
     const rawLongitude = position?.coords?.longitude;
     const latitude = rawLatitude === null || rawLatitude === '' ? Number.NaN : Number(rawLatitude);
     const longitude = rawLongitude === null || rawLongitude === '' ? Number.NaN : Number(rawLongitude);
+    const rawElevation = position?.coords?.altitude;
+    const elevation = rawElevation === null || rawElevation === '' || !Number.isFinite(Number(rawElevation))
+      ? 0 : Math.max(-500, Math.min(10000, Number(rawElevation)));
     return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
       && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
-      ? { latitude, longitude }
+      ? { latitude, longitude, elevation }
       : null;
   };
 
@@ -124,9 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     status.textContent = 'Solicitando ubicación al navegador…';
     try {
       const coordinates = await AstronomyLocation.geolocate();
-      const timezone = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'
-        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-        : '';
       const form = document.createElement('form');
       form.method = 'post';
       form.action = panel.querySelector('form')?.action || 'ubicacion.php';
@@ -134,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         location_name: `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
-        timezone: timezone || window.siteTimeContext?.timezone || AstronomyLocation.DEFAULT_LOCATION.timezone,
+        elevation_meters: coordinates.elevation,
         location_mode: 'geolocation',
         return_to: window.location.pathname,
       };

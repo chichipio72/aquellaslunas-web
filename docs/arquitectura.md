@@ -27,6 +27,11 @@ localidad enlazada a `ubicacion.php`; `site-footer.php` centraliza la atribució
 `assets/js/location.js` pide permisos y maneja errores; `assets/js/astro-map.js` crea el
 mapa Leaflet, busca con Nominatim y mantiene el marcador del observador. Las futuras
 capas o líneas de azimut deben permanecer separadas de ese marcador.
+Cuando una sección abre `ubicacion.php`, puede enviar su ruta interna mediante
+`return`; el valor validado se conserva como `return_to`. La página permite volver
+sin guardar y, después de confirmar, redirige al mismo destino. Se admiten consultas
+internas, pero se rechazan esquemas, hosts, rutas fuera de la instalación, fragmentos
+y caracteres de control.
 
 `includes/site-sections.php` es la fuente única para el orden, etiqueta, URL, presencia en menú y presencia en swipe de cada sección. `renderAstronomySiteNavigation()` genera el menú y aplica `class="is-active"` y `aria-current="page"` a la página actual. `astronomyMobileSwipeContext()` filtra el mismo registro por `swipe_enabled`.
 
@@ -85,10 +90,12 @@ de pantalla. El clic derecho no es seguridad; la protección efectiva depende de
 publicar el original, limitar resolución y conservar la marca de agua de la preview.
 
 `contenidos.php` muestra el índice y `contenido.php?slug=...` resuelve artículos. La
-portada pide al mismo catálogo una trivia y una entrada “Sabías que…” aleatorias; las
-opciones de trivia se mezclan sobre una copia. En modo usuario sólo participan
-entidades válidas y visibles. En debug local, los errores se sustituyen por bloques
-de diagnóstico.
+portada usa una carga focalizada: elige una trivia y una entrada “Sabías que…”
+visibles, carga sólo las opciones de la trivia elegida y conserva únicamente el slug
+de sus artículos para construir los enlaces. No arma el catálogo editorial completo.
+Las opciones de trivia se mezclan sobre una copia. En modo usuario sólo participan
+entidades válidas y visibles. Las pantallas que necesitan índice o detalle conservan
+la carga del catálogo completo.
 
 `includes/content-debug.php` administra ese modo mediante la sesión local y un POST
 con CSRF. Requiere `canUseSiteDebugTools()`. Tanto enlaces como páginas directas y loader comprueban
@@ -116,13 +123,19 @@ retirado; el sitio público y `/admin/` no dependen de herramientas locales.
 
 ## Web Push MVP
 
-El piloto Web Push es exclusivamente administrativo. La portada no muestra controles de suscripción. `/admin/notificaciones-prueba.php` solicita permiso sólo después de una acción explícita, registra `service-worker.js` con alcance `/astro/`, reutiliza una suscripción existente y la envía como JSON a `web-push/subscribe.php`. `web-push/unsubscribe.php` marca la fila inactiva antes de retirar la suscripción del navegador. El service worker sólo atiende `push` y `notificationclick`: no contiene caché, precache ni comportamiento offline.
+El piloto Web Push permite configurar cada dispositivo desde `/notificaciones.php`. El permiso y la suscripción se solicitan sólo después de una acción explícita. La página obtiene la `PushSubscription` real del navegador y el backend exige coincidencia exacta de endpoint, hash, `p256dh` y `auth`; ningún ID numérico funciona como credencial ni se devuelven secretos en las respuestas. La ubicación guardada para avisos es independiente de la ubicación general del sitio. El catálogo público excluye tipos no disponibles y administrativos. `/admin/notificaciones-prueba.php` y `/admin/notificaciones-astronomicas.php` continúan como herramientas privadas de prueba, supervisión y corrección.
+
+`web-push/subscribe.php` registra o reactiva la suscripción y `web-push/unsubscribe.php` marca la fila inactiva antes de retirarla del navegador. `web-push/device-config.php` atiende únicamente solicitudes JSON de origen propio con CSRF de sesión y guarda configuración y preferencias en una transacción mediante la capa común. El service worker sólo atiende `push` y `notificationclick`: no contiene caché, precache ni comportamiento offline.
 
 Mientras dure el piloto, el menú público puede incluir **Administración** → `admin/` para permitir el ingreso desde una PWA standalone. Su visibilidad se controla, como la de las demás entradas del menú principal, desde **Visibilidad de secciones**; el valor predeterminado es visible. Ocultarla no deshabilita la ruta, que sigue reutilizando el login, la sesión y el CSRF administrativos existentes y no concede acceso por sí misma.
 
 El endpoint valida método, tipo y tamaño de cuerpo, origen cuando el navegador lo informa, endpoint HTTPS y claves Base64 URL. `includes/web-push.php` persiste mediante una sentencia preparada en `WEB_DB`; el endpoint es único y un alta repetida reactiva y actualiza la misma fila. No almacena ubicación, preferencias ni identidad personal; `user_agent` es diagnóstico opcional.
 
-El panel envía desde PHP en el hosting mediante `minishlink/web-push` 10.1 y el autoloader de Composer. `symfony/polyfill-mbstring` cubre la ausencia conocida de `mbstring`; producción sigue necesitando PHP 8.2+, cURL, OpenSSL con P-256 e iconv. `vendor/` se genera localmente desde `composer.lock` y sólo se incluye en el despliegue al usar `--include-vendor`. La clave privada VAPID se lee sólo desde la configuración externa, nunca se entrega al navegador. El script Python de la mini PC se conserva como alternativa manual. Ambos emisores actualizan éxito/error y desactivan respuestas 404/410. No existen cron, lógica astronómica, anticipación ni múltiples preferencias.
+El panel envía desde PHP en el hosting mediante `minishlink/web-push` 10.1 y el autoloader de Composer. `symfony/polyfill-mbstring` cubre la ausencia conocida de `mbstring`; producción sigue necesitando PHP 8.2+, cURL, OpenSSL con P-256 e iconv. `vendor/` se genera localmente desde `composer.lock` y sólo se incluye en el despliegue al usar `--include-vendor`. La clave privada VAPID se lee sólo desde la configuración externa, nunca se entrega al navegador. El script Python de la mini PC se conserva como alternativa manual. Ambos emisores actualizan éxito/error y desactivan respuestas 404/410.
+
+Las tareas automáticas del hosting entran únicamente por `scripts/run-scheduled-tasks.php`. El orquestador usa un lock no bloqueante, aplica las migraciones compatibles registradas explícitamente y luego procesa pruebas programadas y avisos astronómicos mediante funciones compartidas. Los wrappers anteriores permanecen disponibles sólo para diagnóstico manual. El estado operativo y las migraciones aplicadas se persisten en MySQL para su consulta administrativa.
+
+El catálogo `web_push_notification_types` separa la disponibilidad global de cada tipo de la preferencia del dispositivo y de su estado técnico. Conserva nombre, plantillas, destino y programación predeterminada. Los procesadores sólo sustituyen marcadores permitidos explícitamente por tipo y guardan en el historial el título, cuerpo y URL usados en cada intento real. Los tipos administrativos, como `test`, no aparecen entre las preferencias normales del dispositivo.
 
 El editor administrativo valida y guarda el contenido persistido en tablas
 editoriales. Su núcleo se mantiene separado de la vista para probar normalización,
@@ -508,6 +521,31 @@ Los tres niveles destacados se presentan con una banda sobria. El último usa un
 
 ## Presentación de eventos y Superluna
 
+### Contexto satelital de portada
+
+La opción `home.satellite_transits.enabled`, administrada en Configuración del
+sitio → Portada, habilita este cálculo. Cuando está activa, la portada ejecuta
+`SatelliteTransitService` una sola vez mediante
+`includes/home-satellite-context.php`, después de resolver la ubicación activa,
+el reloj —incluida la simulación local— y la ventana de oscuridad civil devuelta
+por `tonight`. La consulta combina ISS y Tiangong con objetivos Luna y Sol para
+las 48 horas siguientes. Desactivarla corta antes de construir el proveedor o
+resolver TLE y deja el contexto en estado `disabled`.
+
+El resultado completo queda en `$homePageContext['satellite']`. El mismo
+contexto publica vistas derivadas en `sections.tonight.satellite_events` y
+`sections.upcoming.satellite_events`: la primera contiene sólo eventos lunares
+dentro de la noche local; la segunda contiene todos los eventos solares y los
+lunares restantes, sin repetir los ya asignados a la noche. Una falla de red o
+ausencia de TLE válido deja el bloque satelital como `unavailable`, registra el
+error y no interrumpe los demás cálculos de Inicio.
+
+Las dos tarjetas muestran únicamente `transit` y `very_close`, con hora local y
+duración cuando existe. Los solares conservan la advertencia de filtro
+certificado. Si la lista filtrada queda vacía no se genera contenedor alguno.
+El diagnóstico administrativo al pie muestra `Satélites`, estado y tiempo
+total; en ejecuciones correctas añade resolución TLE y cálculo astronómico.
+
 ### Búsqueda progresiva de “Lo próximo”
 
 `includes/home-upcoming-events.php` centraliza el límite de seis elementos, los tipos
@@ -610,6 +648,8 @@ alternativa sin duplicar una aceptación ya registrada.
 `seo.php` genera metadatos, canonical y JSON-LD. `favicon-links.php` publica SVG, ICO, PNG 32×32 y Apple Touch Icon. `versionedAssetUrl()` agrega `?v=<filemtime>` a CSS, JavaScript, favicon y miniaturas lunares cuando el archivo existe; si no puede leerlo conserva la ruta original.
 
 ## Caché, errores y recuperación
+
+Las fronteras comunes `astronomyDataResolve()`, `astronomyEvents()`, `homeSatelliteContext()` y los endpoints de series del Explorador registran opcionalmente una sola traza por operación completa. `includes/astronomy-trace.php` nunca instrumenta muestras internas y una falla de persistencia sólo se envía a `error_log`. `request_id` es único por operación y queda indexado para que un futuro reporte pueda referenciarlo; `session_trace_id` agrupa anónimamente las operaciones de una pestaña o sesión de navegador.
 
 Las vistas dinámicas que llaman `sendDynamicNoCacheHeaders()` —Inicio, Esta noche, Sol y Luna, Planificador, Eventos, Eclipses, Ubicación y Galería— deshabilitan la caché. Los proxies JSON también usan `no-store`. Los assets estáticos conservan caché normal y cambian de URL al cambiar su `filemtime`.
 

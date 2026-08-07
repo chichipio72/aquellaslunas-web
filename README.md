@@ -69,7 +69,7 @@ Documentación complementaria:
 - Se verifica en el HTML o en Network/Tag Assistant buscando `gtag/js?id=G-GFZJ3D3MF3`. PHP no almacena payloads de Analytics ni crea cookies propias para esa integración; el script externo queda sujeto a las políticas de Google.
 - Los metadatos, canonical y JSON-LD se resuelven desde [includes/seo.php](includes/seo.php). Cada página define su propio título, descripción y ruta antes de cargar el encabezado común.
 - Para agregar una página nueva, define un arreglo SEO con `aquellasLunasSeoPage(...)` y pasa ese arreglo a `renderSeoHead(...)` en el `<head>`.
-- Cuando se agregue una nueva página pública, actualizar [sitemap.xml](sitemap.xml) con la URL absoluta correspondiente.
+- [sitemap.php](sitemap.php) genera `/astro/sitemap.xml` mediante la regla de Apache. Las páginas públicas generales se mantienen allí y los artículos válidos y visibles se incorporan automáticamente desde MySQL.
 
 ## Configuración de la API
 
