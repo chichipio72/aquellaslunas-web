@@ -313,4 +313,94 @@ tonightAssert(is_string($regressionCard) && str_contains($regressionCard, 'Venus
     && !str_contains($regressionCard, 'no habrá planetas'),
     'La tarjeta volvió a interpretar con el reloj real estados generados para una noche simulada.');
 
+$encounterData = [
+    'night' => $base['night'],
+    'moon_encounters' => [
+        ['id' => 'venus', 'name' => 'Venus', 'object_kind' => 'planet', 'minimum_separation_degrees' => 3.24, 'visibility_end' => '2026-07-25T22:00:00-03:00'],
+        ['id' => 'mars', 'name' => 'Marte', 'object_kind' => 'planet', 'minimum_separation_degrees' => 4.8, 'visibility_end' => '2026-07-26T03:00:00-03:00'],
+    ],
+];
+$formalVenus = [[
+    'type' => 'conjunction', 'subtype' => 'venus',
+    'datetime' => '2026-07-25T20:00:00-03:00',
+    'details' => ['both_above_horizon' => true],
+]];
+$withoutDuplicate = astronomyTonightMoonEncounters($encounterData, $formalVenus, $duringNight, $timezone);
+tonightAssert(array_column($withoutDuplicate, 'id') === ['mars'], 'Una conjunción formal se duplicó como objeto cerca de la Luna.');
+tonightAssert(
+    astronomyTonightMoonEncounterText($encounterData['moon_encounters'][0]) === 'Esta noche Venus y la Luna se verán separados por unos 3,2°.',
+    'La separación observacional no se presentó con una cifra decimal.'
+);
+tonightAssert(
+    astronomyTonightMoonEncounterTitle($encounterData['moon_encounters'][0]) === 'Venus cerca de la Luna',
+    'El título del encuentro lunar no usó la configuración editorial.'
+);
+$pastConjunction = $formalVenus;
+$pastConjunction[0]['datetime'] = '2026-07-25T15:00:00-03:00';
+tonightAssert(count(astronomyTonightMoonEncounters($encounterData, $pastConjunction, $duringNight, $timezone)) === 2,
+    'Una conjunción formal anterior a la noche ocultó el encuentro observacional.');
+$futureConjunction = $formalVenus;
+$futureConjunction[0]['datetime'] = '2026-07-26T10:00:00-03:00';
+tonightAssert(count(astronomyTonightMoonEncounters($encounterData, $futureConjunction, $duringNight, $timezone)) === 2,
+    'Una conjunción formal posterior a la noche ocultó el encuentro observacional.');
+$notObservableFormal = $formalVenus;
+$notObservableFormal[0]['details']['both_above_horizon'] = false;
+tonightAssert(count(astronomyTonightMoonEncounters($encounterData, $notObservableFormal, $duringNight, $timezone)) === 2,
+    'Una conjunción formal no observable ocultó el encuentro observacional.');
+$endedEncounter = $encounterData;
+$endedEncounter['moon_encounters'][0]['visibility_end'] = '2026-07-25T19:00:00-03:00';
+tonightAssert(array_column(astronomyTonightMoonEncounters($endedEncounter, [], $duringNight, $timezone), 'id') === ['mars'],
+    'Se mostró un encuentro que ya no era observable durante la noche en curso.');
+
+$homeEncounterData = $cardData;
+$homeEncounterData['moon_encounters'] = [[
+    'id' => 'venus', 'name' => 'Venus', 'object_kind' => 'planet', 'minimum_separation_degrees' => 3.24,
+    'visibility_end' => '2026-07-30T22:00:00-03:00',
+]];
+$homeEncounterText = astronomyTonightCardText(
+    $homeEncounterData,
+    [],
+    new DateTimeImmutable('2026-07-30T18:00:00-03:00'),
+    $timezone
+);
+tonightAssert(
+    $homeEncounterText === 'Esta noche Venus y la Luna se verán separados por unos 3,2°. También estará visible Marte.',
+    'La tarjeta de portada no mostró el encuentro observacional o repitió el planeta.'
+);
+
+$priorityData = $homeEncounterData;
+$priorityData['moon_encounters'] = [
+    ['id' => 'spica', 'name' => 'Spica', 'object_kind' => 'star', 'minimum_separation_degrees' => 1.2, 'visibility_end' => '2026-07-30T23:00:00-03:00'],
+    ['id' => 'mars', 'name' => 'Marte', 'object_kind' => 'planet', 'minimum_separation_degrees' => 6.4, 'visibility_end' => '2026-07-31T03:00:00-03:00'],
+    ['id' => 'venus', 'name' => 'Venus', 'object_kind' => 'planet', 'minimum_separation_degrees' => 3.2, 'visibility_end' => '2026-07-30T22:00:00-03:00'],
+];
+$prioritized = astronomyTonightPrioritizedMoonEncounters($priorityData, [], new DateTimeImmutable('2026-07-30T18:00:00-03:00'), $timezone);
+tonightAssert(array_column($prioritized, 'name') === ['Venus', 'Marte'], 'Los planetas no tuvieron prioridad sobre una estrella más cercana.');
+tonightAssert(
+    astronomyTonightMoonEncountersText($prioritized) === 'Esta noche la Luna estará cerca de Venus (3,2°) y de Marte (6,4°).',
+    'Dos planetas cercanos no usaron el texto editorial especial.'
+);
+$starsOnly = $priorityData;
+$starsOnly['moon_encounters'] = [
+    ['id' => 'regulus', 'name' => 'Régulo', 'object_kind' => 'star', 'minimum_separation_degrees' => 7.0, 'visibility_end' => '2026-07-31T03:00:00-03:00'],
+    ['id' => 'spica', 'name' => 'Spica', 'object_kind' => 'star', 'minimum_separation_degrees' => 2.0, 'visibility_end' => '2026-07-31T03:00:00-03:00'],
+];
+tonightAssert(
+    array_column(astronomyTonightPrioritizedMoonEncounters($starsOnly, [], new DateTimeImmutable('2026-07-30T18:00:00-03:00'), $timezone), 'name') === ['Spica'],
+    'Sin planetas no se eligió la estrella más cercana.'
+);
+$homeFormalText = astronomyTonightCardText(
+    $homeEncounterData,
+    [[
+        'type' => 'conjunction', 'subtype' => 'venus', 'title' => 'Conjunción Luna–Venus',
+        'datetime' => '2026-07-30T21:30:00-03:00', 'details' => ['both_above_horizon' => true],
+    ]],
+    new DateTimeImmutable('2026-07-30T18:00:00-03:00'),
+    $timezone
+);
+tonightAssert(
+    $homeFormalText === 'La Luna y Venus podrán verse juntos alrededor de las 21:30. También estará visible Marte.',
+    'La tarjeta de portada no dio prioridad a la conjunción formal.'
+);
+
 echo "Presentación de esta noche: escenarios completos e incompletos OK\n";

@@ -59,9 +59,14 @@ requireStoreAdminAuthentication();
                 <strong>Entrar al Laboratorio</strong>
             </a>
             <a class="card store-admin-dashboard__card" href="notificaciones-prueba.php">
-                <span class="store-admin-dashboard__card-label">Notificaciones de prueba</span>
-                <span>Suscribí este dispositivo y enviá notificaciones Web Push manuales.</span>
-                <strong>Probar notificaciones</strong>
+                <span class="store-admin-dashboard__card-label">Suscripciones</span>
+                <span>Revisá dispositivos, actividad y salud de las suscripciones Web Push.</span>
+                <strong>Ver suscripciones</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="notificaciones-astronomicas.php">
+                <span class="store-admin-dashboard__card-label">Notificaciones</span>
+                <span>Configurá avisos, revisá resultados y supervisá el scheduler.</span>
+                <strong>Gestionar notificaciones</strong>
             </a>
         </div>
     </main>

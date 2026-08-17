@@ -106,7 +106,7 @@ function astronomyPushCurrentDeviceState(PDO $connection, array $subscriptionPay
     $subscription = astronomyPushIdentifyCurrentSubscription($connection, $subscriptionPayload);
     $subscriptionId = (int) $subscription['id'];
     $statement = $connection->prepare(
-        'SELECT device_name, notifications_enabled, location_name, latitude, longitude, timezone, '
+        'SELECT support_id, device_name, notifications_enabled, location_name, latitude, longitude, timezone, '
         . 'quiet_hours_enabled, quiet_start_local, quiet_end_local, updated_at '
         . 'FROM web_push_device_config WHERE subscription_id = :subscription_id'
     );
@@ -117,6 +117,7 @@ function astronomyPushCurrentDeviceState(PDO $connection, array $subscriptionPay
         'configured' => is_array($device),
         'suggested_device_name' => astronomyPushSuggestedDeviceName($subscription['user_agent'] ?? null),
         'device' => is_array($device) ? [
+            'support_id' => (string) $device['support_id'],
             'device_name' => (string) $device['device_name'],
             'notifications_enabled' => (int) $device['notifications_enabled'] === 1,
             'location_name' => (string) $device['location_name'],

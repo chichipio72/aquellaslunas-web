@@ -237,6 +237,13 @@ estable y no debe modificarse normalmente. El editor conserva por ahora la
 edición técnica del campo con una advertencia explícita; no existe todavía
 historial de slugs ni redirección automática desde valores anteriores.
 
+Los embeds en artículos entran exclusivamente mediante la directiva controlada
+`[[embed url="..."]]`; nunca habilitan HTML o iframes escritos por el editor.
+La política central de proveedores sólo admite inicialmente URLs HTTPS con host
+exacto `chichipiosblog.com.ar` y path bajo `/astronomia/`. El renderer controla
+todos los atributos técnicos. Los embeds inválidos se omiten públicamente y se
+informan como advertencias editoriales sin invalidar el resto del artículo.
+
 ---
 
 ## 10. Texto y controles fuera de tarjetas
@@ -420,7 +427,9 @@ El MVP Web Push conserva estas separaciones:
 - el único cron permanente del hosting invoca `scripts/run-scheduled-tasks.php`; los scripts de salida lunar y recordatorios generales quedan como wrappers CLI de diagnóstico, no como cron separados;
 - las migraciones automáticas compatibles se incorporan mediante la lista explícita y ordenada de `scripts/migrations/registry.php`; las destructivas o irreversibles deben marcarse manuales y nunca ejecutarse automáticamente.
 - los tipos, disponibilidad global, plantillas, URL y valores predeterminados de avisos astronómicos viven en `web_push_notification_types`; `moonrise` y `test` deben renderizarse con los marcadores controlados del módulo común, sin volver a fijar textos o destinos en los procesadores;
+- `moonrise`, `eclipse`, `lunar_conjunction` y `satellite_transit` comparten el contrato de proveedores y el procesador de `includes/web-push-astronomy.php`; no bifurcar programación, No molestar, deduplicación, render, envío ni historial por tipo;
 - `available`, la preferencia `enabled`, la habilitación general del dispositivo y el estado técnico de la suscripción son capas independientes; desactivar un tipo global nunca debe borrar preferencias existentes.
+- cada configuración de dispositivo posee un ID público de soporte aleatorio e inmutable con formato `AL-XXXXXXXX`, almacenado en `web_push_device_config` y protegido por un índice único. Es sólo una referencia para localizar el dispositivo en administración: nunca autentica ni reemplaza la identificación mediante la `PushSubscription` completa, y no debe migrarse entre suscripciones distintas sin continuidad inequívoca.
 
 ---
 

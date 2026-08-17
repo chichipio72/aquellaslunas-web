@@ -39,10 +39,10 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
         'astronomy_trace' => ['label' => 'Trazabilidad astronómica', 'href' => 'trazabilidad-astronomica.php'],
         'gallery' => ['label' => 'Galería', 'href' => 'fotos.php'],
         'laboratory' => ['label' => 'Laboratorio', 'href' => 'laboratorio-astronomico.php'],
-        'notifications' => ['label' => 'Notificaciones de prueba', 'href' => 'notificaciones-prueba.php'],
-        'astronomy_notifications' => ['label' => 'Notificaciones astronómicas', 'href' => 'notificaciones-astronomicas.php'],
-        'notification_types' => ['label' => 'Tipos de notificación', 'href' => 'tipos-notificaciones.php'],
+        'notifications' => ['label' => 'Suscripciones', 'href' => 'notificaciones-prueba.php'],
+        'astronomy_notifications' => ['label' => 'Notificaciones', 'href' => 'notificaciones-astronomicas.php'],
     ];
+    if ($activeSection === 'notification_types') $activeSection = 'astronomy_notifications';
     if (!array_key_exists($activeSection, $sections)) {
         throw new InvalidArgumentException('La sección administrativa activa no es válida.');
     }

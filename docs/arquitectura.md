@@ -68,9 +68,15 @@ conexión falla, sin propagar excepciones a las páginas públicas.
 
 La validación cubre contrato y metadatos, Markdown, identificadores y opciones de
 trivia, imágenes locales y marcadores
-`[[imagen]]`, `[[esquema]]` y `[[trivia]]`. El renderizador Markdown propio implementa
+`[[imagen]]`, `[[esquema]]`, `[[trivia]]` y `[[embed]]`. El renderizador Markdown propio implementa
 un subconjunto deliberadamente pequeño y escapa primero todo texto. Los componentes
 futuros se emiten como marcadores visibles, sin ejecutar contenido arbitrario.
+
+`[[embed url="..."]]` es una directiva controlada, no HTML libre. La política
+central de proveedores admite inicialmente sólo HTTPS, host exacto
+`chichipiosblog.com.ar` y rutas bajo `/astronomia/`. El renderer es el único que
+define iframe, sandbox, carga diferida y presentación responsive. Una directiva
+inválida se omite de la vista pública y queda como advertencia editorial.
 
 Las imágenes reutilizables se resuelven exclusivamente desde
 `assets/images/tienda/previews/contenido/`. Un único resolver filtra archivos JPG/JPEG, PNG y
@@ -640,10 +646,43 @@ La verificación consiste en revisar el HTML o Network/Tag Assistant y confirmar
 `window.aquellasLunasTrackAnalyticsEvent()` definido por ese mismo bloque de
 Analytics. Registra `pwa_install_open`, `pwa_install_prompt`,
 `pwa_install_accepted`, `pwa_install_dismissed`, `pwa_ios_instructions`,
-`pwa_favorite_help` y `pwa_promo_closed`, con `source`, `platform`, `browser`,
+`pwa_favorite_help`, `pwa_promo_closed`, `pwa_embedded_browser_notice` y
+`pwa_embedded_open_external`; la espera fallida de una intención explícita usa
+`pwa_install_intent_unavailable`. Todos incluyen `source`, `platform`, `browser`,
 `display_mode` y `action`. El clic sólo cuenta como intento; aceptación y
 rechazo requieren `userChoice`, y `appinstalled` funciona como confirmación
 alternativa sin duplicar una aceptación ya registrada.
+
+`assets/js/content-trivia.js` reutiliza el mismo helper para medir exclusivamente
+las trivias públicas de portada. `trivia_view` se emite una vez cuando la trivia
+alcanza el viewport mediante `IntersectionObserver`; `trivia_answer`, una vez al
+elegir una opción; y `trivia_article_click`, al seguir el enlace relacionado.
+Los payloads se limitan al código editorial, slug relacionado cuando existe,
+resultado correcto/incorrecto y ordinal de opción. La falta o bloqueo de GA4 no
+interrumpe la interacción.
+
+El mismo script centraliza la detección conservadora de navegadores embebidos
+de Instagram y Facebook mediante marcadores propios de sus User-Agent. En ese
+contexto reemplaza el CTA de instalación por ayuda para abrir la URL actual en
+un navegador normal. Android intenta Chrome mediante un `intent:` construido
+sólo desde una URL HTTP(S) y conserva instrucciones visibles como fallback;
+iOS no intenta abrir Safari automáticamente. El descarte de este aviso dura la
+navegación actual mediante `sessionStorage`. La disponibilidad real de
+`beforeinstallprompt` sigue gobernando la instalación en navegadores normales.
+La tarjeta promocional de portada y la acción Instalar del menú comparten el
+mismo handler y la misma decisión por plataforma. Ocultar la tarjeta durante
+30 días no deshabilita la acción del menú; en modo instalado ambas invitaciones
+quedan ocultas. Si la tarjeta no está visible, el menú muestra en la propia
+navegación las instrucciones manuales necesarias para Safari/iOS.
+
+El salto explícito desde Android agrega `install=1` con `URL.searchParams` sin
+perder el path ni otros parámetros. Ya fuera del navegador embebido, ese valor
+sólo activa una espera coordinada con `beforeinstallprompt`: nunca dispara el
+prompt automáticamente. Cuando el evento está disponible presenta un `dialog`
+con botón habilitado; si no llega a tiempo informa la indisponibilidad y deja
+seguir navegando. Cerrar, rechazar, instalar o detectar modo standalone limpia
+el parámetro mediante `history.replaceState()` sin recargar. iOS queda fuera de
+este mecanismo y conserva sus instrucciones específicas.
 
 `seo.php` genera metadatos, canonical y JSON-LD. `favicon-links.php` publica SVG, ICO, PNG 32×32 y Apple Touch Icon. `versionedAssetUrl()` agrega `?v=<filemtime>` a CSS, JavaScript, favicon y miniaturas lunares cuando el archivo existe; si no puede leerlo conserva la ruta original.
 

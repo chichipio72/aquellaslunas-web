@@ -16,6 +16,10 @@ readonly -a DEPLOY_EXPLICIT_FILES=(
     'scripts/migrations/create-web-push-notification-types.php'
     'scripts/migrations/astronomy-request-log.sql'
     'scripts/migrations/create-astronomy-request-log.php'
+    'scripts/migrations/web-push-astronomy-event-types.sql'
+    'scripts/migrations/create-web-push-astronomy-event-types.php'
+    'scripts/migrations/web-push-support-id.sql'
+    'scripts/migrations/create-web-push-support-id.php'
     'scripts/cleanup-astronomy-request-log.php'
 )
 
@@ -189,6 +193,10 @@ put "${local_root}/scripts/migrations/web-push-notification-types.sql" -o "/scri
 put "${local_root}/scripts/migrations/create-web-push-notification-types.php" -o "/scripts/migrations/create-web-push-notification-types.php"
 put "${local_root}/scripts/migrations/astronomy-request-log.sql" -o "/scripts/migrations/astronomy-request-log.sql"
 put "${local_root}/scripts/migrations/create-astronomy-request-log.php" -o "/scripts/migrations/create-astronomy-request-log.php"
+put "${local_root}/scripts/migrations/web-push-astronomy-event-types.sql" -o "/scripts/migrations/web-push-astronomy-event-types.sql"
+put "${local_root}/scripts/migrations/create-web-push-astronomy-event-types.php" -o "/scripts/migrations/create-web-push-astronomy-event-types.php"
+put "${local_root}/scripts/migrations/web-push-support-id.sql" -o "/scripts/migrations/web-push-support-id.sql"
+put "${local_root}/scripts/migrations/create-web-push-support-id.php" -o "/scripts/migrations/create-web-push-support-id.php"
 put "${local_root}/scripts/migrations/registry.php" -o "/scripts/migrations/registry.php"
 put "${local_root}/scripts/run-scheduled-tasks.php" -o "/scripts/run-scheduled-tasks.php"
 put "${local_root}/scripts/cleanup-astronomy-request-log.php" -o "/scripts/cleanup-astronomy-request-log.php"

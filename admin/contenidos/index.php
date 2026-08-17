@@ -507,12 +507,13 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                     ['label' => 'Imagen independiente', 'snippet' => '[[imagen src="" alt=""]]'],
                     ['label' => 'Esquema', 'snippet' => '[[esquema tipo=""]]'],
                     ['label' => 'Trivia', 'snippet' => '[[trivia id=""]]'],
+                    ['label' => 'Simulador', 'snippet' => '[[embed url=""]]', 'cursor_offset' => -3],
                     ['label' => 'Negrita', 'snippet' => '**negrita**'],
                     ['label' => 'Cursiva', 'snippet' => '*cursiva*'],
                     ['label' => 'Código', 'snippet' => '`código`'],
                     ['label' => 'Lista', 'snippet' => '- elemento de lista'],
                 ] as $toolbarItem): ?>
-                    <button class="editor-button editor-button--quiet" type="button" data-insert-snippet="<?= editorHtml($toolbarItem['snippet']) ?>" title="<?= editorHtml($toolbarItem['snippet']) ?>"><?= editorHtml($toolbarItem['label']) ?></button>
+                    <button class="editor-button editor-button--quiet" type="button" data-insert-snippet="<?= editorHtml($toolbarItem['snippet']) ?>"<?= isset($toolbarItem['cursor_offset']) ? ' data-insert-cursor-offset="' . (int) $toolbarItem['cursor_offset'] . '"' : '' ?> title="<?= editorHtml($toolbarItem['snippet']) ?>"><?= editorHtml($toolbarItem['label']) ?></button>
                 <?php endforeach; ?>
             </div></div>
             <details class="editor-image-block-builder" data-image-block-builder>

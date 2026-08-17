@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/api-client.php';
 require_once __DIR__ . '/web-push.php';
+require_once __DIR__ . '/web-push-support-id.php';
+require_once __DIR__ . '/web-push-astronomy-providers.php';
 
 const ASTRONOMY_PUSH_MOONRISE_TYPE = 'moonrise';
 const ASTRONOMY_PUSH_MOONRISE_EVENT_KEY = 'moonrise';
+const ASTRONOMY_PUSH_ECLIPSE_TYPE = 'eclipse';
+const ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE = 'lunar_conjunction';
+const ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE = 'satellite_transit';
 const ASTRONOMY_PUSH_TEST_TYPE = 'test';
 const ASTRONOMY_PUSH_LOOKBACK_MINUTES = 6;
 const ASTRONOMY_PUSH_TEST_LOOKBACK_MINUTES = 10;
@@ -93,6 +98,10 @@ function astronomyPushAllowedPlaceholders(string $notificationType): array
 {
     return match ($notificationType) {
         'moonrise' => ['event_time', 'event_date', 'location_name', 'lead_minutes', 'device_name'],
+        'eclipse' => ['event_time', 'event_date', 'location_name', 'eclipse_type', 'eclipse_kind', 'device_name'],
+        'lunar_conjunction' => ['event_time', 'event_date', 'location_name', 'object_name', 'separation', 'device_name'],
+        'satellite_transit' => ['event_time', 'event_date', 'location_name', 'satellite_name', 'target_name',
+            'classification', 'separation', 'device_name'],
         'test' => ['event_time', 'event_date', 'location_name', 'device_name'],
         default => [],
     };
@@ -138,7 +147,7 @@ function astronomyPushValidateNotificationType(array $input): array
     $targetUrl = astronomyWebPushNormalizeTargetUrl($input['target_url'] ?? '');
     if (strlen($targetUrl) > 500) throw new InvalidArgumentException('La URL no puede superar 500 caracteres.');
     $scheduleMode = (string) ($input['default_schedule_mode'] ?? '');
-    if (!in_array($scheduleMode, ['before_event', 'fixed_time'], true)) {
+    if (!in_array($scheduleMode, ['before_event', 'fixed_time', 'fixed_local_time'], true)) {
         throw new InvalidArgumentException('El modo de programación predeterminado no es válido.');
     }
     $lead = $input['default_lead_minutes'] ?? null;
@@ -152,7 +161,7 @@ function astronomyPushValidateNotificationType(array $input): array
         ['options' => ['min_range' => -366, 'max_range' => 366]]);
     if ($dayOffset === false) throw new InvalidArgumentException('El desplazamiento de día no es válido.');
     $quietPolicy = (string) ($input['default_quiet_policy'] ?? '');
-    if (!in_array($quietPolicy, ['omit', 'ignore'], true)) {
+    if (!in_array($quietPolicy, ['omit', 'postpone', 'ignore'], true)) {
         throw new InvalidArgumentException('La política predeterminada de No molestar no es válida.');
     }
     $sortOrder = filter_var($input['sort_order'] ?? 0, FILTER_VALIDATE_INT);
@@ -233,6 +242,13 @@ function astronomyPushRenderNotification(array $type, array $event, array $devic
         '{location_name}' => (string) ($device['location_name'] ?? ''),
         '{lead_minutes}' => (string) $lead,
         '{device_name}' => (string) ($device['device_name'] ?? ''),
+        '{eclipse_type}' => (string) ($event['eclipse_type'] ?? ''),
+        '{eclipse_kind}' => (string) ($event['eclipse_kind'] ?? ''),
+        '{object_name}' => (string) ($event['object_name'] ?? ''),
+        '{separation}' => (string) ($event['separation'] ?? ''),
+        '{satellite_name}' => (string) ($event['satellite_name'] ?? ''),
+        '{target_name}' => (string) ($event['target_name'] ?? ''),
+        '{classification}' => (string) ($event['classification'] ?? ''),
     ];
     $title = strtr((string) $type['title_template'], $values);
     $body = strtr((string) $type['body_template'], $values);
@@ -248,6 +264,9 @@ function astronomyPushNotificationPreview(array $type): array
 {
     return astronomyPushRenderNotification($type, [
         'event_time_local' => new DateTimeImmutable('2026-08-04 20:42:00', new DateTimeZone('America/Argentina/Buenos_Aires')),
+        'eclipse_type' => 'eclipse lunar total', 'eclipse_kind' => 'lunar',
+        'object_name' => 'Júpiter', 'separation' => '2,1°',
+        'satellite_name' => 'ISS', 'target_name' => 'Luna', 'classification' => 'tránsito',
     ], [
         'timezone' => 'America/Argentina/Buenos_Aires', 'location_name' => 'Vicente López',
         'device_name' => 'Celular Android',
@@ -275,12 +294,62 @@ function astronomyPushNotificationTime(DateTimeImmutable $eventTimeUtc, int $lea
     return astronomyPushUtc($eventTimeUtc)->modify('-' . $leadMinutes . ' minutes');
 }
 
+function astronomyPushScheduledNotificationTime(DateTimeImmutable $eventTimeUtc, array $preference,
+    array $device): DateTimeImmutable
+{
+    $mode = (string) ($preference['schedule_mode'] ?? 'before_event');
+    if ($mode === 'before_event') {
+        return astronomyPushNotificationTime($eventTimeUtc, (int) ($preference['lead_minutes'] ?? 0));
+    }
+    if (!in_array($mode, ['fixed_local_time', 'fixed_time'], true)) {
+        throw new InvalidArgumentException('El modo de programación guardado no es válido.');
+    }
+    $time = astronomyPushNormalizeTime($preference['delivery_local_time'] ?? null, 'La hora de entrega');
+    if ($time === null) throw new InvalidArgumentException('Falta la hora local de entrega.');
+    $offset = filter_var($preference['delivery_day_offset'] ?? 0, FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => -366, 'max_range' => 366]]);
+    if ($offset === false) throw new InvalidArgumentException('El desplazamiento de entrega no es válido.');
+    $timezone = new DateTimeZone((string) $device['timezone']);
+    $eventLocal = astronomyPushUtc($eventTimeUtc)->setTimezone($timezone);
+    $date = new DateTimeImmutable($eventLocal->format('Y-m-d') . ' ' . $time . ':00', $timezone);
+    if ((int) $offset !== 0) $date = $date->modify(((int) $offset > 0 ? '+' : '') . (int) $offset . ' days');
+    return astronomyPushUtc($date);
+}
+
+function astronomyPushQuietEnd(DateTimeImmutable $instantUtc, array $device): DateTimeImmutable
+{
+    if (!astronomyPushIsQuietAt($instantUtc, $device)) return astronomyPushUtc($instantUtc);
+    $start = astronomyPushNormalizeTime($device['quiet_start_local'] ?? null, 'La hora desde');
+    $end = astronomyPushNormalizeTime($device['quiet_end_local'] ?? null, 'La hora hasta');
+    if ($start === null || $end === null) throw new InvalidArgumentException('No molestar no es válido.');
+    $timezone = new DateTimeZone((string) $device['timezone']);
+    $local = astronomyPushUtc($instantUtc)->setTimezone($timezone);
+    $endLocal = new DateTimeImmutable($local->format('Y-m-d') . ' ' . $end . ':00', $timezone);
+    if ($start > $end && $local->format('H:i') >= $start) $endLocal = $endLocal->modify('+1 day');
+    return astronomyPushUtc($endLocal);
+}
+
 function astronomyPushIsDue(DateTimeImmutable $notificationTimeUtc, DateTimeImmutable $nowUtc,
     int $lookbackMinutes = ASTRONOMY_PUSH_LOOKBACK_MINUTES): bool
 {
     $notification = astronomyPushUtc($notificationTimeUtc)->getTimestamp();
     $now = astronomyPushUtc($nowUtc)->getTimestamp();
     return $notification <= $now && $notification >= $now - $lookbackMinutes * 60;
+}
+
+function astronomyPushLookbackMinutes(string $notificationType): int
+{
+    return $notificationType === ASTRONOMY_PUSH_ECLIPSE_TYPE ? 16 : ASTRONOMY_PUSH_LOOKBACK_MINUTES;
+}
+
+function astronomyPushProviderCadenceDue(string $notificationType, DateTimeImmutable $nowUtc): bool
+{
+    $minutes = match ($notificationType) {
+        ASTRONOMY_PUSH_ECLIPSE_TYPE => 15,
+        ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE, ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE => 5,
+        default => 1,
+    };
+    return ((int) astronomyPushUtc($nowUtc)->format('i')) % $minutes === 0;
 }
 
 /** @return list<array<string,mixed>> */
@@ -310,11 +379,10 @@ function astronomyPushConfiguredDevices(PDO $connection, ?int $subscriptionId = 
     $sql = 'SELECT s.id AS subscription_id, s.active, s.user_agent, s.last_success_at, s.last_error_at, '
         . 's.last_error_message, d.device_name, d.notifications_enabled, d.location_name, d.latitude, '
         . 'd.longitude, d.timezone, d.quiet_hours_enabled, d.quiet_start_local, d.quiet_end_local, '
-        . 'p.enabled AS moonrise_enabled, p.schedule_mode, p.lead_minutes, p.delivery_local_time, '
+        . 'p.notification_type, p.enabled, p.schedule_mode, p.lead_minutes, p.delivery_local_time, '
         . 'p.delivery_day_offset, p.quiet_policy, p.parameters_json, t.* '
         . 'FROM web_push_subscriptions s JOIN web_push_device_config d ON d.subscription_id = s.id '
-        . 'JOIN web_push_notification_preferences p ON p.subscription_id = s.id '
-        . "AND p.notification_type = 'moonrise' LEFT JOIN web_push_notification_types t "
+        . 'JOIN web_push_notification_preferences p ON p.subscription_id = s.id LEFT JOIN web_push_notification_types t '
         . "ON t.notification_type = p.notification_type WHERE s.active = 1 AND d.notifications_enabled = 1 AND p.enabled = 1";
     $parameters = [];
     if ($subscriptionId !== null) {
@@ -328,20 +396,32 @@ function astronomyPushConfiguredDevices(PDO $connection, ?int $subscriptionId = 
     foreach ($statement->fetchAll() as $row) {
         try {
             $validated = astronomyPushValidateDeviceConfig($row + ['notifications_enabled' => true]);
-            if ((string) $row['schedule_mode'] !== 'before_event' || (string) $row['quiet_policy'] !== 'omit') {
-                throw new RuntimeException('La preferencia moonrise guardada no es compatible.');
+            $notificationType = (string) $row['notification_type'];
+            if (!in_array($notificationType, [ASTRONOMY_PUSH_MOONRISE_TYPE, ASTRONOMY_PUSH_ECLIPSE_TYPE,
+                ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE, ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE], true)) {
+                throw new RuntimeException('El tipo astronómico guardado no es compatible.');
             }
-            $lead = filter_var($row['lead_minutes'], FILTER_VALIDATE_INT,
+            $schedule = (string) $row['schedule_mode'];
+            if (!in_array($schedule, ['before_event', 'fixed_local_time', 'fixed_time'], true)) {
+                throw new RuntimeException('La programación guardada no es compatible.');
+            }
+            $lead = $row['lead_minutes'] === null ? null : filter_var($row['lead_minutes'], FILTER_VALIDATE_INT,
                 ['options' => ['min_range' => 1, 'max_range' => 1440]]);
-            if ($lead === false) throw new RuntimeException('La anticipación moonrise guardada no es válida.');
-            astronomyPushValidateParametersJson($row['parameters_json']);
+            if ($schedule === 'before_event' && $lead === false) throw new RuntimeException('La anticipación guardada no es válida.');
+            if ($schedule !== 'before_event' && astronomyPushNormalizeTime($row['delivery_local_time'], 'La hora') === null) {
+                throw new RuntimeException('La hora fija guardada no es válida.');
+            }
+            if (!in_array((string) $row['quiet_policy'], ['omit', 'postpone', 'ignore'], true)) {
+                throw new RuntimeException('La política de silencio guardada no es válida.');
+            }
+            astronomyPushEventParameters($row);
         } catch (Throwable $exception) {
-            $devices[] = array_replace($row, ['_configuration_error' => 'Configuración moonrise no válida.']);
+            $devices[] = array_replace($row, ['_configuration_error' => 'Configuración astronómica no válida.']);
             continue;
         }
-        $device = array_replace($row, $validated, ['lead_minutes' => (int) $lead]);
+        $device = array_replace($row, $validated, ['lead_minutes' => $lead === null ? null : (int) $lead]);
         try { $device['notification_type_config'] = astronomyPushValidateNotificationType($row); }
-        catch (Throwable $exception) { $device['_notification_type_error'] = 'Catálogo moonrise no válido.'; }
+        catch (Throwable $exception) { $device['_notification_type_error'] = 'Catálogo astronómico no válido.'; }
         $devices[] = $device;
     }
     return $devices;
@@ -352,7 +432,9 @@ function astronomyPushAdminSubscriptions(PDO $connection): array
 {
     return $connection->query(
         'SELECT s.id AS subscription_id, s.active, s.user_agent, s.created_at, s.updated_at, '
-        . 's.last_success_at, s.last_error_at, s.last_error_message, d.device_name '
+        . 's.last_success_at, s.last_error_at, s.last_error_message, d.support_id, d.device_name, '
+        . 'd.location_name, d.timezone, d.notifications_enabled, d.quiet_hours_enabled, '
+        . 'd.quiet_start_local, d.quiet_end_local '
         . 'FROM web_push_subscriptions s LEFT JOIN web_push_device_config d ON d.subscription_id = s.id '
         . 'ORDER BY s.id DESC'
     )->fetchAll();
@@ -389,6 +471,50 @@ function astronomyPushDeviceNotificationPreferences(PDO $connection, int $subscr
     return $statement->fetchAll();
 }
 
+/** @return list<array<string,mixed>> */
+function astronomyPushAdminUpcomingEvents(array $device, array $preferences, DateTimeImmutable $nowUtc): array
+{
+    $results = [];
+    foreach ($preferences as $preference) {
+        if ((int) ($preference['available'] ?? 0) !== 1) continue;
+        $type = (string) $preference['notification_type'];
+        if (!in_array($type, [ASTRONOMY_PUSH_MOONRISE_TYPE, ASTRONOMY_PUSH_ECLIPSE_TYPE,
+            ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE, ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE], true)) continue;
+        $configured = array_replace($device, $preference, ['notification_type' => $type]);
+        if ((int) ($preference['enabled'] ?? 0) !== 1 && $type === ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE) {
+            $results[] = ['notification_type' => $type, 'display_name' => $preference['display_name'],
+                'enabled' => false, 'event' => null, 'error' => null, 'not_calculated' => true];
+            continue;
+        }
+        try {
+            $events = astronomyPushProviderEvents($configured, $nowUtc);
+            usort($events, static fn(array $a, array $b): int => $a['event_time_utc'] <=> $b['event_time_utc']);
+            $event = null;
+            foreach ($events as $candidate) {
+                if ($candidate['event_time_utc'] > $nowUtc) { $event = $candidate; break; }
+            }
+            $schedule = null;
+            $quiet = false;
+            $effective = null;
+            if (is_array($event)) {
+                $schedule = astronomyPushScheduledNotificationTime($event['event_time_utc'], $configured, $configured);
+                $quiet = astronomyPushIsQuietAt($schedule, $configured);
+                $effective = (string) ($configured['quiet_policy'] ?? 'omit') === 'postpone' && $quiet
+                    ? astronomyPushQuietEnd($schedule, $configured) : $schedule;
+            }
+            $results[] = ['notification_type' => $type, 'display_name' => $preference['display_name'],
+                'enabled' => (int) ($preference['enabled'] ?? 0) === 1, 'event' => $event,
+                'notification_time_utc' => $schedule, 'effective_time_utc' => $effective,
+                'quiet' => $quiet, 'quiet_policy' => $configured['quiet_policy'], 'error' => null];
+        } catch (Throwable $exception) {
+            $results[] = ['notification_type' => $type, 'display_name' => $preference['display_name'],
+                'enabled' => (int) ($preference['enabled'] ?? 0) === 1, 'event' => null,
+                'error' => astronomyWebPushSanitizeError($exception->getMessage())];
+        }
+    }
+    return $results;
+}
+
 function astronomyPushSaveDevice(PDO $connection, int $subscriptionId, array $input): void
 {
     $device = astronomyPushValidateDeviceConfig($input);
@@ -398,22 +524,30 @@ function astronomyPushSaveDevice(PDO $connection, int $subscriptionId, array $in
     $ownsTransaction = !$connection->inTransaction();
     if ($ownsTransaction) $connection->beginTransaction();
     try {
+        $supportIdStatement = $connection->prepare(
+            'SELECT support_id FROM web_push_device_config WHERE subscription_id = :subscription_id'
+        );
+        $supportIdStatement->execute(['subscription_id' => $subscriptionId]);
+        $supportId = $supportIdStatement->fetchColumn();
+        if (!is_string($supportId) || astronomyPushNormalizeSupportId($supportId) === null) {
+            $supportId = astronomyPushAllocateSupportId($connection);
+        }
         $statement = $connection->prepare(
-            'INSERT INTO web_push_device_config (subscription_id, device_name, notifications_enabled, location_name, '
+            'INSERT INTO web_push_device_config (subscription_id, support_id, device_name, notifications_enabled, location_name, '
             . 'latitude, longitude, timezone, quiet_hours_enabled, quiet_start_local, quiet_end_local) '
-            . 'VALUES (:subscription_id, :device_name, :notifications_enabled, :location_name, :latitude, :longitude, '
+            . 'VALUES (:subscription_id, :support_id, :device_name, :notifications_enabled, :location_name, :latitude, :longitude, '
             . ':timezone, :quiet_hours_enabled, :quiet_start_local, :quiet_end_local) '
             . 'ON DUPLICATE KEY UPDATE device_name = VALUES(device_name), notifications_enabled = VALUES(notifications_enabled), '
             . 'location_name = VALUES(location_name), latitude = VALUES(latitude), longitude = VALUES(longitude), '
             . 'timezone = VALUES(timezone), quiet_hours_enabled = VALUES(quiet_hours_enabled), '
             . 'quiet_start_local = VALUES(quiet_start_local), quiet_end_local = VALUES(quiet_end_local)'
         );
-        $statement->execute(['subscription_id' => $subscriptionId] + $device);
+        $statement->execute(['subscription_id' => $subscriptionId, 'support_id' => $supportId] + $device);
         $preference = $connection->prepare(
             'INSERT INTO web_push_notification_preferences (subscription_id, notification_type, enabled, schedule_mode, '
             . 'lead_minutes, delivery_local_time, delivery_day_offset, quiet_policy, parameters_json) '
             . 'VALUES (:subscription_id, :notification_type, :enabled, :schedule_mode, :lead_minutes, '
-            . ':delivery_local_time, :delivery_day_offset, :quiet_policy, NULL) '
+            . ':delivery_local_time, :delivery_day_offset, :quiet_policy, :parameters_json) '
             . 'ON DUPLICATE KEY UPDATE enabled = VALUES(enabled)'
         );
         foreach (astronomyPushNotificationTypes($connection) as $notificationType) {
@@ -429,6 +563,8 @@ function astronomyPushSaveDevice(PDO $connection, int $subscriptionId, array $in
                 'delivery_local_time' => $notificationType['default_delivery_time'],
                 'delivery_day_offset' => $notificationType['default_delivery_day_offset'],
                 'quiet_policy' => $notificationType['default_quiet_policy'],
+                'parameters_json' => ($defaults = astronomyPushDefaultParameters($typeCode)) === []
+                    ? null : json_encode($defaults, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             ]);
         }
         if ($ownsTransaction) $connection->commit();
@@ -517,7 +653,7 @@ function astronomyPushComplete(PDO $connection, int $subscriptionId, string $not
 function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable $nowUtc, bool $dryRun,
     ?callable $eventResolver = null, ?callable $sender = null, ?callable $output = null): array
 {
-    $eventResolver ??= static fn(array $device, DateTimeImmutable $now): array => astronomyPushMoonriseEvents($device, $now);
+    $eventResolver ??= static fn(array $device, DateTimeImmutable $now): array => astronomyPushProviderEvents($device, $now);
     $sender ??= static function (array $device, array $message) use ($connection): array {
         return astronomyWebPushSend($connection, loadWebPushServerConfig(), (int) $device['subscription_id'],
             $message['title'], $message['body'], $message['url']);
@@ -527,6 +663,8 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
         'skipped' => 0, 'deduplicated' => 0];
     $eventCache = [];
     foreach ($devices as $device) {
+        $notificationType = (string) ($device['notification_type'] ?? ASTRONOMY_PUSH_MOONRISE_TYPE);
+        $device['notification_type'] = $notificationType;
         $identity = 'Dispositivo ' . $device['device_name'] . ' (ID ' . (int) $device['subscription_id'] . ')';
         if (isset($device['_configuration_error'])) {
             $counts['failed']++;
@@ -534,27 +672,50 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
             continue;
         }
         $cacheKey = implode('|', [number_format((float) $device['latitude'], 6, '.', ''),
-            number_format((float) $device['longitude'], 6, '.', ''), (string) $device['timezone'], '0', 'moonrise']);
+            number_format((float) $device['longitude'], 6, '.', ''), (string) $device['timezone'], '0',
+            $notificationType, json_encode(astronomyPushEventParameters($device), JSON_UNESCAPED_SLASHES)]);
         if (!array_key_exists($cacheKey, $eventCache)) {
             try { $eventCache[$cacheKey] = $eventResolver($device, $nowUtc); }
             catch (Throwable $exception) {
                 $counts['failed']++;
-                $output($identity . ': error de cálculo lunar; se continúa con los demás dispositivos.');
+                $output($identity . ': error del proveedor ' . $notificationType . '; se continúa con los demás tipos.');
                 continue;
             }
         }
         $output($identity . '; ubicación ' . $device['location_name'] . '.');
         foreach ($eventCache[$cacheKey] as $event) {
             $counts['evaluated']++;
-            $notificationUtc = astronomyPushNotificationTime($event['event_time_utc'], (int) $device['lead_minutes']);
+            if (!isset($event['event_key']) || !($event['event_time_utc'] ?? null) instanceof DateTimeImmutable) {
+                $counts['failed']++;
+                $output('Evento inválido devuelto por ' . $notificationType . '.');
+                continue;
+            }
+            $nominalUtc = astronomyPushScheduledNotificationTime($event['event_time_utc'], $device, $device);
+            $quietPolicy = (string) ($device['quiet_policy'] ?? 'omit');
+            $notificationUtc = $nominalUtc;
+            if ($quietPolicy === 'postpone' && astronomyPushIsQuietAt($nominalUtc, $device)) {
+                $notificationUtc = astronomyPushQuietEnd($nominalUtc, $device);
+                if ($notificationUtc->getTimestamp() - $nominalUtc->getTimestamp() > 12 * 3600
+                    || $notificationUtc >= $event['event_time_utc']) {
+                    $output('Decisión: la postergación superaría 12 horas o el instante del evento.');
+                    continue;
+                }
+            }
+            if (in_array($notificationType, [ASTRONOMY_PUSH_ECLIPSE_TYPE, ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE], true)
+                && $notificationUtc >= $event['event_time_utc']) {
+                $output('Decisión: el aviso fijo ya no tendría sentido temporal.');
+                continue;
+            }
             $output('Evento ' . $event['event_time_local']->format('Y-m-d H:i:s T') . '; aviso nominal '
-                . $notificationUtc->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i:s T') . '.');
-            if (!astronomyPushIsDue($notificationUtc, $nowUtc)) {
+                . $nominalUtc->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i:s T')
+                . ($notificationUtc != $nominalUtc ? '; entrega pospuesta '
+                    . $notificationUtc->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i:s T') : '') . '.');
+            if (!astronomyPushIsDue($notificationUtc, $nowUtc, astronomyPushLookbackMinutes($notificationType))) {
                 $output('Decisión: fuera de la ventana retrospectiva.');
                 continue;
             }
             $counts['due']++;
-            $quiet = astronomyPushIsQuietAt($notificationUtc, $device);
+            $quiet = $quietPolicy === 'omit' && astronomyPushIsQuietAt($notificationUtc, $device);
             $typeUnavailable = !isset($device['notification_type_config'])
                 || (int) $device['notification_type_config']['available'] !== 1
                 || (int) $device['notification_type_config']['admin_only'] !== 0;
@@ -564,7 +725,7 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
                         : 'Decisión: enviaría; dry-run sin escritura ni envío.'));
                 continue;
             }
-            $claim = astronomyPushClaim($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+            $claim = astronomyPushClaim($connection, (int) $device['subscription_id'], $notificationType,
                 (string) $event['event_key'], $event['event_time_utc'], $notificationUtc, $nowUtc);
             if (!$claim['claimed']) {
                 $counts['deduplicated']++;
@@ -572,15 +733,15 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
                 continue;
             }
             if ($typeUnavailable) {
-                $typeError = isset($device['_notification_type_error']) ? 'Catálogo moonrise no válido.' : null;
+                $typeError = isset($device['_notification_type_error']) ? 'Catálogo astronómico no válido.' : null;
                 if ($typeError !== null) {
-                    astronomyPushComplete($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+                    astronomyPushComplete($connection, (int) $device['subscription_id'], $notificationType,
                         (string) $event['event_key'], $event['event_time_utc'], $claim['attempted_at'],
                         'failed', $typeError);
                     $counts['failed']++;
-                    $output('Decisión: error de catálogo moonrise.');
+                    $output('Decisión: error de catálogo astronómico.');
                 } else {
-                    astronomyPushComplete($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+                    astronomyPushComplete($connection, (int) $device['subscription_id'], $notificationType,
                         (string) $event['event_key'], $event['event_time_utc'], $claim['attempted_at'],
                         'skipped_unavailable', null, 'notification_type_unavailable');
                     $counts['skipped']++;
@@ -591,15 +752,15 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
             try {
                 $content = astronomyPushRenderNotification($device['notification_type_config'], $event, $device, $device);
             } catch (Throwable $exception) {
-                astronomyPushComplete($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+                astronomyPushComplete($connection, (int) $device['subscription_id'], $notificationType,
                     (string) $event['event_key'], $event['event_time_utc'], $claim['attempted_at'],
-                    'failed', 'No se pudo renderizar la notificación moonrise.');
+                    'failed', 'No se pudo renderizar la notificación astronómica.');
                 $counts['failed']++;
-                $output('Decisión: plantilla moonrise inválida.');
+                $output('Decisión: plantilla astronómica inválida.');
                 continue;
             }
             if ($quiet) {
-                astronomyPushComplete($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+                astronomyPushComplete($connection, (int) $device['subscription_id'], $notificationType,
                     (string) $event['event_key'], $event['event_time_utc'], $claim['attempted_at'],
                     'skipped_quiet_hours', null, 'quiet_hours', $content);
                 $counts['skipped']++;
@@ -614,7 +775,7 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
                 $success = false;
                 $error = 'Error de envío Web Push (' . get_debug_type($exception) . ')';
             }
-            astronomyPushComplete($connection, (int) $device['subscription_id'], ASTRONOMY_PUSH_MOONRISE_TYPE,
+            astronomyPushComplete($connection, (int) $device['subscription_id'], $notificationType,
                 (string) $event['event_key'], $event['event_time_utc'], $claim['attempted_at'],
                 $success ? 'sent' : 'failed', $error, null, $content);
             $counts[$success ? 'sent' : 'failed']++;
@@ -889,26 +1050,44 @@ function astronomyPushProcessScheduledTests(PDO $connection, DateTimeImmutable $
     return $counts;
 }
 
-/** @return array{moonrise:array<string,int>,tests:array<string,int>,summary:array<string,int>} */
+/** @return array<string,mixed> */
 function astronomyPushRunReminderCycle(PDO $connection, DateTimeImmutable $nowUtc, bool $dryRun = false,
     ?int $subscriptionId = null, ?callable $detailOutput = null): array
 {
     $detailOutput ??= static function (string $message): void {};
     $devices = astronomyPushConfiguredDevices($connection, $subscriptionId);
-    $moonrise = astronomyPushProcess($connection, $devices, $nowUtc, $dryRun, null, null, $detailOutput);
+    $byType = [];
+    foreach ([ASTRONOMY_PUSH_MOONRISE_TYPE, ASTRONOMY_PUSH_ECLIPSE_TYPE,
+        ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE, ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE] as $type) {
+        $typeDevices = array_values(array_filter($devices,
+            static fn(array $device): bool => (string) ($device['notification_type'] ?? '') === $type));
+        $byType[$type] = astronomyPushProviderCadenceDue($type, $nowUtc)
+            ? astronomyPushProcess($connection, $typeDevices, $nowUtc, $dryRun, null, null, $detailOutput)
+            : ['devices' => count($typeDevices), 'evaluated' => 0, 'due' => 0, 'sent' => 0, 'failed' => 0,
+                'skipped' => 0, 'deduplicated' => 0];
+    }
     $tests = astronomyPushProcessScheduledTests(
         $connection, $nowUtc, $dryRun, $subscriptionId, null, $detailOutput
     );
+    $evaluated = $sent = $skipped = $errors = 0;
+    foreach ($byType as $counts) {
+        $evaluated += $counts['evaluated'];
+        $sent += $counts['sent'];
+        $skipped += $counts['skipped'] + $counts['deduplicated'];
+        $errors += $counts['failed'];
+    }
     return [
-        'moonrise' => $moonrise,
+        'moonrise' => $byType[ASTRONOMY_PUSH_MOONRISE_TYPE],
+        'eclipse' => $byType[ASTRONOMY_PUSH_ECLIPSE_TYPE],
+        'lunar_conjunction' => $byType[ASTRONOMY_PUSH_LUNAR_CONJUNCTION_TYPE],
+        'satellite_transit' => $byType[ASTRONOMY_PUSH_SATELLITE_TRANSIT_TYPE],
         'tests' => $tests,
         'summary' => [
             'tests_processed' => $tests['sent'] + $tests['failed'] + $tests['skipped'] + $tests['expired'],
-            'evaluated' => $moonrise['evaluated'] + $tests['pending_due'],
-            'sent' => $moonrise['sent'] + $tests['sent'],
-            'skipped' => $moonrise['skipped'] + $tests['skipped'] + $tests['expired'] + $moonrise['deduplicated']
-                + $tests['deduplicated'],
-            'errors' => $moonrise['failed'] + $tests['failed'],
+            'evaluated' => $evaluated + $tests['pending_due'],
+            'sent' => $sent + $tests['sent'],
+            'skipped' => $skipped + $tests['skipped'] + $tests['expired'] + $tests['deduplicated'],
+            'errors' => $errors + $tests['failed'],
         ],
     ];
 }

@@ -21,6 +21,7 @@ function astronomySiteSections(): array
         'content' => ['id' => 'content', 'label' => 'Contenidos', 'url' => 'contenidos.php', 'order' => 67, 'menu_enabled' => astronomySiteMenuEntryEnabled('content') && isContentEnabled(), 'swipe_enabled' => false],
         'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 70, 'menu_enabled' => astronomySiteMenuEntryEnabled('location'), 'swipe_enabled' => false],
         'notifications' => ['id' => 'notifications', 'label' => 'Configurar notificaciones', 'url' => 'notificaciones.php', 'order' => 72, 'menu_enabled' => astronomySiteMenuEntryEnabled('notifications'), 'swipe_enabled' => false],
+        'moon_songs' => ['id' => 'moon_songs', 'label' => 'Canciones a la Luna', 'url' => 'canciones-a-la-luna.php', 'order' => 73, 'menu_enabled' => astronomySiteMenuEntryEnabled('moon_songs'), 'swipe_enabled' => false],
         'capabilities' => ['id' => 'capabilities', 'label' => 'Qué ofrece Aquellas Lunas', 'url' => 'que-podes-hacer.php', 'order' => 75, 'menu_enabled' => astronomySiteMenuEntryEnabled('capabilities'), 'swipe_enabled' => false],
         'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 80, 'menu_enabled' => astronomySiteMenuEntryEnabled('about'), 'swipe_enabled' => false],
         'administration' => ['id' => 'administration', 'label' => 'Administración', 'url' => 'admin/', 'order' => 90, 'menu_enabled' => astronomySiteMenuEntryEnabled('administration'), 'swipe_enabled' => false],

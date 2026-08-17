@@ -31,6 +31,32 @@ function astronomyPushAdminAgent(mixed $value): string
     return strlen($label) > 100 ? substr($label, 0, 97) . '…' : $label;
 }
 
+function astronomyPushAdminStatusLabel(?string $status): string
+{
+    return [
+        'success' => 'Correcto', 'running' => 'En ejecución',
+        'sent' => 'Enviada', 'failed' => 'Fallida', 'processing' => 'Procesando',
+        'skipped_quiet_hours' => 'Omitida por No molestar',
+        'skipped_unavailable' => 'Tipo no disponible', 'expired' => 'Vencida',
+        'cancelled' => 'Cancelada', 'pending' => 'Programada',
+    ][$status ?? ''] ?? ($status ?: 'Sin datos');
+}
+
+function astronomyPushAdminDate(?string $value, ?string $timezone = null, string $format = 'd/m H:i'): string
+{
+    if (!$value) return '—';
+    try {
+        $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+        return $date->setTimezone(new DateTimeZone($timezone ?: 'UTC'))->format($format);
+    }
+    catch (Throwable $exception) { return $value; }
+}
+
+function astronomyPushAdminShortDate(?string $value, ?string $timezone = null): string
+{
+    return astronomyPushAdminDate($value, $timezone, 'd/m H:i');
+}
+
 $errors = [];
 $success = '';
 $connection = null;
@@ -39,8 +65,9 @@ $device = null;
 $logs = [];
 $scheduledTests = [];
 $devicePreferences = [];
+$notificationTypes = [];
 $testNotificationType = null;
-$upcoming = null;
+$upcoming = [];
 $systemState = null;
 $selectedId = filter_var($_GET['subscription_id'] ?? $_POST['subscription_id'] ?? null,
     FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -50,6 +77,7 @@ try {
     if (is_array($migrationRegistry)) $systemState = scheduledTaskAdminState($connection, $migrationRegistry);
     try { $testNotificationType = astronomyPushNotificationType($connection, 'test'); }
     catch (Throwable $exception) { $testNotificationType = null; }
+    $notificationTypes = astronomyPushNotificationTypes($connection);
     $subscriptions = astronomyPushAdminSubscriptions($connection);
     if ($selectedId === false || $selectedId === null) {
         $selectedId = isset($subscriptions[0]) ? (int) $subscriptions[0]['subscription_id'] : null;
@@ -90,18 +118,8 @@ try {
         $scheduledTests = astronomyPushScheduledTests($connection, $selectedId);
         $devicePreferences = astronomyPushDeviceNotificationPreferences($connection, $selectedId);
         if ($device['device_name'] !== null && $device['timezone'] !== null) {
-            $calculationDevice = array_replace($device, [
-                'lead_minutes' => (int) ($device['lead_minutes'] ?: 15),
-                'quiet_hours_enabled' => (int) $device['quiet_hours_enabled'],
-            ]);
-            $nowUtc = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-            foreach (astronomyPushMoonriseEvents($calculationDevice, $nowUtc) as $event) {
-                if ($event['event_time_utc'] <= $nowUtc) continue;
-                $nominal = astronomyPushNotificationTime($event['event_time_utc'], (int) $calculationDevice['lead_minutes']);
-                $upcoming = $event + ['notification_time_utc' => $nominal,
-                    'quiet' => astronomyPushIsQuietAt($nominal, $calculationDevice)];
-                break;
-            }
+            $upcoming = astronomyPushAdminUpcomingEvents($device, $devicePreferences,
+                new DateTimeImmutable('now', new DateTimeZone('UTC')));
         }
     }
 } catch (InvalidArgumentException $exception) {
@@ -124,6 +142,14 @@ $form = [
     'quiet_end_local' => $configured && $device['quiet_end_local'] ? substr((string) $device['quiet_end_local'], 0, 5) : '08:00',
     'moonrise_enabled' => $configured ? (int) ($device['moonrise_enabled'] ?? 0) : 0,
 ];
+$deviceTimezone = $configured && is_string($device['timezone']) ? $device['timezone'] : 'UTC';
+usort($upcoming, static function (array $left, array $right): int {
+    $leftTime = $left['effective_time_utc'] ?? $left['notification_time_utc'] ?? null;
+    $rightTime = $right['effective_time_utc'] ?? $right['notification_time_utc'] ?? null;
+    if ($leftTime === null) return $rightTime === null ? 0 : 1;
+    if ($rightTime === null) return -1;
+    return $leftTime <=> $rightTime;
+});
 ?>
 <!doctype html>
 <html lang="es">
@@ -131,9 +157,10 @@ $form = [
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
-    <title>Notificaciones astronómicas · Aquellas Lunas</title>
+    <title>Notificaciones · Aquellas Lunas</title>
     <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= astronomyPushAdminHtml('../' . versionedAssetUrl('assets/css/styles.css')) ?>">
+    <script src="<?= astronomyPushAdminHtml('../' . versionedAssetUrl('assets/js/admin-notification-status.js')) ?>" defer></script>
     <style>
         .astronomy-notifications-admin { display: grid; gap: 1.15rem; max-width: 96rem; }
         .astronomy-notifications-admin > :is(.store-admin-alert, .store-admin-success) { margin: 0; }
@@ -273,34 +300,130 @@ $form = [
             .astronomy-notifications-admin__actions .button-primary { width: 100%; min-width: 0; }
             .astronomy-notifications-admin__scroll-region { max-width: 100%; }
         }
+        .astronomy-notifications-admin__automation { width: 100%; padding-block: 1rem; }
+        .astronomy-notifications-admin__automation-metrics { display: flex; flex-wrap: wrap; gap: .65rem 1.5rem; margin: 0; }
+        .astronomy-notifications-admin__automation-metrics div { min-width: 8rem; }
+        .astronomy-notifications-admin__automation-metrics dt { color: #98a6bd; font-size: .72rem; }
+        .astronomy-notifications-admin__automation-metrics dd { margin: .18rem 0 0; color: #edf2fa; font-size: .88rem; font-weight: 750; }
+        .astronomy-notifications-admin__automation-metrics .status-success { color: #a8d9ba; }
+        .astronomy-notifications-admin__automation-metrics .status-failed,
+        .astronomy-notifications-admin__automation-error dd { color: #efb0b0; }
+        .astronomy-notifications-admin__automation-error { flex: 1 1 100%; padding: .65rem .75rem; border: 1px solid rgba(215,142,142,.5); border-radius: .6rem; background: rgba(143,55,55,.12); }
+        .astronomy-notifications-admin__test-tools { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+        .astronomy-notifications-admin__tool { min-width: 0; padding: 0; overflow: hidden; }
+        .astronomy-notifications-admin__tool > summary,
+        .astronomy-notifications-admin__device-details > summary,
+        .astronomy-notifications-admin__parameters > summary { cursor: pointer; list-style: none; }
+        .astronomy-notifications-admin__tool > summary::-webkit-details-marker,
+        .astronomy-notifications-admin__device-details > summary::-webkit-details-marker,
+        .astronomy-notifications-admin__parameters > summary::-webkit-details-marker { display: none; }
+        .astronomy-notifications-admin__tool > summary { display: flex; justify-content: space-between; align-items: center; min-height: 4rem; padding: 1rem 1.2rem; color: #eef2fa; font-weight: 780; }
+        .astronomy-notifications-admin__summary-action { color: #e2bd5f; font-size: .78rem; }
+        .astronomy-notifications-admin__tool[open] .astronomy-notifications-admin__summary-action { font-size: 0; }
+        .astronomy-notifications-admin__tool[open] .astronomy-notifications-admin__summary-action::after { content: 'Cerrar'; font-size: .78rem; }
+        .astronomy-notifications-admin__tool-body { display: grid; gap: 1rem; padding: 0 1.2rem 1.2rem; border-top: 1px solid rgba(151,172,213,.17); }
+        .astronomy-notifications-admin__tool-body > :first-child { margin-top: 1rem; }
+        .astronomy-notifications-admin__catalog-link { color: #e8cf8c; text-decoration: none; font-size: .82rem; font-weight: 700; text-align: right; }
+        .astronomy-notifications-admin__catalog-link small { display: block; margin-top: .2rem; color: #93a2b9; font-weight: 500; }
+        .astronomy-notifications-admin__device-summary { display: grid; grid-template-columns: 1.4fr repeat(2,minmax(0,1fr)); gap: .7rem; }
+        .astronomy-notifications-admin__device-summary > div { display: grid; gap: .25rem; min-width: 0; padding: .8rem; border: 1px solid rgba(151,172,213,.18); border-radius: .65rem; background: rgba(5,10,21,.38); }
+        .astronomy-notifications-admin__device-summary span { color: #99a7bc; font-size: .76rem; }
+        .astronomy-notifications-admin__device-summary strong { color: #eef2fa; font-size: .9rem; overflow-wrap: anywhere; }
+        .astronomy-notifications-admin__preferences-section > h3,
+        .astronomy-notifications-admin__quiet-compact h3 { margin: 0; font-size: .98rem; color: #f0d27d; }
+        .astronomy-notifications-admin__preferences { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        .astronomy-notifications-admin__preference { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+        .astronomy-notifications-admin__preference p { margin: .2rem 0 0; }
+        .astronomy-notifications-admin__switch--compact { min-height: 0; padding: 0; border: 0; background: transparent; }
+        .astronomy-notifications-admin__quiet-compact { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .8rem; align-items: center; padding: .8rem; border: 1px solid rgba(151,172,213,.18); border-radius: .7rem; background: rgba(8,15,29,.4); }
+        .astronomy-notifications-admin__quiet-compact p { margin: .25rem 0 0; color: #aeb9ce; font-size: .8rem; }
+        .astronomy-notifications-admin__quiet-times { display: grid; grid-template-columns: repeat(2,minmax(8rem,1fr)); gap: .7rem; grid-column: 1/-1; }
+        .astronomy-notifications-admin__quiet-times[hidden] { display: none !important; }
+        .astronomy-notifications-admin__device-details { border: 1px solid rgba(151,172,213,.22); border-radius: .7rem; overflow: hidden; }
+        .astronomy-notifications-admin__device-details > summary { padding: .8rem 1rem; color: #cbd5e6; font-weight: 700; }
+        .astronomy-notifications-admin__details-body { display: grid; gap: 1rem; padding: 0 1rem 1rem; }
+        .astronomy-notifications-admin__technical-state { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .6rem; margin: 0; }
+        .astronomy-notifications-admin__technical-state div { padding: .65rem; background: rgba(5,10,21,.38); border-radius: .55rem; }
+        .astronomy-notifications-admin__technical-state dt { color: #94a2b8; font-size: .7rem; }
+        .astronomy-notifications-admin__technical-state dd { margin: .2rem 0 0; overflow-wrap: anywhere; font-size: .8rem; }
+        .astronomy-notifications-admin__parameters { padding: .7rem; border: 1px solid rgba(151,172,213,.16); border-radius: .6rem; }
+        .astronomy-notifications-admin__parameters dl { display: grid; gap: .5rem; }
+        .astronomy-notifications-admin__parameters dd { margin: .2rem 0 0; overflow-wrap: anywhere; color: #9facbf; font-size: .72rem; }
+        .astronomy-notifications-admin__upcoming-list { display: grid; gap: .65rem; }
+        .astronomy-notifications-admin__upcoming-item { display: grid; grid-template-columns: 8rem minmax(0,1fr); gap: 1rem; align-items: center; padding: .75rem .85rem; border: 1px solid rgba(151,172,213,.17); border-radius: .65rem; background: rgba(8,15,29,.36); }
+        .astronomy-notifications-admin__upcoming-item time { color: #f0d27d; font-weight: 760; }
+        .astronomy-notifications-admin__upcoming-item h3,
+        .astronomy-notifications-admin__upcoming-item p { margin: 0; }
+        .astronomy-notifications-admin__upcoming-item p { margin-top: .2rem; color: #aab6ca; font-size: .8rem; }
+        .astronomy-notifications-admin__responsive-table { max-width: 100%; overflow-x: auto; }
+        .astronomy-notifications-admin__row-details { margin-top: .35rem; font-size: .75rem; }
+        .astronomy-notifications-admin__row-details summary { color: #e2bd5f; cursor: pointer; }
+        .astronomy-notifications-admin__row-details dl { display: grid; gap: .35rem; min-width: 16rem; }
+        .astronomy-notifications-admin__row-details dt { color: #8f9db4; }
+        .astronomy-notifications-admin__row-details dd { margin: .1rem 0 0; white-space: normal; overflow-wrap: anywhere; }
+        @media (max-width: 52rem) {
+            .astronomy-notifications-admin__test-tools,
+            .astronomy-notifications-admin__device-summary,
+            .astronomy-notifications-admin__preferences,
+            .astronomy-notifications-admin__technical-state { grid-template-columns: 1fr; }
+            .astronomy-notifications-admin__configuration-head { align-items: start; }
+            .astronomy-notifications-admin__catalog-link { text-align: left; }
+        }
+        @media (max-width: 40rem) {
+            .astronomy-notifications-admin__automation-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; }
+            .astronomy-notifications-admin__automation-metrics div { min-width: 0; }
+            .astronomy-notifications-admin__automation-error { grid-column: 1/-1; }
+            .astronomy-notifications-admin__upcoming-item { grid-template-columns: 1fr; gap: .25rem; }
+            .astronomy-notifications-admin__responsive-table { overflow: visible; }
+            .astronomy-notifications-admin__responsive-table table,
+            .astronomy-notifications-admin__responsive-table tbody,
+            .astronomy-notifications-admin__responsive-table tr,
+            .astronomy-notifications-admin__responsive-table td { display: block; width: 100%; }
+            .astronomy-notifications-admin__responsive-table thead { display: none; }
+            .astronomy-notifications-admin__responsive-table tr { margin-bottom: .7rem; padding: .65rem; border: 1px solid rgba(151,172,213,.18); border-radius: .65rem; background: rgba(8,15,29,.36); }
+            .astronomy-notifications-admin__responsive-table td { display: grid; grid-template-columns: 7rem minmax(0,1fr); gap: .55rem; padding: .28rem 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+            .astronomy-notifications-admin__responsive-table td::before { content: attr(data-label); color: #8f9db4; font-size: .72rem; font-weight: 700; }
+        }
     </style>
 </head>
 <body class="store-admin">
-<?php renderStoreAdminNavigation('astronomy_notifications', 'Notificaciones astronómicas'); ?>
-<main class="store-admin-main astronomy-notifications-admin">
+<?php renderStoreAdminNavigation('astronomy_notifications', 'Notificaciones'); ?>
+<main class="store-admin-main astronomy-notifications-admin" data-live-admin-status data-status-kind="notifications" data-status-url="api/notificaciones.php?subscription_id=<?= (int) ($selectedId ?? 0) ?>" data-subscription-id="<?= (int) ($selectedId ?? 0) ?>" data-device-timezone="<?= astronomyPushAdminHtml($deviceTimezone) ?>" data-csrf-token="<?= astronomyPushAdminHtml(storeAdminCsrfToken()) ?>">
     <?php if ($errors !== []): ?><section class="store-admin-alert" role="alert"><strong>No se pudo completar la operación</strong><ul><?php foreach ($errors as $error): ?><li><?= astronomyPushAdminHtml($error) ?></li><?php endforeach; ?></ul></section><?php endif; ?>
     <?php if ($success !== ''): ?><section class="store-admin-success" role="status"><strong><?= astronomyPushAdminHtml($success) ?></strong></section><?php endif; ?>
 
+    <?php define('AQUELLAS_LUNAS_NOTIFICATIONS_ADMIN_VIEW', true); require __DIR__ . '/partials/notificaciones-operativas.php'; ?>
+
+    <?php if (false): // Vista anterior conservada temporalmente como referencia durante la consolidación. ?>
     <div class="astronomy-notifications-admin__operational-head">
-    <section class="card astronomy-notifications-admin__panel">
-        <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Automatización</p><h2>Estado del sistema</h2></div>
+    <section class="card astronomy-notifications-admin__panel" data-scheduler-block>
+        <div class="astronomy-notifications-admin__panel-heading admin-live-status__heading"><div><p class="eyebrow">Automatización</p><h2>Estado del scheduler</h2></div><div class="admin-live-status__controls"><button type="button" class="button compact-secondary-button" data-refresh-button>Actualizar</button><span data-refresh-feedback aria-live="polite">Datos cargados con la página</span></div></div>
         <?php if (!is_array($systemState)): ?><p class="store-admin-empty">El estado del orquestador todavía no está disponible.</p>
         <?php else:
             $orchestratorState = $systemState['orchestrator'];
             $lockBusy = scheduledTaskLockIsBusy();
         ?><dl class="astronomy-notifications-admin__system-grid">
-            <div class="astronomy-notifications-admin__metric"><dt>Última ejecución</dt><dd title="<?= astronomyPushAdminHtml($orchestratorState['last_started_at'] ?? '—') ?>"><?= astronomyPushAdminHtml($orchestratorState['last_started_at'] ?? '—') ?></dd></div>
-            <div class="astronomy-notifications-admin__metric"><dt>Última ejecución exitosa</dt><dd title="<?= astronomyPushAdminHtml($orchestratorState['last_success_at'] ?? '—') ?>"><?= astronomyPushAdminHtml($orchestratorState['last_success_at'] ?? '—') ?></dd></div>
-            <div class="astronomy-notifications-admin__metric"><dt>Última migración</dt><dd title="<?= astronomyPushAdminHtml($systemState['last_migration']['migration_id'] ?? '—') ?>"><?= astronomyPushAdminHtml($systemState['last_migration']['migration_id'] ?? '—') ?></dd></div>
-            <div class="astronomy-notifications-admin__metric"><dt>Migraciones automáticas pendientes</dt><dd><?= count($systemState['automatic_pending']) ?></dd></div>
+            <div class="astronomy-notifications-admin__metric"><dt>Último inicio</dt><dd data-scheduler-last-started-at><?= astronomyPushAdminHtml($orchestratorState['last_started_at'] ?? '—') ?></dd></div>
+            <div class="astronomy-notifications-admin__metric"><dt>Última finalización</dt><dd data-scheduler-last-finished-at><?= astronomyPushAdminHtml($orchestratorState['last_finished_at'] ?? '—') ?></dd></div>
+            <div class="astronomy-notifications-admin__metric"><dt>Último éxito</dt><dd data-scheduler-last-success-at><?= astronomyPushAdminHtml($orchestratorState['last_success_at'] ?? '—') ?></dd></div>
+            <div class="astronomy-notifications-admin__metric"><dt>Estado</dt><dd data-scheduler-status><?= astronomyPushAdminHtml($orchestratorState['last_status'] ?? '—') ?></dd></div>
             <div class="astronomy-notifications-admin__metric"><dt>Estado del lock</dt><dd><?= $lockBusy === null ? 'No disponible' : ($lockBusy ? 'En ejecución' : 'Libre') ?></dd></div>
-            <div class="astronomy-notifications-admin__metric astronomy-notifications-admin__metric--error"><dt>Último error general</dt><dd title="<?= astronomyPushAdminHtml(!empty($orchestratorState['last_error']) ? astronomyWebPushSanitizeError((string) $orchestratorState['last_error']) : '—') ?>"><?= astronomyPushAdminHtml(
+            <div class="astronomy-notifications-admin__metric astronomy-notifications-admin__metric--error"><dt>Último error</dt><dd data-scheduler-last-error><?= astronomyPushAdminHtml(
                 !empty($orchestratorState['last_error'])
                     ? astronomyWebPushSanitizeError((string) $orchestratorState['last_error']) : '—'
             ) ?></dd></div>
         </dl>
         <?php if ($systemState['manual_pending'] !== []): ?><p class="push-admin__note">Hay migraciones manuales pendientes; el orquestador informará si alguna bloquea tareas.</p><?php endif; ?>
         <?php endif; ?>
+    </section>
+
+    <section class="card astronomy-notifications-admin__panel astronomy-notifications-admin__selector">
+        <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Catálogo global</p><h2>Tipos de notificación</h2></div>
+        <?php if ($notificationTypes === []): ?><p class="store-admin-empty">No hay tipos registrados.</p><?php else: ?>
+        <dl class="push-admin__device-state astronomy-notifications-admin__compact-state">
+            <?php foreach ($notificationTypes as $notificationType): ?><div><dt><?= astronomyPushAdminHtml($notificationType['display_name']) ?> <code><?= astronomyPushAdminHtml($notificationType['notification_type']) ?></code></dt><dd><?= (int) $notificationType['available'] === 1 ? 'Disponible' : 'No disponible' ?> · <?= (int) $notificationType['admin_only'] === 1 ? 'Sólo administración' : 'Dispositivos' ?> · <?= astronomyPushAdminHtml($notificationType['default_schedule_mode']) ?></dd></div><?php endforeach; ?>
+        </dl><?php endif; ?>
+        <a class="button compact-secondary-button" href="tipos-notificaciones.php">Ver y editar catálogo</a>
     </section>
 
     <section class="card astronomy-notifications-admin__panel astronomy-notifications-admin__selector">
@@ -317,6 +440,24 @@ $form = [
         <?php endif; ?>
     </section>
     </div>
+
+    <?php if (is_array($device)): ?>
+    <section class="card astronomy-notifications-admin__panel">
+        <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Envío inmediato</p><h2>Enviar prueba manual</h2></div>
+        <p class="push-admin__note">Envía ahora una notificación al dispositivo seleccionado, sin esperar al scheduler.</p>
+        <form method="post" class="astronomy-notifications-admin__configuration-form" data-notification-action>
+            <input type="hidden" name="csrf_token" value="<?= astronomyPushAdminHtml(storeAdminCsrfToken()) ?>">
+            <input type="hidden" name="subscription_id" value="<?= (int) $device['subscription_id'] ?>">
+            <input type="hidden" name="action" value="send_manual_test">
+            <div class="astronomy-notifications-admin__fields">
+                <label class="astronomy-notifications-admin__field">Título<input type="text" name="title" maxlength="120" required value="Aquellas Lunas"></label>
+                <label class="astronomy-notifications-admin__field">URL a abrir<input type="text" name="target_url" maxlength="2048" required value="./"></label>
+                <label class="astronomy-notifications-admin__field astronomy-notifications-admin__field--full">Mensaje<textarea name="body" maxlength="500" rows="3" required>Esta es una notificación de prueba.</textarea></label>
+            </div>
+            <div class="astronomy-notifications-admin__actions"><button type="submit" class="button button-primary">Enviar ahora</button></div>
+        </form>
+    </section>
+    <?php endif; ?>
 
     <?php if (is_array($device)): ?>
     <section class="card astronomy-notifications-admin__panel astronomy-notifications-admin__configuration">
@@ -365,7 +506,7 @@ $form = [
                 <div class="astronomy-notifications-admin__preference">
                     <label class="astronomy-notifications-admin__switch"><span><?= astronomyPushAdminHtml($preference['display_name']) ?><?php if ((int) $preference['available'] !== 1): ?> — no disponible globalmente<?php endif; ?></span><input type="checkbox" name="notification_preferences[<?= astronomyPushAdminHtml($preference['notification_type']) ?>]" value="1"
                         <?= (int) ($preference['enabled'] ?? 0) === 1 ? ' checked' : '' ?><?= (int) $preference['available'] !== 1 ? ' disabled' : '' ?>><span class="astronomy-notifications-admin__switch-control" aria-hidden="true"></span></label>
-                    <p><?= astronomyPushAdminHtml($preference['description'] ?: '') ?><?php if ($preference['notification_type'] === 'moonrise'): ?> Se enviará <?= (int) ($preference['lead_minutes'] ?? $preference['default_lead_minutes']) ?> minutos antes.<?php endif; ?></p>
+                    <p><?= astronomyPushAdminHtml($preference['description'] ?: '') ?><?php $parameters = astronomyPushEventParameters($preference); if ($parameters !== []): ?> Parámetros: <?= astronomyPushAdminHtml(json_encode($parameters, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>.<?php endif; ?></p>
                 </div>
                 <?php endforeach; ?>
                 </div>
@@ -387,7 +528,7 @@ $form = [
             $testTimezone = new DateTimeZone((string) $device['timezone']);
             $testNow = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         ?>
-        <form method="post" class="astronomy-notifications-admin__test-form">
+        <form method="post" class="astronomy-notifications-admin__test-form" data-notification-action>
             <input type="hidden" name="csrf_token" value="<?= astronomyPushAdminHtml(storeAdminCsrfToken()) ?>">
             <input type="hidden" name="subscription_id" value="<?= (int) $device['subscription_id'] ?>">
             <input type="hidden" name="action" value="schedule_test">
@@ -404,8 +545,8 @@ $form = [
         <?php endif; ?>
 
         <div><h3>Pruebas pendientes y recientes</h3></div>
-        <?php if ($scheduledTests === []): ?><p class="store-admin-empty">Todavía no hay pruebas programadas para este dispositivo.</p><?php else: ?>
-        <div class="push-admin__table-wrap astronomy-notifications-admin__scroll-region"><table class="push-admin__table"><thead><tr><th>Programada</th><th>No molestar</th><th>Estado</th><th>Procesada</th><th>Resultado</th><th>Acción</th></tr></thead><tbody>
+        <?php if ($scheduledTests === []): ?><p class="store-admin-empty">Todavía no hay pruebas programadas para este dispositivo.</p><?php endif; ?>
+        <div class="push-admin__table-wrap astronomy-notifications-admin__scroll-region"><table class="push-admin__table"><thead><tr><th>Programada</th><th>No molestar</th><th>Estado</th><th>Procesada</th><th>Resultado</th><th>Acción</th></tr></thead><tbody data-tests-body>
         <?php foreach ($scheduledTests as $test):
             $testLocal = $configured
                 ? (new DateTimeImmutable((string) $test['scheduled_at_utc'], new DateTimeZone('UTC')))->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i T')
@@ -419,7 +560,7 @@ $form = [
             <td><?= astronomyPushAdminHtml($statusLabels[(string) $test['status']] ?? $test['status']) ?></td>
             <td><?= astronomyPushAdminHtml($test['processed_at'] ?: '—') ?></td>
             <td><?= astronomyPushAdminHtml($test['error_message'] ? astronomyWebPushSanitizeError((string) $test['error_message']) : ($test['notification_log_id'] ? 'Log #' . (int) $test['notification_log_id'] : '—')) ?></td>
-            <td><?php if ($test['status'] === 'pending'): ?><form method="post">
+            <td><?php if ($test['status'] === 'pending'): ?><form method="post" data-notification-action>
                 <input type="hidden" name="csrf_token" value="<?= astronomyPushAdminHtml(storeAdminCsrfToken()) ?>">
                 <input type="hidden" name="subscription_id" value="<?= (int) $device['subscription_id'] ?>">
                 <input type="hidden" name="action" value="cancel_test">
@@ -427,31 +568,36 @@ $form = [
                 <button type="submit" class="button compact-secondary-button">Cancelar</button>
             </form><?php else: ?>—<?php endif; ?></td>
         </tr><?php endforeach; ?>
-        </tbody></table></div><?php endif; ?>
+        </tbody></table></div>
     </section>
 
     <section class="card astronomy-notifications-admin__panel">
-        <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Próximo evento</p><h2>Salida lunar</h2></div>
-        <?php if (!$configured): ?><p class="store-admin-empty">Guardá una ubicación para calcular la próxima salida.</p>
-        <?php elseif ($upcoming === null): ?><p class="store-admin-empty">No se encontró una salida lunar para hoy o mañana local.</p>
+        <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Próximos eventos</p><h2>Proveedores astronómicos</h2></div>
+        <?php if (!$configured): ?><p class="store-admin-empty">Guardá una ubicación para calcular próximos eventos.</p>
+        <?php elseif ($upcoming === []): ?><p class="store-admin-empty">No hay tipos disponibles para calcular.</p>
         <?php else: ?><dl class="push-admin__device-state astronomy-notifications-admin__compact-state">
-            <div><dt>Preferencia</dt><dd><?= $form['moonrise_enabled'] ? 'Habilitada' : 'Deshabilitada' ?></dd></div>
-            <div><dt>Salida local</dt><dd><?= astronomyPushAdminHtml($upcoming['event_time_local']->format('Y-m-d H:i T')) ?></dd></div>
-            <div><dt>Aviso nominal</dt><dd><?= astronomyPushAdminHtml($upcoming['notification_time_utc']->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i T')) ?></dd></div>
-            <div><dt>No molestar</dt><dd><?= $upcoming['quiet'] ? 'Se omitiría' : 'Fuera del horario de silencio' ?></dd></div>
+        <?php foreach ($upcoming as $next): $event = $next['event'] ?? null; ?>
+            <div><dt><?= astronomyPushAdminHtml($next['display_name']) ?></dt><dd>
+                <?= $next['enabled'] ? 'Habilitada' : 'Deshabilitada' ?> ·
+                <?php if (!empty($next['not_calculated'])): ?>cálculo omitido mientras está deshabilitada
+                <?php elseif (!empty($next['error'])): ?>error: <?= astronomyPushAdminHtml($next['error']) ?>
+                <?php elseif (!is_array($event)): ?>sin evento en el horizonte
+                <?php else: ?>evento <?= astronomyPushAdminHtml($event['event_time_local']->format('Y-m-d H:i T')) ?> · aviso <?= astronomyPushAdminHtml($next['notification_time_utc']->setTimezone(new DateTimeZone((string) $device['timezone']))->format('Y-m-d H:i T')) ?> · <?= $next['quiet'] ? ((string) $next['quiet_policy'] === 'postpone' ? 'se postergaría' : 'se omitiría') : 'fuera de No molestar' ?><?php endif; ?>
+            </dd></div>
+        <?php endforeach; ?>
         </dl><?php endif; ?>
     </section>
 
     <section class="card astronomy-notifications-admin__panel">
         <div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Historial</p><h2>Últimos resultados</h2></div>
-        <?php if ($logs === []): ?><p class="store-admin-empty">Todavía no hay registros para este dispositivo.</p><?php else: ?>
-        <div class="push-admin__table-wrap astronomy-notifications-admin__scroll-region"><table class="push-admin__table"><thead><tr><th>Evento</th><th>Fecha UTC</th><th>Estado</th><th>Decisión</th><th>Intento</th><th>Resultado</th></tr></thead><tbody>
+        <?php if ($logs === []): ?><p class="store-admin-empty">Todavía no hay registros para este dispositivo.</p><?php endif; ?>
+        <div class="push-admin__table-wrap astronomy-notifications-admin__scroll-region"><table class="push-admin__table"><thead><tr><th>Evento</th><th>Fecha UTC</th><th>Estado</th><th>Decisión</th><th>Intento</th><th>Resultado</th></tr></thead><tbody data-logs-body>
         <?php foreach ($logs as $row): ?><tr><td><?= astronomyPushAdminHtml($row['notification_type']) ?></td><td><?= astronomyPushAdminHtml($row['event_time_utc']) ?></td><td><?= astronomyPushAdminHtml($row['status']) ?></td><td><?= astronomyPushAdminHtml($row['decision_reason'] ?: '—') ?></td><td><?= astronomyPushAdminHtml($row['attempted_at']) ?></td><td><?= astronomyPushAdminHtml($row['sent_at'] ?: ($row['error_message'] ? astronomyWebPushSanitizeError((string) $row['error_message']) : '—')) ?></td></tr><?php endforeach; ?>
-        </tbody></table></div><?php endif; ?>
+        </tbody></table></div>
     </section>
     </div>
 
-    <section class="card astronomy-notifications-admin__panel astronomy-notifications-admin__coming"><div class="astronomy-notifications-admin__panel-heading"><p class="eyebrow">Próximamente</p><h2>Otros avisos</h2></div><p>Eclipses, conjunciones y tránsitos de la ISS todavía no están activos ni son configurables.</p></section>
+    <?php endif; ?>
     <?php endif; ?>
 </main>
 </body>

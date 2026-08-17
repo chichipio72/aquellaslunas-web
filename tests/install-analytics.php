@@ -38,6 +38,9 @@ foreach ([
     'pwa_ios_instructions',
     'pwa_favorite_help',
     'pwa_promo_closed',
+    'pwa_embedded_browser_notice',
+    'pwa_embedded_open_external',
+    'pwa_install_intent_unavailable',
 ] as $eventName) {
     installAnalyticsAssert(str_contains($installScript, "'$eventName'"), 'Falta el evento ' . $eventName . '.');
 }
@@ -47,5 +50,8 @@ foreach (['source', 'platform', 'browser', 'display_mode', 'action'] as $paramet
 installAnalyticsAssert(str_contains($installScript, "choice?.outcome === 'accepted'"), 'No se distingue la aceptación del diálogo.');
 installAnalyticsAssert(str_contains($installScript, "choice?.outcome === 'dismissed'"), 'No se distingue el rechazo del diálogo.');
 installAnalyticsAssert(str_contains($installScript, "isInstalledApp()"), 'No se contempla el modo instalado.');
+installAnalyticsAssert(str_contains($installScript, 'getEmbeddedBrowserContext()'), 'Falta la detección centralizada de navegadores embebidos.');
+installAnalyticsAssert(str_contains($installScript, 'package=com.android.chrome'), 'Falta la apertura explícita del navegador en Android.');
+installAnalyticsAssert(str_contains($installScript, 'sessionStorage'), 'El descarte del aviso embebido no se limita a la navegación actual.');
 
 echo "Instalación y Analytics: OK\n";

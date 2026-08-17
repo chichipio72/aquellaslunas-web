@@ -126,6 +126,19 @@ function astronomyTonightCardText(
             $encounterSentence = astronomyEditorialText('tonight.card.encounter', ['objetos' => astronomyTonightNaturalList($objects), 'hora' => $date->format('H:i')]);
             break;
         }
+        if ($encounterSentence === '') {
+            $nearby = astronomyTonightPrioritizedMoonEncounters($data, $events, $now, $timezone);
+            if ($nearby !== []) {
+                $names = array_values(array_filter(array_map(
+                    static fn(array $encounter): string => trim((string) ($encounter['name'] ?? '')),
+                    $nearby
+                )));
+                if ($names !== []) {
+                    $encounterObjects = array_merge(['La Luna'], $names);
+                    $encounterSentence = astronomyTonightMoonEncountersText($nearby);
+                }
+            }
+        }
     }
 
     $encounterLookup = array_map(
@@ -442,6 +455,90 @@ function astronomyTonightHasRelevantMoonEvent(array $data, array $events, string
         }
     }
     return false;
+}
+
+function astronomyTonightFormalConjunctionTargetIds(array $data, array $events, string $timezone): array
+{
+    $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
+    $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
+    if ($nightStart === null || $nightEnd === null) return [];
+    $ids = [];
+    foreach ($events as $event) {
+        if (!is_array($event) || ($event['type'] ?? null) !== 'conjunction') continue;
+        $date = astronomyTonightDateTime($event['datetime'] ?? null, $timezone);
+        $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+        if (
+            $date === null
+            || $date < $nightStart
+            || $date > $nightEnd
+            || !astronomyEventRelevantTonight($event)
+            || ($details['both_above_horizon'] ?? false) !== true
+        ) continue;
+        $id = is_string($event['subtype'] ?? null) ? trim($event['subtype']) : '';
+        if ($id !== '') $ids[$id] = true;
+    }
+    return $ids;
+}
+
+function astronomyTonightMoonEncounters(array $data, array $events, DateTimeImmutable $now, string $timezone): array
+{
+    $formal = astronomyTonightFormalConjunctionTargetIds($data, $events, $timezone);
+    $nightStart = astronomyTonightDateTime($data['night']['start'] ?? null, $timezone);
+    $nightEnd = astronomyTonightDateTime($data['night']['end'] ?? null, $timezone);
+    if ($nightStart === null || $nightEnd === null) return [];
+    $currentNight = $now >= $nightStart && $now <= $nightEnd;
+    $encounters = [];
+    foreach (is_array($data['moon_encounters'] ?? null) ? $data['moon_encounters'] : [] as $encounter) {
+        if (!is_array($encounter)) continue;
+        $id = is_string($encounter['id'] ?? null) ? trim($encounter['id']) : '';
+        $end = astronomyTonightDateTime($encounter['visibility_end'] ?? null, $timezone);
+        if ($id === '' || isset($formal[$id]) || ($currentNight && ($end === null || $end <= $now))) continue;
+        $encounters[] = $encounter;
+    }
+    return $encounters;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyTonightPrioritizedMoonEncounters(array $data, array $events, DateTimeImmutable $now, string $timezone): array
+{
+    $encounters = astronomyTonightMoonEncounters($data, $events, $now, $timezone);
+    $bySeparation = static fn(array $first, array $second): int =>
+        ((float) ($first['minimum_separation_degrees'] ?? INF)) <=> ((float) ($second['minimum_separation_degrees'] ?? INF));
+    $planets = array_values(array_filter($encounters, static fn(array $encounter): bool => ($encounter['object_kind'] ?? '') === 'planet'));
+    if ($planets !== []) {
+        usort($planets, $bySeparation);
+        return array_slice($planets, 0, 2);
+    }
+    $stars = array_values(array_filter($encounters, static fn(array $encounter): bool => ($encounter['object_kind'] ?? '') === 'star'));
+    usort($stars, $bySeparation);
+    return $stars === [] ? [] : [$stars[0]];
+}
+
+function astronomyTonightMoonEncounterText(array $encounter): string
+{
+    return astronomyEditorialText('tonight.moon_encounter.text', [
+        'objeto' => (string) ($encounter['name'] ?? ''),
+        'separacion' => number_format((float) ($encounter['minimum_separation_degrees'] ?? 0), 1, ',', ''),
+    ]);
+}
+
+/** @param list<array<string,mixed>> $encounters */
+function astronomyTonightMoonEncountersText(array $encounters): string
+{
+    if (count($encounters) < 2) return isset($encounters[0]) ? astronomyTonightMoonEncounterText($encounters[0]) : '';
+    return astronomyEditorialText('tonight.moon_encounter.two_planets_text', [
+        'primer_objeto' => (string) ($encounters[0]['name'] ?? ''),
+        'primera_separacion' => number_format((float) ($encounters[0]['minimum_separation_degrees'] ?? 0), 1, ',', ''),
+        'segundo_objeto' => (string) ($encounters[1]['name'] ?? ''),
+        'segunda_separacion' => number_format((float) ($encounters[1]['minimum_separation_degrees'] ?? 0), 1, ',', ''),
+    ]);
+}
+
+function astronomyTonightMoonEncounterTitle(array $encounter): string
+{
+    return astronomyEditorialText('tonight.moon_encounter.title', [
+        'objeto' => (string) ($encounter['name'] ?? ''),
+    ]);
 }
 
 function astronomyTonightApplyMoonEditorialPriority(array $sections, bool $moonIsRelevant): array

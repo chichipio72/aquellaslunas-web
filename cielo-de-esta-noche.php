@@ -73,6 +73,7 @@ try {
 }
 
 $sections = $tonightData !== null ? astronomyTonightPreparedSections($tonightData, $now, $timezoneName) : [];
+$moonEncounters = $tonightData !== null ? astronomyTonightMoonEncounters($tonightData, $tonightEvents, $now, $timezoneName) : [];
 $sections = astronomyTonightApplyMoonEditorialPriority(
     $sections,
     $tonightData !== null && astronomyTonightHasRelevantMoonEvent($tonightData, $tonightEvents, $timezoneName)
@@ -148,10 +149,19 @@ $pageSeo = aquellasLunasSeoPage(
                     <button type="button" class="button compact-secondary-button" data-api-retry>Reintentar</button>
                 </div>
             <?php else: ?>
-                <?php if ($sections === []): ?>
+                <?php if ($sections === [] && $moonEncounters === []): ?>
                     <p class="tonight-empty" role="status">No hay objetos observables para mostrar durante esta noche.</p>
                 <?php else: ?>
                     <div class="tonight-sections">
+                        <?php if ($moonEncounters !== []): ?><section class="tonight-section" aria-labelledby="tonight-moon-encounters-title">
+                            <h2 id="tonight-moon-encounters-title"><?= htmlspecialchars(astronomyEditorialText('tonight.moon_encounter.section_title')) ?></h2>
+                            <div class="tonight-object-list"><?php foreach ($moonEncounters as $encounter): ?>
+                                <article class="tonight-object">
+                                    <h3><?= htmlspecialchars(astronomyTonightMoonEncounterTitle($encounter)) ?></h3>
+                                    <p><?= htmlspecialchars(astronomyTonightMoonEncounterText($encounter)) ?></p>
+                                </article>
+                            <?php endforeach; ?></div>
+                        </section><?php endif; ?>
                         <?php if ($highlights !== []): ?><section class="tonight-section tonight-highlights" aria-labelledby="tonight-highlights-title">
                             <h2 id="tonight-highlights-title">Lo mejor para mirar esta noche</h2>
                             <div class="tonight-object-list tonight-object-list--highlights"><?php foreach ($highlights as $object): $constellationName = astronomyTonightConstellationName($object); ?>

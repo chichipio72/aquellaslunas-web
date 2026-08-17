@@ -205,10 +205,37 @@
 
 .home-v2-horizon {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: .45rem 1.5rem;
   margin: 0;
 }
+
+.home-notification-link {
+  position: absolute;
+  top: .55rem;
+  right: .55rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border: 1px solid rgba(169, 196, 245, .24);
+  border-radius: 50%;
+  background: rgba(10, 17, 31, .64);
+  color: #9eacc4;
+  text-decoration: none;
+  transition: color .18s ease, border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.home-v2-horizon .home-notification-link { position: static; margin-left: auto; }
+.home-notification-link svg { width: 1.05rem; height: 1.05rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.home-notification-link:hover { color: var(--text); border-color: rgba(169, 196, 245, .5); background: rgba(46, 62, 91, .72); transform: translateY(-1px); }
+.home-notification-link:focus-visible { outline: 2px solid var(--interactive); outline-offset: 3px; }
+.home-notification-link[data-notification-state="active"] { border-color: rgba(226, 189, 95, .62); background: rgba(226, 189, 95, .14); color: var(--lunar); }
+.home-v2-event--notifiable,
+.home-v2-event--satellite { padding-right: 3.45rem; }
 
 .home-v2-horizon p {
   margin: 0;
@@ -623,6 +650,24 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+}
+
+@media (min-width: 641px) and (max-width: 960px) {
+  .home-v2-horizon--two-events {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .45rem .7rem;
+  }
+
+  .home-v2-horizon--two-events p:first-of-type {
+    grid-column: 1 / -1;
+  }
+
+  .home-v2-horizon--two-events .home-notification-link {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 640px) {

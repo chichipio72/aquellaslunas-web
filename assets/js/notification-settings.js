@@ -11,12 +11,23 @@
   const saveStatus = root.querySelector('[data-device-save-status]');
   const lastSaved = root.querySelector('[data-device-last-saved]');
   const typesContainer = root.querySelector('[data-notification-types]');
-  const geolocationButton = root.querySelector('[data-use-current-location]');
-  const geolocationStatus = root.querySelector('[data-geolocation-status]');
+  const context = root.querySelector('[data-notification-context]');
+  const contextType = context?.dataset.notificationType || '';
+  const pushHeading = root.querySelector('[data-push-heading]');
+  const pushStepLabel = root.querySelector('[data-push-step-label]');
+  const pushReadyCopy = root.querySelector('[data-push-ready-copy]');
+  const quietHoursInput = form?.elements.quiet_hours_enabled;
+  const quietTimes = root.querySelector('[data-quiet-times]');
+  const quietState = root.querySelector('[data-quiet-state]');
+  const selectedLocation = root.querySelector('[data-selected-location]');
   const iosHelp = root.querySelector('[data-ios-pwa-help]');
+  const supportBlock = root.querySelector('[data-device-support]');
+  const supportId = root.querySelector('[data-device-support-id]');
+  const copySupportId = root.querySelector('[data-copy-support-id]');
   const configUrl = root.dataset.deviceConfigUrl || '';
   const csrfToken = root.dataset.deviceCsrf || '';
   const locationReady = root.dataset.locationReady === 'true';
+  let useGeneralLocation = root.dataset.locationChangeRequested === 'true';
   const serviceWorkerTools = window.AstronomyPushServiceWorker;
   let currentSubscription = null;
 
@@ -39,7 +50,10 @@
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.ok !== true || !result.state) {
-      throw new Error(typeof result.message === 'string' ? result.message : 'No pudimos cargar la configuración.');
+      const error = new Error(typeof result.message === 'string' ? result.message : 'No pudimos cargar la configuración.');
+      error.httpStatus = response.status;
+      error.logicalCode = typeof result.code === 'string' ? result.code : 'invalid_response';
+      throw error;
     }
     return result.state;
   };
@@ -54,6 +68,17 @@
     return 'La programación se define según el evento.';
   };
 
+  const typeDescription = (type) => {
+    const description = String(type.description || '').trim();
+    const schedule = scheduleText(type);
+    if (!description) return schedule;
+    if ((Number.isInteger(type.lead_minutes) && description.includes(String(type.lead_minutes)))
+      || (type.delivery_time && description.includes(String(type.delivery_time).slice(0, 5)))) {
+      return description;
+    }
+    return `${description} ${schedule}`;
+  };
+
   const renderTypes = (types) => {
     typesContainer.replaceChildren();
     types.forEach((type) => {
@@ -64,7 +89,7 @@
       const name = document.createElement('strong');
       name.textContent = type.display_name;
       const description = document.createElement('small');
-      description.textContent = `${type.description || ''} ${scheduleText(type)}`.trim();
+      description.textContent = typeDescription(type);
       copy.append(name, description);
       const input = document.createElement('input');
       input.type = 'checkbox';
@@ -75,6 +100,10 @@
       control.className = 'notification-settings__switch-control';
       control.setAttribute('aria-hidden', 'true');
       label.append(copy, input, control);
+      if (type.notification_type === contextType) {
+        label.classList.add('is-context-target');
+        label.dataset.notificationContextTarget = '';
+      }
       typesContainer.append(label);
     });
     if (types.length === 0) {
@@ -83,6 +112,19 @@
       empty.textContent = 'No hay tipos de aviso disponibles actualmente.';
       typesContainer.append(empty);
     }
+    const target = typesContainer.querySelector('[data-notification-context-target]');
+    if (target) {
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({behavior: 'smooth', block: 'center'});
+        target.querySelector('input')?.focus({preventScroll: true});
+      });
+    }
+  };
+
+  const updateQuietHours = () => {
+    const enabled = quietHoursInput?.checked === true;
+    if (quietTimes) quietTimes.hidden = !enabled;
+    setText(quietState, enabled ? 'Activado' : 'Desactivado');
   };
 
   const fillForm = (state) => {
@@ -95,21 +137,35 @@
       return;
     }
     form.elements.device_name.value = device?.device_name || state.suggested_device_name || 'Mi dispositivo';
+    const currentSupportId = typeof device?.support_id === 'string' ? device.support_id : '';
+    setText(supportId, currentSupportId);
+    if (supportBlock) supportBlock.hidden = currentSupportId === '';
+    if (copySupportId) copySupportId.dataset.supportId = currentSupportId;
     form.elements.notifications_enabled.checked = device ? device.notifications_enabled === true : true;
-    form.elements.location_name.value = device?.location_name || root.dataset.defaultLocationName || '';
-    form.elements.latitude.value = device?.latitude ?? root.dataset.defaultLatitude ?? '';
-    form.elements.longitude.value = device?.longitude ?? root.dataset.defaultLongitude ?? '';
-    form.elements.timezone.value = device?.timezone
-      || root.dataset.defaultTimezone
-      || Intl.DateTimeFormat().resolvedOptions().timeZone
-      || '';
+    form.elements.location_name.value = (!useGeneralLocation && device?.location_name) || root.dataset.defaultLocationName || '';
+    form.elements.latitude.value = (!useGeneralLocation && device?.latitude != null) ? device.latitude : (root.dataset.defaultLatitude ?? '');
+    form.elements.longitude.value = (!useGeneralLocation && device?.longitude != null) ? device.longitude : (root.dataset.defaultLongitude ?? '');
+    form.elements.timezone.value = (!useGeneralLocation && device?.timezone)
+      ? device.timezone
+      : (root.dataset.defaultTimezone || '');
+    setText(selectedLocation, form.elements.location_name.value);
     form.elements.quiet_hours_enabled.checked = device?.quiet_hours_enabled === true;
     form.elements.quiet_start_local.value = device?.quiet_start_local || '23:00';
     form.elements.quiet_end_local.value = device?.quiet_end_local || '08:00';
+    updateQuietHours();
     renderTypes(Array.isArray(state.notification_types) ? state.notification_types : []);
     setText(configState, state.configured ? 'Configurada' : 'Falta completar');
-    setText(summaryState, state.configured ? 'Lista para recibir avisos' : 'Suscripción activa');
+    setText(summaryState, state.configured ? 'Activas' : 'Suscripción activa');
+    root.classList.toggle('is-ready', state.configured === true);
+    if (state.configured) {
+      setText(pushHeading, 'Notificaciones activadas');
+      if (pushStepLabel) pushStepLabel.hidden = true;
+      if (pushReadyCopy) pushReadyCopy.hidden = false;
+    }
     setText(lastSaved, device?.updated_at ? `Último guardado: ${device.updated_at}` : 'Todavía sin guardar');
+    if (!state.configured) {
+      setText(saveStatus, 'Este dispositivo todavía no tiene configuración. Completá las preferencias para guardarla.');
+    }
     formCard.hidden = false;
   };
 
@@ -139,35 +195,36 @@
       }
       fillForm(await request('read', currentSubscription));
     } catch (error) {
-      console.error('Web Push settings load failed:', error);
-      setText(configState, 'No disponible');
-      setText(summaryState, 'No pudimos cargarla');
-      setText(saveStatus, 'No se pudo activar el servicio de notificaciones. Recargá la página e intentá nuevamente.');
+      const diagnostic = {
+        httpStatus: Number.isInteger(error?.httpStatus) ? error.httpStatus : 0,
+        code: typeof error?.logicalCode === 'string' ? error.logicalCode : 'client_error',
+      };
+      console.error('Web Push settings load failed:', diagnostic);
+      if (diagnostic.code === 'subscription_not_active') {
+        setText(configState, 'Reactivación necesaria');
+        setText(summaryState, 'Suscripción desactualizada');
+        setText(saveStatus, 'La suscripción guardada por este navegador ya no está activa. Volvé a activar las notificaciones en este dispositivo.');
+      } else {
+        setText(configState, 'No disponible');
+        setText(summaryState, 'No pudimos cargarla');
+        setText(saveStatus, 'No se pudo cargar la configuración. Recargá la página e intentá nuevamente.');
+      }
     }
   };
 
-  geolocationButton?.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      setText(geolocationStatus, 'Este navegador no permite obtener la ubicación. Podés ingresar las coordenadas manualmente.');
-      return;
+  quietHoursInput?.addEventListener('change', updateQuietHours);
+
+  copySupportId?.addEventListener('click', async () => {
+    const value = copySupportId.dataset.supportId || '';
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setText(copySupportId, 'Copiado');
+      window.setTimeout(() => setText(copySupportId, 'Copiar'), 1600);
+    } catch (error) {
+      console.error('Notification support ID copy failed:', {code: 'clipboard_unavailable'});
+      setText(saveStatus, `No se pudo copiar automáticamente. ID: ${value}`);
     }
-    geolocationButton.disabled = true;
-    setText(geolocationStatus, 'Obteniendo tu ubicación…');
-    navigator.geolocation.getCurrentPosition((position) => {
-      form.elements.latitude.value = position.coords.latitude.toFixed(6);
-      form.elements.longitude.value = position.coords.longitude.toFixed(6);
-      if (!form.elements.timezone.value) {
-        form.elements.timezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-      }
-      setText(geolocationStatus, `Coordenadas obtenidas: ${form.elements.latitude.value}, ${form.elements.longitude.value}. Escribí el nombre del lugar si hace falta.`);
-      geolocationButton.disabled = false;
-    }, (error) => {
-      const denied = error.code === error.PERMISSION_DENIED;
-      setText(geolocationStatus, denied
-        ? 'No se concedió acceso a la ubicación. Podés completar los datos manualmente.'
-        : 'No pudimos obtener la ubicación. Revisá los datos manualmente.');
-      geolocationButton.disabled = false;
-    }, {enableHighAccuracy: false, timeout: 12000, maximumAge: 300000});
   });
 
   form?.addEventListener('submit', async (event) => {
@@ -194,9 +251,18 @@
     };
     try {
       const state = await request('save', currentSubscription, config);
+      useGeneralLocation = false;
+      if (root.dataset.locationChangeRequested === 'true') {
+        root.dataset.locationChangeRequested = 'false';
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       fillForm(state);
       setText(saveStatus, 'Preferencias guardadas. Los próximos avisos serán procesados por el sistema.');
     } catch (error) {
+      console.error('Web Push settings save failed:', {
+        httpStatus: Number.isInteger(error?.httpStatus) ? error.httpStatus : 0,
+        code: typeof error?.logicalCode === 'string' ? error.logicalCode : 'client_error',
+      });
       setText(saveStatus, error instanceof Error ? error.message : 'No pudimos guardar las preferencias.');
     } finally {
       submit.disabled = false;

@@ -20,6 +20,7 @@ function aquellasLunasSitemapEntries(array $catalog): array
         '/planificador.php',
         '/eclipses.php',
         '/ubicacion.php',
+        '/canciones-a-la-luna.php',
         '/que-podes-hacer.php',
         '/acerca-del-sitio.php',
         '/contenidos.php',

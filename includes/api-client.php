@@ -209,7 +209,15 @@ function renderAstronomyTimings(): void
                         <div class="api-diagnostics__page-profile-row"><span>Elevación / zona / modo</span><span><?= htmlspecialchars(number_format((float) ($satelliteLocation['elevation_meters'] ?? 0.0), 1, ',', '.') . ' m · ' . (string) ($satelliteLocation['timezone'] ?? '') . ' · ' . (string) ($satelliteLocation['mode'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span></div>
                     <?php endif; ?>
                     <?php foreach (($satelliteDiagnostic['tle_sources'] ?? []) as $satellite => $source): ?>
-                        <div class="api-diagnostics__page-profile-row"><span>TLE <?= htmlspecialchars((string) $satellite, ENT_QUOTES, 'UTF-8') ?></span><span><?= htmlspecialchars((string) $source, ENT_QUOTES, 'UTF-8') ?></span></div>
+                        <?php if (!is_array($source)) continue; ?>
+                        <?php $tleVisualStatus = in_array($source['visual_status'] ?? '', ['normal', 'warning', 'unreliable'], true) ? $source['visual_status'] : 'normal'; ?>
+                        <div class="api-diagnostics__page-profile-row api-diagnostics__tle api-diagnostics__tle--<?= htmlspecialchars($tleVisualStatus, ENT_QUOTES, 'UTF-8') ?>" data-tle-status="<?= htmlspecialchars($tleVisualStatus, ENT_QUOTES, 'UTF-8') ?>">
+                            <span>TLE <?= htmlspecialchars(strtoupper((string) $satellite), ENT_QUOTES, 'UTF-8') ?></span>
+                            <span><?= htmlspecialchars((string) ($source['cache_status'] ?? 'unknown'), ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars((string) ($source['visual_label'] ?? 'normal'), ENT_QUOTES, 'UTF-8') ?><br>
+                                Cache <?= htmlspecialchars((string) ($source['downloaded_at_utc'] ?? '—'), ENT_QUOTES, 'UTF-8') ?> · epoch <?= htmlspecialchars((string) ($source['epoch_utc'] ?? '—'), ENT_QUOTES, 'UTF-8') ?><br>
+                                Edad al inicio <?= is_numeric($source['age_at_start_hours'] ?? null) ? htmlspecialchars(number_format((float) $source['age_at_start_hours'], 1, ',', '.') . ' h') : '—' ?> · al final <?= is_numeric($source['age_at_end_hours'] ?? null) ? htmlspecialchars(number_format((float) $source['age_at_end_hours'], 1, ',', '.') . ' h') : '—' ?>
+                            </span>
+                        </div>
                     <?php endforeach; ?>
                     <?php if (($satelliteDiagnostic['events'] ?? []) === []): ?>
                         <div class="api-diagnostics__page-profile-row"><span>Eventos</span><span>ninguno</span></div>

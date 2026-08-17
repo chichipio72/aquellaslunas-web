@@ -425,8 +425,15 @@
     const snippetButton = event.target.closest('[data-insert-snippet]');
     if (snippetButton) {
       const textarea = form.querySelector('[data-markdown-editor]');
-      textarea.setRangeText(snippetButton.dataset.insertSnippet, textarea.selectionStart, textarea.selectionEnd, 'end');
+      const insertionStart = textarea.selectionStart;
+      const snippet = snippetButton.dataset.insertSnippet;
+      textarea.setRangeText(snippet, insertionStart, textarea.selectionEnd, 'end');
       textarea.focus();
+      const cursorOffset = Number(snippetButton.dataset.insertCursorOffset);
+      if (Number.isInteger(cursorOffset)) {
+        const cursorPosition = insertionStart + snippet.length + cursorOffset;
+        textarea.setSelectionRange(cursorPosition, cursorPosition);
+      }
       markDirty();
       return;
     }

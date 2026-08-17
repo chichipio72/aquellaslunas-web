@@ -115,7 +115,9 @@ try {
         . " AND notification_type = 'moonrise'");
     $connection->exec("UPDATE web_push_notification_types SET available = 0 WHERE notification_type = 'moonrise'");
     $preferences = astronomyPushDeviceNotificationPreferences($connection, $subscriptionId);
-    notificationTypeAssert(count($preferences) === 1 && (int) $preferences[0]['available'] === 0
+    $moonrisePreference = array_values(array_filter($preferences,
+        static fn(array $preference): bool => $preference['notification_type'] === 'moonrise'))[0] ?? null;
+    notificationTypeAssert(is_array($moonrisePreference) && (int) $moonrisePreference['available'] === 0
         && (int) $preferenceBefore === 1, 'La preferencia no se conservó al desactivar globalmente el tipo.');
 
     $now = new DateTimeImmutable('2099-08-04 12:00:00', new DateTimeZone('UTC'));

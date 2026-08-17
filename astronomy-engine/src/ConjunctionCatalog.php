@@ -3,6 +3,13 @@ declare(strict_types=1);
 namespace AstronomyEngine;
 final class ConjunctionCatalog
 {
+    /** @return array<string,string> */
+    public static function names():array{return[
+        'mercury'=>'Mercurio','venus'=>'Venus','mars'=>'Marte','jupiter'=>'Júpiter','saturn'=>'Saturno',
+        'aldebaran'=>'Aldebarán','elnath'=>'Elnath','alhena'=>'Alhena','pollux'=>'Pólux','regulus'=>'Régulo','zubenelgenubi'=>'Zubenelgenubi','spica'=>'Spica','antares'=>'Antares','nunki'=>'Nunki','deneb_algedi'=>'Deneb Algedi',
+        'pleiades'=>'Pléyades','hyades'=>'Híades','m44'=>'M44/Pesebre',
+    ];}
+
     /** @return list<ConjunctionTarget> */
     public static function targets():array{return[
         new ConjunctionTarget('mercury','planet'),new ConjunctionTarget('venus','planet'),new ConjunctionTarget('mars','planet'),new ConjunctionTarget('jupiter','planet'),new ConjunctionTarget('saturn','planet'),

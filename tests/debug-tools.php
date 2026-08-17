@@ -84,6 +84,11 @@ try {
     $GLOBALS['home_satellite_diagnostic'] = [
         'status' => 'ejecutado correctamente', 'total_ms' => 630.2,
         'tle_resolution_ms' => 0.2, 'calculation_ms' => 629.9,
+        'tle_sources' => ['iss' => [
+            'cache_status' => 'cache_hit', 'downloaded_at_utc' => '2026-08-13T10:00:00.000000+00:00',
+            'epoch_utc' => '2026-08-13T00:00:00.000000+00:00', 'age_at_start_hours' => 12.0,
+            'age_at_end_hours' => 60.0, 'visual_status' => 'warning', 'visual_label' => 'advertencia',
+        ]],
     ];
     ob_start();
     renderAstronomyTimings();
@@ -95,6 +100,11 @@ try {
         && str_contains($adminTimings, 'Satélites: ejecutado correctamente')
         && str_contains($adminTimings, 'Resolución TLE 0,2 ms')
         && str_contains($adminTimings, 'Cálculo 629,9 ms'), 'Falta el diagnóstico satelital visible o sus subtareas.');
+    debugToolsAssert(str_contains($adminTimings, 'TLE ISS')
+        && str_contains($adminTimings, 'cache_hit · advertencia')
+        && str_contains($adminTimings, 'Edad al inicio 12,0 h · al final 60,0 h')
+        && str_contains($adminTimings, 'data-tle-status="warning"'),
+        'Falta la metadata o el estado visual del TLE en el diagnóstico administrativo.');
     debugToolsAssert(str_contains($adminTimings, '<details class="api-diagnostics__page-profile">'), 'El perfil no quedó contraído inicialmente.');
     debugToolsAssert(!str_contains($adminTimings, '<details class="api-diagnostics__page-profile" open'), 'El perfil se abrió inicialmente.');
     debugToolsAssert(substr_count($adminTimings, 'api-diagnostics__page-profile-group') === 1, 'La jerarquía no distingue el único grupo desplegable.');

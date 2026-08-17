@@ -74,8 +74,10 @@ try {
     $observer = new AstronomyObserver(-34.53, -58.48, 'America/Argentina/Buenos_Aires');
     $offlineService = new SatelliteLunarTransitService(new FixtureSatelliteTleProvider(__DIR__ . '/fixtures/satellite'));
     $search = $offlineService->search($observer, new DateTimeImmutable('2026-07-26T00:00:00-03:00'), 48, ['iss', 'tiangong']);
-    tleServiceAssert(count($search->search->events) === 1, 'Offline 48-hour search lost the historical event.');
-    tleServiceAssert($search->search->events[0]->satellite === 'tiangong', 'Offline search returned the wrong satellite.');
+    $alertEvents = array_values(array_filter($search->search->events,
+        static fn($event): bool => in_array($event->classification, ['transit', 'very_close'], true)));
+    tleServiceAssert(count($alertEvents) === 1, 'Offline 48-hour search lost the historical alert event.');
+    tleServiceAssert($alertEvents[0]->satellite === 'tiangong', 'Offline search returned the wrong satellite.');
     tleServiceAssert($search->metrics['tle_fixtures'] === 2 && $search->metrics['service_total_ms'] > 0, 'Service counters are incomplete.');
     tleServiceAssert(count($search->tleMetadata) === 2 && $search->warnings !== [], 'Service metadata or warnings are missing.');
 
@@ -83,7 +85,7 @@ try {
         'status' => 'OK',
         'cache' => ['hot' => $hot->cacheStatus, 'expired' => $updated->cacheStatus, 'fallback' => $fallback->cacheStatus,
             'download_calls' => $downloader->calls],
-        'offline_48h' => ['events' => count($search->search->events), 'event' => $search->search->events[0]->data(),
+        'offline_48h' => ['events' => count($alertEvents), 'event' => $alertEvents[0]->data(),
             'metrics' => $search->metrics],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 } finally {

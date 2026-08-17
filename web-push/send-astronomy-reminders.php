@@ -50,10 +50,12 @@ try {
     $cycle = astronomyPushRunReminderCycle(
         $connection, $nowUtc, $dryRun, $subscriptionId, 'astronomyReminderOutput'
     );
-    $counts = $cycle['moonrise'];
-    astronomyReminderOutput('Resumen: vencidos ' . $counts['due'] . ', enviados ' . $counts['sent']
-        . ', omitidos ' . $counts['skipped'] . ', deduplicados ' . $counts['deduplicated']
-        . ', fallidos ' . $counts['failed'] . '.');
+    foreach (['moonrise', 'eclipse', 'lunar_conjunction', 'satellite_transit'] as $type) {
+        $counts = $cycle[$type];
+        astronomyReminderOutput('Resumen ' . $type . ': vencidos ' . $counts['due'] . ', enviados ' . $counts['sent']
+            . ', omitidos ' . $counts['skipped'] . ', deduplicados ' . $counts['deduplicated']
+            . ', fallidos ' . $counts['failed'] . '.');
+    }
     $testCounts = $cycle['tests'];
     astronomyReminderOutput('Resumen de pruebas: vencidas para procesar ' . $testCounts['pending_due']
         . ', enviadas ' . $testCounts['sent'] . ', omitidas ' . $testCounts['skipped']

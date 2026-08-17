@@ -46,13 +46,31 @@ try {
         === 'Volver a Configurar notificaciones', 'Falta la etiqueta amigable del retorno.');
 
     $settingsScript = file_get_contents(__DIR__ . '/../assets/js/notification-settings.js');
+    $settingsPage = file_get_contents(__DIR__ . '/../notificaciones.php');
     $pushScript = file_get_contents(__DIR__ . '/../assets/js/push-notifications.js');
     $subscribeEndpoint = file_get_contents(__DIR__ . '/../web-push/subscribe.php');
     notificationLocationAssert(is_string($settingsScript)
-        && str_contains($settingsScript, "device?.location_name || root.dataset.defaultLocationName")
-        && str_contains($settingsScript, "device?.latitude ?? root.dataset.defaultLatitude")
+        && str_contains($settingsScript, "!useGeneralLocation && device?.location_name")
+        && str_contains($settingsScript, "root.dataset.defaultLatitude")
         && str_contains($settingsScript, "if (!device && !locationReady)"),
         'La ubicación propia no conserva prioridad sobre el valor general inicial.');
+    notificationLocationAssert(is_string($settingsPage)
+        && str_contains($settingsPage, '?notification_location_changed=1')
+        && str_contains($settingsPage, 'type="hidden" name="latitude"')
+        && !str_contains($settingsPage, 'data-use-current-location'),
+        'La interfaz pública no usa exclusivamente el selector común de ubicación.');
+    $typesPosition = strpos($settingsPage, 'id="notification-types-heading"');
+    $quietPosition = strpos($settingsPage, 'id="notification-quiet-heading"');
+    $savePosition = strpos($settingsPage, 'type="submit">Guardar preferencias');
+    $devicePosition = strpos($settingsPage, '<summary>Opciones del dispositivo</summary>');
+    notificationLocationAssert($typesPosition !== false && $quietPosition !== false
+        && $savePosition !== false && $devicePosition !== false
+        && $typesPosition < $quietPosition && $quietPosition < $savePosition && $savePosition < $devicePosition,
+        'El formulario público no conserva el orden compacto solicitado.');
+    notificationLocationAssert(str_contains($settingsPage, 'data-quiet-times hidden')
+        && str_contains($settingsScript, 'updateQuietHours')
+        && str_contains($settingsScript, 'typeDescription(type)'),
+        'No molestar no inicia colapsado o las descripciones no evitan repeticiones.');
     notificationLocationAssert(is_string($pushScript)
         && str_contains($pushScript, "root.dataset.locationReady === 'true'")
         && str_contains($pushScript, "if (!locationReady)"),

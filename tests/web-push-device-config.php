@@ -59,6 +59,9 @@ try {
         && $saved['device']['location_name'] === 'Vicente López'
         && $saved['device']['quiet_hours_enabled'] === true,
         'La configuración inicial no se guardó correctamente.');
+    $supportId = astronomyPushNormalizeSupportId($saved['device']['support_id'] ?? null);
+    pushDeviceAssert($supportId !== null && $supportId === $saved['device']['support_id'],
+        'La configuración no recibió un ID de soporte público válido.');
     $moonrise = array_values(array_filter($saved['notification_types'],
         static fn(array $type): bool => $type['notification_type'] === 'moonrise'))[0] ?? null;
     pushDeviceAssert(is_array($moonrise) && $moonrise['enabled'] === true && $moonrise['lead_minutes'] === 15,
@@ -74,6 +77,8 @@ try {
     pushDeviceAssert($edited['device']['device_name'] === 'Teléfono editado'
         && $edited['device']['notifications_enabled'] === false,
         'La edición posterior no se conservó.');
+    pushDeviceAssert($edited['device']['support_id'] === $supportId,
+        'El ID de soporte cambió al editar la configuración.');
 
     $wrongKeys = $subscription;
     $wrongKeys['keys']['auth'] = pushDeviceBase64Url(str_repeat("\x03", 16));
@@ -103,8 +108,11 @@ try {
     pushDeviceAssert($inactiveDenied, 'Una suscripción desactivada conservó acceso público.');
     astronomyWebPushSaveSubscription($connection, astronomyWebPushValidateSubscription($subscription),
         'Mozilla/5.0 (Linux; Android 14) Chrome/150.0');
-    pushDeviceAssert(astronomyPushCurrentDeviceState($connection, $subscription)['configured'] === true,
+    $reactivated = astronomyPushCurrentDeviceState($connection, $subscription);
+    pushDeviceAssert($reactivated['configured'] === true,
         'La reactivación no conservó la configuración existente.');
+    pushDeviceAssert($reactivated['device']['support_id'] === $supportId,
+        'El ID de soporte cambió al reactivar la misma suscripción.');
 
     pushDeviceAssert(astronomyPushDeviceRequestIsSameOrigin([
         'HTTP_HOST' => 'example.test', 'HTTP_ORIGIN' => 'https://example.test', 'HTTP_SEC_FETCH_SITE' => 'same-origin',
@@ -139,10 +147,10 @@ $page = file_get_contents(__DIR__ . '/../notificaciones.php');
 $script = file_get_contents(__DIR__ . '/../assets/js/notification-settings.js');
 pushDeviceAssert(is_string($page) && !str_contains($page, 'subscription_id'),
     'La página pública usa un ID de suscripción como credencial.');
-pushDeviceAssert(is_string($script) && str_contains($script, 'navigator.geolocation.getCurrentPosition')
+pushDeviceAssert(is_string($script) && !str_contains($script, 'navigator.geolocation.getCurrentPosition')
     && str_contains($script, "Notification.permission !== 'granted'")
     && str_contains($script, 'display-mode: standalone'),
-    'Faltan estados, geolocalización o ayuda PWA en el cliente.');
+    'Faltan estados o ayuda PWA, o se reintrodujo una ubicación paralela en el cliente.');
 pushDeviceAssert(!str_contains($script, 'p256dh') && !str_contains($script, '.auth'),
     'El cliente manipula innecesariamente secretos de la suscripción.');
 

@@ -391,6 +391,10 @@ ob_start();
 renderAstronomyHomeContentCards($catalog);
 $homeCards = (string) ob_get_clean();
 contentSystemAssert(str_contains($homeCards, 'data-content-trivia'), 'La portada no renderizó la trivia interactiva.');
+contentSystemAssert(str_contains($homeCards, 'data-trivia-code='), 'La trivia no expuso su código editorial para Analytics.');
+contentSystemAssert(str_contains($homeCards, 'data-article-slug='), 'La trivia relacionada no expuso el slug editorial para Analytics.');
+contentSystemAssert(substr_count($homeCards, 'data-trivia-option-index=') >= 2, 'Las opciones no exponen un ordinal para Analytics.');
+contentSystemAssert(substr_count($homeCards, 'data-trivia-article-link') === 1, 'El enlace relacionado no quedó identificado para Analytics.');
 contentSystemAssert(substr_count($homeCards, 'data-correct="true"') === 1, 'La trivia no identificó exactamente una respuesta correcta después de mezclar.');
 contentSystemAssert(!str_contains($homeCards, 'Conocer la respuesta'), 'Persistió el enlace anterior de la trivia.');
 contentSystemAssert(

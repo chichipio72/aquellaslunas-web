@@ -98,6 +98,12 @@ function astronomySiteConfigCatalog(): array
             'default' => true,
             'description' => 'Muestra el acceso público a las preferencias de notificaciones de este dispositivo.',
         ],
+        'menu.moon_songs.enabled' => [
+            'group' => 'menu',
+            'label' => 'Canciones a la Luna',
+            'default' => true,
+            'description' => 'Muestra la playlist lunar en el menú principal.',
+        ],
         'menu.capabilities.enabled' => [
             'group' => 'menu',
             'label' => 'Qué ofrece Aquellas Lunas',
@@ -201,6 +207,7 @@ function astronomySiteMenuConfigBySectionId(): array
         'content' => 'menu.content.enabled',
         'location' => 'menu.location.enabled',
         'notifications' => 'menu.notifications.enabled',
+        'moon_songs' => 'menu.moon_songs.enabled',
         'capabilities' => 'menu.capabilities.enabled',
         'about' => 'menu.about.enabled',
         'administration' => 'menu.administration.enabled',

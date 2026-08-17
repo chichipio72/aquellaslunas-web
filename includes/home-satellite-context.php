@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/astronomy-trace.php';
+require_once __DIR__ . '/home-notification-links.php';
 
 use AstronomyEngine\Facade\AstronomyObserver;
 use AstronomyEngine\Satellite\CachedCelesTrakTleProvider;
+use AstronomyEngine\Satellite\ResolvedTle;
 use AstronomyEngine\Satellite\SatelliteTransitEvent;
 use AstronomyEngine\Satellite\SatelliteTransitService;
 use AstronomyEngine\Satellite\SatelliteTransitServiceResult;
@@ -57,8 +59,16 @@ function homeSatelliteDisplayEvents(array $events): array
 }
 
 /** @return array{title:string,time:string,duration:?string,edge_distance:?string,solar_warning:?string} */
-function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $timezoneName): array
+function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $timezoneName,
+    DateTimeImmutable $now): array
 {
+    $timezone = new DateTimeZone($timezoneName);
+    $eventLocal = $event->maximum->setTimezone($timezone);
+    $nowLocal = $now->setTimezone($timezone);
+    $weekdays = [1 => 'Lun', 2 => 'Mar', 3 => 'Mié', 4 => 'Jue', 5 => 'Vie', 6 => 'Sáb', 7 => 'Dom'];
+    $eventTime = $eventLocal->format('Y-m-d') === $nowLocal->format('Y-m-d')
+        ? $eventLocal->format('H:i')
+        : $weekdays[(int) $eventLocal->format('N')] . ' ' . $eventLocal->format('j') . ' · ' . $eventLocal->format('H:i');
     $satellite = $event->satellite === 'iss' ? 'ISS' : ($event->satellite === 'tiangong' ? 'Tiangong' : $event->satelliteName);
     $body = $event->targetBody === 'sun' ? 'al Sol' : 'a la Luna';
     $classification = $event->classification === 'transit' ? 'tránsito' : 'acercamiento muy cercano';
@@ -69,7 +79,7 @@ function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $ti
         'title' => $event->classification === 'near_pass'
             ? $satellite . ' pasará cerca ' . ($event->targetBody === 'sun' ? 'del Sol' : 'de la Luna')
             : $satellite . ' · ' . $classification . ' frente ' . $body,
-        'time' => $event->maximum->setTimezone(new DateTimeZone($timezoneName))->format('H:i'),
+        'time' => $eventTime,
         'duration' => $duration,
         'edge_distance' => $event->classification === 'near_pass'
             ? number_format(max(0.0, $event->minimumSeparationDegrees - $event->targetApparentRadiusDegrees), 1, ',', '.') . '°'
@@ -81,14 +91,16 @@ function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $ti
 }
 
 /** @param list<SatelliteTransitEvent> $events */
-function renderHomeSatelliteEventItems(array $events, string $timezoneName, bool $featureFirst = false): void
+function renderHomeSatelliteEventItems(array $events, string $timezoneName, DateTimeImmutable $now,
+    bool $featureFirst = false): void
 {
     foreach (homeSatelliteDisplayEvents($events) as $index => $event) {
-        $presentation = homeSatelliteEventPresentation($event, $timezoneName);
+        $presentation = homeSatelliteEventPresentation($event, $timezoneName, $now);
         $class = 'home-v2-event home-v2-event--satellite'
             . ($featureFirst && $index === 0 ? ' home-v2-event--featured' : '');
         ?>
         <section class="<?= htmlspecialchars($class, ENT_QUOTES, 'UTF-8') ?>" data-satellite-event data-satellite-target="<?= htmlspecialchars($event->targetBody, ENT_QUOTES, 'UTF-8') ?>">
+            <?php renderHomeNotificationLink('satellite_transit'); ?>
             <time datetime="<?= htmlspecialchars($event->maximum->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($presentation['time'], ENT_QUOTES, 'UTF-8') ?></time>
             <h3><?= htmlspecialchars($presentation['title'], ENT_QUOTES, 'UTF-8') ?></h3>
             <?php if ($presentation['duration'] !== null): ?><p>Duración <?= htmlspecialchars($presentation['duration'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
@@ -114,9 +126,43 @@ function homeSatelliteDiagnostic(array $context, float $totalMilliseconds, ?arra
         ];
     }
     $tleSources = [];
+    $result = $context['combined_result'] ?? null;
+    $searchStart = $result instanceof SatelliteTransitServiceResult ? $result->search->start : null;
+    $searchEnd = $result instanceof SatelliteTransitServiceResult ? $result->search->end : null;
     foreach (($context['tle_metadata'] ?? []) as $satellite => $metadata) {
-        if (!is_array($metadata)) continue;
-        $tleSources[(string) $satellite] = (string) ($metadata['cache_status'] ?? 'unknown');
+        if ($metadata instanceof ResolvedTle) {
+            $epoch = $metadata->tle->epochUtc;
+            $downloadedAt = $metadata->downloadedAtUtc;
+            $cacheStatus = $metadata->cacheStatus;
+            $satellite = $metadata->satellite;
+        } elseif (is_array($metadata)) {
+            try {
+                $epoch = new DateTimeImmutable((string) ($metadata['epoch_utc'] ?? ''));
+                $downloadedAt = new DateTimeImmutable((string) ($metadata['downloaded_at_utc'] ?? ''));
+            } catch (Throwable) {
+                continue;
+            }
+            $cacheStatus = (string) ($metadata['cache_status'] ?? 'unknown');
+        } else {
+            continue;
+        }
+        $ageAtStart = $searchStart !== null ? ($searchStart->getTimestamp() - $epoch->getTimestamp()) / 3600.0 : null;
+        $ageAtEnd = $searchEnd !== null ? ($searchEnd->getTimestamp() - $epoch->getTimestamp()) / 3600.0 : null;
+        $referenceAge = $ageAtEnd ?? $ageAtStart;
+        $visualStatus = $referenceAge === null || $referenceAge < 24.0
+            ? 'normal'
+            : ($referenceAge <= 72.0 ? 'warning' : 'unreliable');
+        $tleSources[(string) $satellite] = [
+            'cache_status' => $cacheStatus,
+            'downloaded_at_utc' => $downloadedAt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.uP'),
+            'epoch_utc' => $epoch->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.uP'),
+            'age_at_start_hours' => $ageAtStart,
+            'age_at_end_hours' => $ageAtEnd,
+            'visual_status' => $visualStatus,
+            'visual_label' => match ($visualStatus) {
+                'warning' => 'advertencia', 'unreliable' => 'no confiable', default => 'normal',
+            },
+        ];
     }
     return [
         'status' => match ($context['status'] ?? null) {

@@ -13,6 +13,7 @@ use InvalidArgumentException;
 final class TonightCalculator
 {
     private const STEP = 300;
+    public const MOON_ENCOUNTER_MAX_SEPARATION_DEGREES = 10.0;
     private const STATUS_ORDER = ['visible_now'=>0,'visible_later'=>1,'visible_earlier'=>2];
     private readonly MeeusSolarPositionCalculator $sun;
     private readonly MeeusLunarCalculator $moon;
@@ -57,7 +58,9 @@ final class TonightCalculator
         }
         $count=count(array_filter($planetResults,static fn(array $p):bool=>$p['visibility_status']!=='not_visible_tonight'));
         $reason=$nightRun===null?'no_civil_darkness':($count===0?'no_visible_planets':null);
+        $encounters=$nightBounds!==null?$this->moonEncounters($samples,$sun,$moon,$observer,$nightBounds):[];
         $result=['date'=>$localDate->format('Y-m-d'),'timezone'=>$observer->timezone->getName(),'location'=>['latitude'=>$observer->latitudeDegrees,'longitude'=>$observer->longitudeDegrees],'detail'=>$detail,'night'=>$night,'generated_at'=>$now->setTimezone($observer->timezone)->setTime((int)$now->setTimezone($observer->timezone)->format('H'),(int)$now->setTimezone($observer->timezone)->format('i'),(int)$now->setTimezone($observer->timezone)->format('s'))->format(DATE_ATOM),'planets'=>$planetResults,'summary'=>['visible_planet_count'=>$count,'has_visible_planets'=>$count>0,'night_available'=>$nightRun!==null]];
+        $result['moon_encounters']=$encounters;
         if($reason!==null)$result['summary']['reason']=$reason;
         if($detail==='full'){$result['stars']=$stars;$result['deep_sky_objects']=$deep;if($moonResult!==null)$result['moon']=$moonResult;}
         return $result;
@@ -82,6 +85,26 @@ final class TonightCalculator
         if($constellation&&$catalog===null){$longitude=$kind==='moon'?$moon[$index]->eclipticLongitudeDegrees:$this->eclipticLongitude($this->planets->target($id,$relevant),$relevant);$base['constellation']=$this->zodiacConstellation($longitude);}
         if($kind!=='moon'){$indexes=[];foreach($runs as $run)foreach($run['indexes'] as $i)$indexes[$i]=true;$best=null;$sep=INF;foreach(array_keys($indexes) as $i){$s=$this->separation($positions[$i]['alt'],$positions[$i]['az'],$moon[$i]->altitudeDegrees,$moon[$i]->azimuthDegrees);if($s<$sep){$sep=$s;$best=$i;}}$rounded=round($sep,1);$base['near_moon']=$rounded<=10;$base['moon_separation_degrees']=$rounded;$base['moon_separation_at']=$samples[$best]->setTimezone($observer->timezone)->format(DATE_ATOM);if($rounded<=5)$base['moon_proximity']='very_close';elseif($rounded<=10)$base['moon_proximity']='close';}
         return$base;
+    }
+
+    /** @param list<DateTimeImmutable> $samples @param list<SolarPosition> $sun @param list<LunarPosition> $moon @param array{0:DateTimeImmutable,1:DateTimeImmutable} $nightBounds @return list<array<string,mixed>> */
+    private function moonEncounters(array $samples,array $sun,array $moon,AstronomyObserver $observer,array $nightBounds):array
+    {
+        $names=ConjunctionCatalog::names();$results=[];
+        foreach(ConjunctionCatalog::targets() as $target){
+            $best=null;$minimum=INF;$visibleIndexes=[];$maxSun=$target->kind==='planet'?-6.0:($target->kind==='star'?-12.0:-18.0);$minAltitude=$target->kind==='open_cluster'?15.0:10.0;
+            foreach($samples as $i=>$instant){
+                if($instant<$nightBounds[0]||$instant>$nightBounds[1])continue;
+                $equatorial=$target->kind==='planet'?$this->planets->target($target->id,$instant):$this->planets->fixed($target,$instant);
+                $position=$this->horizontal($equatorial,$instant,$observer);
+                if($moon[$i]->altitudeDegrees<10.0||$position['alt']<$minAltitude||$sun[$i]->altitudeDegrees>$maxSun)continue;
+                $visibleIndexes[]=$i;$separation=$this->separation($position['alt'],$position['az'],$moon[$i]->altitudeDegrees,$moon[$i]->azimuthDegrees);
+                if($separation<$minimum){$minimum=$separation;$best=$i;}
+            }
+            if($best===null||$minimum>self::MOON_ENCOUNTER_MAX_SEPARATION_DEGREES)continue;
+            $results[]=['id'=>$target->id,'name'=>$names[$target->id]??$target->id,'object_kind'=>$target->kind,'minimum_separation_degrees'=>round($minimum,1),'minimum_separation_at'=>$samples[$best]->setTimezone($observer->timezone)->format(DATE_ATOM),'visibility_start'=>$samples[$visibleIndexes[0]]->setTimezone($observer->timezone)->format(DATE_ATOM),'visibility_end'=>$samples[$visibleIndexes[array_key_last($visibleIndexes)]]->setTimezone($observer->timezone)->format(DATE_ATOM)];
+        }
+        usort($results,static fn(array $a,array $b):int=>[$a['minimum_separation_at'],$a['minimum_separation_degrees']]<=>[$b['minimum_separation_at'],$b['minimum_separation_degrees']]);return$results;
     }
 
     /** @param array<string,int|float|string> $entry */ private function starCoordinates(array $entry,DateTimeImmutable $date):EquatorialCoordinates{$jd=2440587.5+$date->getTimestamp()/86400;$years=2000+($jd-2451545)/365.25-1991.25;$dec=(float)$entry['dec']+(float)$entry['pmDec']*$years/3600000;$cos=max(1e-9,cos(deg2rad($dec)));$ra=(float)$entry['ra']+(float)$entry['pmRa']*$years/(3600000*$cos);return$this->precess(new EquatorialCoordinates($this->norm($ra),$dec),$date);}

@@ -10,6 +10,8 @@ use AstronomyEngine\Facade\AstronomyObserver;
 use AstronomyEngine\Satellite\SatelliteTransitEvent;
 use AstronomyEngine\Satellite\SatelliteTransitSearchResult;
 use AstronomyEngine\Satellite\SatelliteTransitServiceResult;
+use AstronomyEngine\Satellite\ResolvedTle;
+use AstronomyEngine\Satellite\Tle;
 
 function homeSatelliteAssert(bool $condition, string $message): void
 {
@@ -38,7 +40,16 @@ $events = [
 ];
 $search = new SatelliteTransitSearchResult($now, $now->modify('+48 hours'), $observer,
     ['moon','sun'], $events, ['total_ms' => 1.0], 0.0);
-$serviceResult = new SatelliteTransitServiceResult($search, [], [], ['service_total_ms' => 1.0]);
+$diagnosticTle = static function (string $satellite, string $epoch, string $status): ResolvedTle {
+    $tle = new Tle(strtoupper($satellite), 'line 1', 'line 2', $satellite === 'iss' ? 25544 : 48274,
+        new DateTimeImmutable($epoch), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    return new ResolvedTle($satellite, $tle, new DateTimeImmutable('2026-07-24T11:45:00Z'),
+        $status, 0.0, 'high', []);
+};
+$serviceResult = new SatelliteTransitServiceResult($search, [
+    'iss' => $diagnosticTle('iss', '2026-07-24T00:00:00Z', 'cache_hit'),
+    'tiangong' => $diagnosticTle('tiangong', '2026-07-23T04:00:00Z', 'fallback'),
+], [], ['service_total_ms' => 1.0]);
 $calls = 0;
 $runner = static function (AstronomyObserver $resolvedObserver, DateTimeImmutable $start, int $hours,
     array $satellites, array $targets) use (&$calls, $serviceResult): SatelliteTransitServiceResult {
@@ -75,9 +86,9 @@ homeSatelliteAssert((astronomySiteConfigCatalog()['home.satellite_transits.enabl
 
 $renderMoon = homeSatelliteEvent('moon', '2026-07-24T22:00:00Z', 'very_close');
 $renderSun = homeSatelliteEvent('sun', '2026-07-24T16:00:00Z', 'transit', 1.49);
-ob_start(); renderHomeSatelliteEventItems([$renderMoon], 'UTC', true); $tonightHtml = (string) ob_get_clean();
-ob_start(); renderHomeSatelliteEventItems([$renderSun], 'UTC'); $upcomingHtml = (string) ob_get_clean();
-ob_start(); renderHomeSatelliteEventItems([], 'UTC'); $emptyHtml = (string) ob_get_clean();
+ob_start(); renderHomeSatelliteEventItems([$renderMoon], 'UTC', $now, true); $tonightHtml = (string) ob_get_clean();
+ob_start(); renderHomeSatelliteEventItems([$renderSun], 'UTC', $now); $upcomingHtml = (string) ob_get_clean();
+ob_start(); renderHomeSatelliteEventItems([], 'UTC', $now); $emptyHtml = (string) ob_get_clean();
 homeSatelliteAssert(str_contains($tonightHtml, 'Tiangong · acercamiento muy cercano frente a la Luna')
     && str_contains($tonightHtml, '>22:00<'), 'Tonight satellite event is not rendered with its local time.');
 homeSatelliteAssert(str_contains($upcomingHtml, 'Tiangong · tránsito frente al Sol')
@@ -93,15 +104,22 @@ homeSatelliteAssert(count($selectedNear) === 1 && $selectedNear[0] === $nearClos
 homeSatelliteAssert(homeSatelliteDisplayEvents([$closeDiagnostic]) === [], 'La categoría close se volvió pública.');
 homeSatelliteAssert(homeSatelliteDisplayEvents([$nearClosest, $renderMoon]) === [$renderMoon],
     'Un near_pass desplazó a un evento satelital más importante.');
-ob_start(); renderHomeSatelliteEventItems([$nearClosest], 'UTC'); $nearHtml = (string) ob_get_clean();
+ob_start(); renderHomeSatelliteEventItems([$nearClosest], 'UTC', $now); $nearHtml = (string) ob_get_clean();
 homeSatelliteAssert(str_contains($nearHtml, 'Tiangong pasará cerca de la Luna')
     && str_contains($nearHtml, 'A unos 2,2° del borde.'),
     'El near_pass no mostró el texto o la distancia al borde esperados.');
 $nearSun = homeSatelliteEvent('sun', '2026-07-24T17:00:00Z', 'near_pass', null, 3.2, 0.26);
-ob_start(); renderHomeSatelliteEventItems([$nearSun], 'UTC'); $nearSunHtml = (string) ob_get_clean();
+ob_start(); renderHomeSatelliteEventItems([$nearSun], 'UTC', $now); $nearSunHtml = (string) ob_get_clean();
 homeSatelliteAssert(str_contains($nearSunHtml, 'Tiangong pasará cerca del Sol')
     && str_contains($nearSunHtml, 'filtro solar certificado'),
     'El near_pass solar perdió su texto o la advertencia de seguridad.');
+$augustNow = new DateTimeImmutable('2026-08-07T17:00:00-03:00');
+$augustEvent = homeSatelliteEvent('moon', '2026-08-08T04:21:05-03:00', 'near_pass', null, 2.74, 0.272);
+$augustPresentation = homeSatelliteEventPresentation(
+    $augustEvent, 'America/Argentina/Buenos_Aires', $augustNow
+);
+homeSatelliteAssert($augustPresentation['time'] === 'Sáb 8 · 04:21',
+    'El evento satelital del día local siguiente no mostró día abreviado, fecha y hora.');
 $successDiagnostic = homeSatelliteDiagnostic($context, 10.0, [
     'latitude' => 41.87, 'longitude' => 12.49, 'timezone' => 'UTC', 'mode' => 'manual',
 ]);
@@ -117,6 +135,14 @@ homeSatelliteAssert($successDiagnostic['result_source'] === 'calculated'
     'El diagnóstico no conserva identidad, ubicación o eventos de la solicitud satelital.');
 homeSatelliteAssert($failedDiagnostic['result_source'] === 'calculation_failed',
     'El diagnóstico presenta un cálculo fallido como reutilizado o calculado.');
+homeSatelliteAssert($successDiagnostic['tle_sources']['iss']['cache_status'] === 'cache_hit'
+    && $successDiagnostic['tle_sources']['iss']['visual_status'] === 'warning'
+    && $successDiagnostic['tle_sources']['iss']['age_at_start_hours'] === 12.0
+    && $successDiagnostic['tle_sources']['iss']['age_at_end_hours'] === 60.0,
+    'El diagnóstico TLE no conserva estado, epoch o edades de la ISS.');
+homeSatelliteAssert($successDiagnostic['tle_sources']['tiangong']['visual_status'] === 'unreliable'
+    && $successDiagnostic['tle_sources']['tiangong']['visual_label'] === 'no confiable',
+    'El diagnóstico TLE no aplica el umbral no confiable al final de la ventana.');
 
 $index = file_get_contents(__DIR__ . '/../index.php');
 homeSatelliteAssert(is_string($index) && substr_count($index, 'homeSatelliteContext(') === 1,

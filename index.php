@@ -26,9 +26,12 @@ require_once __DIR__ . '/includes/moon-images.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/home-upcoming-events.php';
 require_once __DIR__ . '/includes/home-satellite-context.php';
+require_once __DIR__ . '/includes/web-push-device-config.php';
 require_once __DIR__ . '/includes/home-satellite-local-test.php';
 require_once __DIR__ . '/includes/content-system.php';
 sendDynamicNoCacheHeaders();
+astronomyPushDeviceStartSession();
+$homeNotificationCsrfToken = astronomyPushDeviceCsrfToken();
 
 /** @param array<string,float> $details */
 function homePageProfileRecord(string $label, int $startedAt, array $details = []): void
@@ -291,9 +294,10 @@ $homePageProfileContentMilliseconds = 0.0;
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/protected-photos.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/home-notification-links.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyMobileSwipeNavigationScript('home'); ?>
 </head>
-<body data-api-state="<?= $hasApiError ? 'error' : 'ok' ?>" data-cloud-cover-latitude="<?= htmlspecialchars((string) $latitude, ENT_QUOTES, 'UTF-8') ?>" data-cloud-cover-longitude="<?= htmlspecialchars((string) $longitude, ENT_QUOTES, 'UTF-8') ?>" data-cloud-cover-timezone="<?= htmlspecialchars($timezoneName, ENT_QUOTES, 'UTF-8') ?>"<?= astronomyMobileSwipeNavigationAttributes('home') ?>>
+<body data-api-state="<?= $hasApiError ? 'error' : 'ok' ?>" data-cloud-cover-latitude="<?= htmlspecialchars((string) $latitude, ENT_QUOTES, 'UTF-8') ?>" data-cloud-cover-longitude="<?= htmlspecialchars((string) $longitude, ENT_QUOTES, 'UTF-8') ?>" data-cloud-cover-timezone="<?= htmlspecialchars($timezoneName, ENT_QUOTES, 'UTF-8') ?>" data-notification-config-url="<?= htmlspecialchars(astronomyInternalUrl('web-push/device-config.php'), ENT_QUOTES, 'UTF-8') ?>" data-notification-csrf="<?= htmlspecialchars($homeNotificationCsrfToken, ENT_QUOTES, 'UTF-8') ?>"<?= astronomyMobileSwipeNavigationAttributes('home') ?>>
     <?php require __DIR__ . '/includes/navigation-indicator.php'; ?>
     <?php renderAstronomyDebugClock($now); ?>
     <?php renderAstronomySiteHeader('home', $location); ?>
@@ -308,8 +312,9 @@ $homePageProfileContentMilliseconds = 0.0;
                 <div class="home-v2-moon__image moon-apparent-orientation" data-moon-rotation-degrees="<?= htmlspecialchars((string) $moonCssRotation) ?>"><img src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="360" height="360" alt="Apariencia actual de la Luna desde <?= htmlspecialchars($locationLabel) ?>" style="--moon-apparent-rotation: <?= htmlspecialchars((string) $moonCssRotation) ?>deg"></div>
                 <div class="home-v2-moon__copy">
                     <h2><?= htmlspecialchars($moonPhase) ?></h2>
-                    <?php if ($moonHorizonEvents !== []): ?><div class="home-v2-horizon" aria-label="Próximos horarios de la Luna">
+                    <?php if ($moonHorizonEvents !== []): ?><div class="home-v2-horizon<?= count($moonHorizonEvents) >= 2 ? ' home-v2-horizon--two-events' : '' ?>" aria-label="Próximos horarios de la Luna">
                         <?php foreach ($moonHorizonEvents as $horizonEvent): ?><p><time datetime="<?= htmlspecialchars($horizonEvent['date']->format(DateTimeInterface::ATOM)) ?>"><?= htmlspecialchars(homeV2HorizonLabel($horizonEvent['kind'], $horizonEvent['date'], $now)) ?></time></p><?php endforeach; ?>
+                        <?php if ($nextMoonRise !== null): ?><?php renderHomeNotificationLink('moonrise'); ?><?php endif; ?>
                     </div><?php endif; ?>
                     <?php if ($moonSituation !== null): ?><p class="home-v2-situation<?= $moonriseNoticeLevel !== null ? ' moonrise-notice moonrise-notice--' . htmlspecialchars($moonriseNoticeLevel) : '' ?>"><?= htmlspecialchars($moonSituation) ?></p><?php endif; ?>
                     <?php if ($illumination !== null): ?><p class="home-v2-illumination"><strong><?= htmlspecialchars($illumination) ?></strong> iluminada</p><?php endif; ?>
@@ -327,7 +332,7 @@ $homePageProfileContentMilliseconds = 0.0;
             <div class="home-v2-card__heading"><h2 id="v2-tonight-title">El cielo esta noche</h2></div>
             <p class="home-v2-tonight__summary"><?= htmlspecialchars($tonightText ?? 'La información de esta noche no está disponible por el momento.') ?></p>
             <?php if ($visibleTonightSatelliteEvents !== []): ?><div class="home-v2-upcoming home-v2-satellite-events home-v2-satellite-events--tonight">
-                <?php renderHomeSatelliteEventItems($visibleTonightSatelliteEvents, $timezoneName, true); ?>
+                <?php renderHomeSatelliteEventItems($visibleTonightSatelliteEvents, $timezoneName, $now, true); ?>
             </div><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('cielo-de-esta-noche.php'), ENT_QUOTES, 'UTF-8') ?>">Explorar esta noche <span aria-hidden="true">→</span></a>
         </article>
@@ -366,17 +371,19 @@ $homePageProfileContentMilliseconds = 0.0;
                     homeUpcomingProfileAdd('preparación de nubosidad', (hrtime(true) - $cloudPreparationStarted) / 1_000_000);
                     $calendarPreparationStarted = hrtime(true);
                     $calendarEvent = astronomyCalendarEventData($event, $presentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eventos.php'));
+                    $notificationType = homeNotificationTypeForEvent($event);
                     homeUpcomingProfileAdd('preparación de acciones de tarjetas', (hrtime(true) - $calendarPreparationStarted) / 1_000_000);
                     $cardRenderStarted = hrtime(true);
                 ?>
-                <section class="<?= $index === 0 ? 'home-v2-event home-v2-event--featured' : 'home-v2-event' ?>">
+                <section class="<?= $index === 0 ? 'home-v2-event home-v2-event--featured' : 'home-v2-event' ?><?= $notificationType !== null ? ' home-v2-event--notifiable' : '' ?>">
+                    <?php if ($notificationType !== null) renderHomeNotificationLink($notificationType); ?>
                     <?php renderAstronomyIcon($event, $latitude, 'home-v2-event__icon'); ?>
                     <?php if ($date !== null): ?><?php renderAstronomyEventDateHeader($date, $now, astronomyNearbyEventDate($date), ['class' => 'home-v2-event__date']); ?><?php endif; ?>
                     <div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if ($observation !== null): ?><p class="home-v2-event__times"><?= htmlspecialchars($observation['first_label']) ?> <?= htmlspecialchars($observation['first_time']->format('H:i')) ?> · <?= htmlspecialchars($observation['second_label']) ?> <?= htmlspecialchars($observation['second_time']->format('H:i')) ?> · Intervalo <?= htmlspecialchars($observation['start']->format('H:i')) ?>–<?= htmlspecialchars($observation['end']->format('H:i')) ?></p><?php elseif ($horizonDetail !== null): ?><p class="home-v2-event__horizon"><span><?= htmlspecialchars($horizonDetail['label']) ?> · <time datetime="<?= htmlspecialchars($horizonDetail['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($horizonDetail['date']->format('H:i')) ?></time></span></p><?php endif; ?><?php if ($cloudDate !== null): ?><p class="home-v2-event__horizon" data-cloud-cover-event="<?= htmlspecialchars($cloudDate->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><span>Nubosidad prevista</span><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-icon hidden></span></p><?php endif; ?><?php if ($presentation['explanation'] !== ''): ?><p><?= htmlspecialchars($presentation['explanation']) ?></p><?php endif; ?><?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--home'); ?></div>
                 </section>
                 <?php homeUpcomingProfileAdd('armado final de tarjetas', (hrtime(true) - $cardRenderStarted) / 1_000_000); ?>
                 <?php endforeach; ?>
-                <?php renderHomeSatelliteEventItems($visibleUpcomingSatelliteEvents, $timezoneName, $upcomingEvents === []); ?>
+                <?php renderHomeSatelliteEventItems($visibleUpcomingSatelliteEvents, $timezoneName, $now, $upcomingEvents === []); ?>
             </div><?php else: ?><p class="home-v2-unavailable">No hay eventos cercanos para mostrar.</p><?php endif; ?>
             <a class="home-v2-card__link" href="<?= htmlspecialchars(astronomyInternalUrl('eventos.php'), ENT_QUOTES, 'UTF-8') ?>">Ver todos los eventos <span aria-hidden="true">→</span></a>
         </article>

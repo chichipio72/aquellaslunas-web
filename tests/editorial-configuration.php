@@ -10,6 +10,10 @@ function editorialRejects(callable $callback, string $message): void { try { $ca
 $unavailable = static function (): PDO { throw new RuntimeException('unavailable'); };
 editorialAssert(astronomyEditorialNumber('home.altitude.very_low_max', $unavailable) === 15.0, 'El fallback no devolvió el umbral histórico.');
 editorialAssert(astronomyEditorialText('event.conjunction.visible', [], $unavailable) === 'Se podrán ver juntos alrededor de esa hora.', 'El fallback no devolvió el texto histórico.');
+editorialAssert(astronomyEditorialText('tonight.moon_encounter.section_title', [], $unavailable) === 'Objetos cerca de la Luna', 'El título de encuentros lunares no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.moon_encounter.title', ['objeto' => 'Venus'], $unavailable) === 'Venus cerca de la Luna', 'El título de tarjeta lunar no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.moon_encounter.text', ['objeto' => 'Venus', 'separacion' => '7,1'], $unavailable) === 'Esta noche Venus y la Luna se verán separados por unos 7,1°.', 'La descripción lunar no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.moon_encounter.two_planets_text', ['primer_objeto' => 'Venus', 'primera_separacion' => '3,2', 'segundo_objeto' => 'Marte', 'segunda_separacion' => '6,4'], $unavailable) === 'Esta noche la Luna estará cerca de Venus (3,2°) y de Marte (6,4°).', 'El texto para dos planetas no quedó disponible en la configuración editorial.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', '{objeto} y {planeta}'), 'Se aceptó un placeholder desconocido.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', 'Estarán muy juntas'), 'Se eliminó un placeholder obligatorio.');
 editorialRejects(fn() => astronomyEditorialValidateText('cloud.today.best_moon', 'Mirar {codigo}'), 'La recomendación de nubosidad aceptó lógica o placeholders libres.');

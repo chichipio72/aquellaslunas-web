@@ -44,6 +44,7 @@ grep -q 'data-image-selector data-image-filter="vertical"' "$work_dir/edit-image
 grep -q 'data-image-hero="\(true\|false\)"' "$work_dir/edit-images"
 grep -q 'data-image-vertical="\(true\|false\)"' "$work_dir/edit-images"
 grep -q 'data-image-filter-empty hidden' "$work_dir/edit-images"
+grep -Fq 'data-insert-snippet="[[embed url=&quot;&quot;]]" data-insert-cursor-offset="-3"' "$work_dir/edit-images"
 grep -q 'class="editor-slug-warning"' "$work_dir/edit-images"
 grep -q 'cambiar el slug modifica su URL pública' "$work_dir/edit-images"
 grep -q "option.dataset.imageHero === 'true'" /var/www/html/admin/contenidos/editor.js

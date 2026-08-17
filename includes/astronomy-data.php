@@ -306,9 +306,10 @@ function astronomyDataAltitudeProfile(array $location, string $date, string $tar
 function astronomyDataTonight(array $location, string $date, string $detail, string $label, int $timeout = 12): array
 {
     $parameters = ['date' => $date, 'detail' => $detail] + astronomyDataLocationParameters($location);
-    return astronomyDataResolve(
+    $calculator = new TonightCalculator();
+    $result = astronomyDataResolve(
         'tonight',
-        static fn(): array => (new TonightCalculator())->calculate(
+        static fn(): array => $calculator->calculate(
             new DateTimeImmutable($date, new DateTimeZone((string) $location['timezone'])),
             astronomyDataObserver($location),
             $detail
@@ -323,4 +324,13 @@ function astronomyDataTonight(array $location, string $date, string $detail, str
             }
         }
     );
+    if (!is_array($result['moon_encounters'] ?? null)) {
+        $portable = $calculator->calculate(
+            new DateTimeImmutable($date, new DateTimeZone((string) $location['timezone'])),
+            astronomyDataObserver($location),
+            $detail
+        );
+        $result['moon_encounters'] = $portable['moon_encounters'] ?? [];
+    }
+    return $result;
 }

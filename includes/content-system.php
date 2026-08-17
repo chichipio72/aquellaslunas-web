@@ -12,6 +12,75 @@ require_once __DIR__ . '/site-configuration.php';
 const ASTRONOMY_CONTENT_IMAGE_DIRECTORY = __DIR__ . '/../assets/images/tienda/previews/contenido';
 const ASTRONOMY_CONTENT_IMAGE_URL_PREFIX = 'assets/images/tienda/previews/contenido/';
 
+/** @return list<array{scheme:string,host:string,path_prefix:string,title:string}> */
+function astronomyContentEmbedProviders(): array
+{
+    return [[
+        'scheme' => 'https',
+        'host' => 'chichipiosblog.com.ar',
+        'path_prefix' => '/astronomia/',
+        'title' => 'Simulador astronómico interactivo',
+    ]];
+}
+
+/** @return array{url:string,title:string}|null */
+function astronomyContentResolveEmbedUrl(mixed $value): ?array
+{
+    if (!is_string($value) || $value === '' || trim($value) !== $value || filter_var($value, FILTER_VALIDATE_URL) === false) {
+        return null;
+    }
+    $parts = parse_url($value);
+    if (
+        !is_array($parts)
+        || isset($parts['user'])
+        || isset($parts['pass'])
+        || isset($parts['port'])
+        || ($parts['scheme'] ?? null) !== 'https'
+        || !is_string($parts['host'] ?? null)
+        || !is_string($parts['path'] ?? null)
+    ) {
+        return null;
+    }
+    $decodedPath = rawurldecode($parts['path']);
+    if (
+        preg_match('/%(?:00|2e|2f|5c)/i', $parts['path']) === 1
+        ||
+        str_contains($decodedPath, "\0")
+        || str_contains($decodedPath, '\\')
+        || str_contains($decodedPath, '//')
+        || preg_match('~(?:^|/)\.\.?(?:/|$)~', $decodedPath) === 1
+    ) {
+        return null;
+    }
+    foreach (astronomyContentEmbedProviders() as $provider) {
+        if (
+            $parts['scheme'] === $provider['scheme']
+            && $parts['host'] === $provider['host']
+            && str_starts_with($decodedPath, $provider['path_prefix'])
+        ) {
+            return ['url' => $value, 'title' => $provider['title']];
+        }
+    }
+    return null;
+}
+
+function astronomyContentEmbedHtml(array $attributes): string
+{
+    if (array_keys($attributes) !== ['url']) {
+        return '';
+    }
+    $embed = astronomyContentResolveEmbedUrl($attributes['url']);
+    if ($embed === null) {
+        return '';
+    }
+    return '<div class="content-embed" data-swipe-navigation-ignore>'
+        . '<iframe src="' . htmlspecialchars($embed['url'], ENT_QUOTES, 'UTF-8') . '"'
+        . ' title="' . htmlspecialchars($embed['title'], ENT_QUOTES, 'UTF-8') . '"'
+        . ' loading="lazy" sandbox="allow-scripts allow-same-origin"'
+        . ' referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+        . '</div>';
+}
+
 function astronomyContentError(string $field, string $message): array
 {
     return ['field' => $field, 'message' => $message];
@@ -74,7 +143,7 @@ function astronomyContentComponentAttributes(string $source): ?array
 function astronomyContentMarkdownComponents(string $markdown): array
 {
     $components = [];
-    preg_match_all('/\[\[(imagen|esquema|trivia)([^\]]*)\]\]/i', $markdown, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+    preg_match_all('/\[\[(imagen|esquema|trivia|embed)([^\]]*)\]\]/i', $markdown, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
     foreach ($matches as $match) {
         $offset = (int) $match[0][1];
         $components[] = [
@@ -336,7 +405,7 @@ function astronomyContentValidateArticle(string $slug, $raw, string $filename): 
     preg_match_all('/\[\[[^\]]*\]\]/', $markdown, $allMarkers);
     foreach ($allMarkers[0] ?? [] as $marker) {
         if (
-            preg_match('/^\[\[(?:imagen|esquema|trivia)(?:[^\]]*)\]\]$/i', $marker) !== 1
+            preg_match('/^\[\[(?:imagen|esquema|trivia|embed)(?:[^\]]*)\]\]$/i', $marker) !== 1
             && preg_match('/^\[\[\/?bloque-imagen(?:[^\]]*)\]\]$/i', $marker) !== 1
         ) {
             $errors[] = astronomyContentError('articulo.componentes', 'El Markdown contiene un marcador desconocido o mal formado.');
@@ -345,7 +414,23 @@ function astronomyContentValidateArticle(string $slug, $raw, string $filename): 
     }
     foreach ($components as $index => $component) {
         if ($component['attributes'] === null) {
+            if ($component['type'] === 'embed') {
+                $warnings[] = array_merge(
+                    astronomyContentError('articulo.componentes.' . $index, 'El embed tiene atributos inválidos y se omitirá en la vista pública.'),
+                    ['component' => $index + 1, 'line' => $component['line'], 'kind' => 'invalid_embed']
+                );
+                continue;
+            }
             $errors[] = astronomyContentError('articulo.componentes.' . $index, 'El marcador tiene atributos inválidos.');
+            continue;
+        }
+        if ($component['type'] === 'embed') {
+            if (astronomyContentEmbedHtml($component['attributes']) === '') {
+                $warnings[] = array_merge(
+                    astronomyContentError('articulo.componentes.' . $index, 'El embed no utiliza una URL y atributos permitidos; se omitirá en la vista pública.'),
+                    ['component' => $index + 1, 'line' => $component['line'], 'kind' => 'invalid_embed']
+                );
+            }
             continue;
         }
         if ($component['type'] === 'imagen') {
@@ -385,6 +470,19 @@ function astronomyContentValidateArticle(string $slug, $raw, string $filename): 
                 )
             );
         }
+    }
+    preg_match_all(
+        '/^[ \t]*\[\[\s*embed\b(?![^\r\n]*\]\])[^\r\n]*$/mi',
+        $markdown,
+        $malformedEmbeds,
+        PREG_OFFSET_CAPTURE
+    );
+    foreach ($malformedEmbeds[0] ?? [] as $index => $malformedEmbed) {
+        $line = substr_count(substr($markdown, 0, (int) $malformedEmbed[1]), "\n") + 1;
+        $warnings[] = array_merge(
+            astronomyContentError('articulo.embeds_malformados.' . $index, 'El embed está incompleto o mal formado y se omitirá en la vista pública.'),
+            ['line' => $line, 'kind' => 'invalid_embed']
+        );
     }
     $imageBlockAnalysis = astronomyContentMarkdownImageBlocks($markdown);
     foreach ($imageBlockAnalysis['issues'] as $issueIndex => $issue) {
@@ -1058,12 +1156,13 @@ function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = t
                     <?php if (($trivia['warnings'] ?? []) !== []): ?><?php renderAstronomyContentWarning(['slug' => $trivia['source_slug'] . '#' . $trivia['id'], 'warnings' => $trivia['warnings']]); ?><?php endif; ?>
                     <p class="eyebrow">TRIVIA</p>
                     <?= astronomyContentProtectedImageHtml($trivia['image'], '') ?>
-                    <div class="content-trivia" data-content-trivia>
+                    <div class="content-trivia" data-content-trivia
+                         data-trivia-code="<?= htmlspecialchars((string) $trivia['id'], ENT_QUOTES, 'UTF-8') ?>"<?= $triviaArticleUrl !== null ? ' data-article-slug="' . htmlspecialchars((string) $trivia['source_slug'], ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                         <h2 id="<?= htmlspecialchars($triviaDomId, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string) $trivia['raw']['pregunta']) ?></h2>
                         <div class="content-trivia__options" role="group" aria-labelledby="<?= htmlspecialchars($triviaDomId, ENT_QUOTES, 'UTF-8') ?>">
-                            <?php foreach ($trivia['raw']['opciones'] as $option): ?>
+                            <?php foreach ($trivia['raw']['opciones'] as $optionIndex => $option): ?>
                                 <?php $isCorrect = trim((string) ($option['explicacion'] ?? '')) !== ''; ?>
-                                <button type="button" class="interactive-choice" data-trivia-option data-correct="<?= $isCorrect ? 'true' : 'false' ?>">
+                                <button type="button" class="interactive-choice" data-trivia-option data-trivia-option-index="<?= (int) $optionIndex + 1 ?>" data-correct="<?= $isCorrect ? 'true' : 'false' ?>">
                                     <span><?= htmlspecialchars((string) ($option['texto'] ?? '')) ?></span>
                                     <span class="interactive-choice__status" data-trivia-option-status hidden></span>
                                 </button>
@@ -1072,7 +1171,7 @@ function renderAstronomyHomeContentCards(array $catalog, bool $triviaEnabled = t
                         <div class="interactive-feedback" data-trivia-feedback aria-live="polite" aria-atomic="true" tabindex="-1" hidden>
                             <strong data-trivia-result></strong>
                             <p><?= htmlspecialchars($correctExplanation) ?></p>
-                            <?php if ($triviaArticleUrl !== null): ?><a class="content-card__read-link" href="<?= htmlspecialchars($triviaArticleUrl, ENT_QUOTES, 'UTF-8') ?>">Leer más sobre este tema <span aria-hidden="true">→</span></a><?php endif; ?>
+                            <?php if ($triviaArticleUrl !== null): ?><a class="content-card__read-link" data-trivia-article-link href="<?= htmlspecialchars($triviaArticleUrl, ENT_QUOTES, 'UTF-8') ?>">Leer más sobre este tema <span aria-hidden="true">→</span></a><?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -1153,11 +1252,16 @@ function astronomyContentRenderMarkdownFragment(string $markdown): string
             $html[] = '<h' . $level . $id . '>' . astronomyContentInlineMarkdown($match[2]) . '</h' . $level . '>';
             continue;
         }
-        if (preg_match('/^\[\[(imagen|esquema|trivia)([^\]]*)\]\]$/i', $trimmed, $match) === 1) {
+        if (preg_match('/^\[\[(imagen|esquema|trivia|embed)([^\]]*)\]\]$/i', $trimmed, $match) === 1) {
             $flushParagraph();
             $type = strtolower($match[1]);
             $attributes = astronomyContentComponentAttributes($match[2]);
-            if ($type === 'imagen' && is_array($attributes)) {
+            if ($type === 'embed' && is_array($attributes)) {
+                $embedHtml = astronomyContentEmbedHtml($attributes);
+                if ($embedHtml !== '') {
+                    $html[] = $embedHtml;
+                }
+            } elseif ($type === 'imagen' && is_array($attributes)) {
                 $image = astronomyContentResolveImage($attributes['src'] ?? null, 'articulo.imagen');
                 if ($image['url'] !== null) {
                     $alt = htmlspecialchars((string) ($attributes['alt'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -1168,6 +1272,10 @@ function astronomyContentRenderMarkdownFragment(string $markdown): string
             } else {
                 $html[] = '<div class="content-component-placeholder" data-content-component="' . $type . '"><code>' . htmlspecialchars($trimmed, ENT_QUOTES, 'UTF-8') . '</code></div>';
             }
+            continue;
+        }
+        if (preg_match('/^\[\[\s*embed\b/i', $trimmed) === 1) {
+            $flushParagraph();
             continue;
         }
         if (preg_match('/^(?:-{3,}|\*{3,})$/', $trimmed) === 1) {
