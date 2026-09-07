@@ -10,10 +10,16 @@ function editorialRejects(callable $callback, string $message): void { try { $ca
 $unavailable = static function (): PDO { throw new RuntimeException('unavailable'); };
 editorialAssert(astronomyEditorialNumber('home.altitude.very_low_max', $unavailable) === 15.0, 'El fallback no devolvió el umbral histórico.');
 editorialAssert(astronomyEditorialText('event.conjunction.visible', [], $unavailable) === 'Se podrán ver juntos alrededor de esa hora.', 'El fallback no devolvió el texto histórico.');
+editorialAssert(astronomyEditorialText('event.node.ascending.title', [], $unavailable) === 'La Luna cruza hacia el norte', 'El fallback editorial perdió el título del nodo ascendente.');
+editorialAssert(astronomyEditorialText('event.node.descending.label', [], $unavailable) === 'Nodo descendente', 'El fallback editorial perdió la etiqueta corta del nodo descendente.');
 editorialAssert(astronomyEditorialText('tonight.moon_encounter.section_title', [], $unavailable) === 'Objetos cerca de la Luna', 'El título de encuentros lunares no quedó disponible en la configuración editorial.');
 editorialAssert(astronomyEditorialText('tonight.moon_encounter.title', ['objeto' => 'Venus'], $unavailable) === 'Venus cerca de la Luna', 'El título de tarjeta lunar no quedó disponible en la configuración editorial.');
 editorialAssert(astronomyEditorialText('tonight.moon_encounter.text', ['objeto' => 'Venus', 'separacion' => '7,1'], $unavailable) === 'Esta noche Venus y la Luna se verán separados por unos 7,1°.', 'La descripción lunar no quedó disponible en la configuración editorial.');
 editorialAssert(astronomyEditorialText('tonight.moon_encounter.two_planets_text', ['primer_objeto' => 'Venus', 'primera_separacion' => '3,2', 'segundo_objeto' => 'Marte', 'segunda_separacion' => '6,4'], $unavailable) === 'Esta noche la Luna estará cerca de Venus (3,2°) y de Marte (6,4°).', 'El texto para dos planetas no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.card.lunar_eclipse', ['eclipse' => 'un eclipse lunar parcial', 'hora' => '01:12'], $unavailable) === 'Esta noche será visible un eclipse lunar parcial desde tu ubicación. Máximo: 01:12.', 'El resumen protagonista del eclipse no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.lunar_eclipse.section_title', [], $unavailable) === 'Eclipse lunar esta noche', 'El título de sección del eclipse no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.lunar_eclipse.card_title', [], $unavailable) === 'Eclipse visible desde tu ubicación', 'El título de tarjeta del eclipse no quedó disponible en la configuración editorial.');
+editorialAssert(astronomyEditorialText('tonight.card.connector.and', [], $unavailable) === 'y', 'El conector final del resumen no quedó disponible en la configuración editorial.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', '{objeto} y {planeta}'), 'Se aceptó un placeholder desconocido.');
 editorialRejects(fn() => astronomyEditorialValidateText('event.conjunction.very_close', 'Estarán muy juntas'), 'Se eliminó un placeholder obligatorio.');
 editorialRejects(fn() => astronomyEditorialValidateText('cloud.today.best_moon', 'Mirar {codigo}'), 'La recomendación de nubosidad aceptó lógica o placeholders libres.');
@@ -37,6 +43,9 @@ try {
     editorialAssert(astronomyEditorialNumber('event.conjunction.very_close_degrees') === 2.0, 'No se aplicó el override numérico.');
     $presentation = astronomyEventPresentation(['type' => 'conjunction', 'subtype' => 'venus', 'title' => 'Conjunción Luna–Venus', 'datetime' => '2026-01-01T20:00:00Z', 'details' => ['separation_degrees' => 1.5]], 'UTC');
     editorialAssert($presentation['title'] === 'Venus y la Luna, pegadísimas', 'El texto editado no llegó a la presentación pública.');
+    astronomyEditorialSave($connection, [], ['event.node.ascending.title' => 'La Luna pasa al hemisferio norte']);
+    $nodePresentation = astronomyEventPresentation(['type' => 'lunar_nodes', 'subtype' => 'ascending_node', 'title' => 'Nodo lunar ascendente', 'datetime' => '2026-01-02T20:00:00Z', 'details' => ['moon_distance_km' => 380000]], 'UTC');
+    editorialAssert($nodePresentation['title'] === 'La Luna pasa al hemisferio norte', 'El override editorial del nodo no llegó a la presentación pública.');
     astronomyEditorialRestoreBlock($connection, 'events');
     $restoredState = astronomyEditorialValueState('texts', 'event.conjunction.very_close');
     editorialAssert(!$restoredState['modified'] && $restoredState['status'] === 'Predeterminado' && $restoredState['value'] === '{objeto} y la Luna estarán muy juntas', 'Restaurar no volvió a exponer el default en el control.');

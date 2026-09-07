@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/includes/web-push-device-config.php';
 require_once __DIR__ . '/includes/location-context.php';
 require_once __DIR__ . '/includes/location-map.php';
 require_once __DIR__ . '/includes/site-header.php';
@@ -9,6 +10,8 @@ require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/api-client.php';
 sendDynamicNoCacheHeaders();
+astronomyPushDeviceStartSession();
+$pushCsrfToken = astronomyPushDeviceCsrfToken();
 
 $message = '';
 $messageIsError = false;
@@ -17,17 +20,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($result['ok']) {
         $returnTo = astronomyLocationReturnPath($_POST['return_to'] ?? null);
         $target = $returnTo ?? astronomyInternalUrl('ubicacion.php') . '?saved=1';
+        if (str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')) {
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode([
+                'ok' => true,
+                'redirect' => $target,
+                'location' => astronomyLocationContext(),
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         header('Location: ' . $target, true, 303);
         exit;
     }
     $message = $result['message'];
     $messageIsError = true;
+    if (str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'message' => $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
 $returnTo = astronomyLocationReturnPath($_GET['return'] ?? ($_POST['return_to'] ?? null));
 $returnLabel = $returnTo !== null ? astronomyLocationReturnLabel($returnTo) : null;
 $location = astronomyLocationContext();
 if (isset($_GET['saved'])) {
-    $message = 'Ubicación guardada. Ya se usa en todo el sitio.';
+    $message = isset($_GET['notification_sync']) && $_GET['notification_sync'] === 'failed'
+        ? 'La ubicación general se guardó, pero no se pudo actualizar la ubicación de las notificaciones.'
+        : (isset($_GET['notification_sync']) && $_GET['notification_sync'] === 'ok'
+            ? 'Ubicación guardada y actualizada también para las notificaciones de este dispositivo.'
+            : 'Ubicación guardada. Ya se usa en todo el sitio.');
+    $messageIsError = isset($_GET['notification_sync']) && $_GET['notification_sync'] === 'failed';
 }
 $pageSeo = aquellasLunasSeoPage('Configurar ubicación | Aquellas Lunas', 'Elegí la ubicación del observador para todos los datos locales del sitio.', '/ubicacion.php', 'website');
 ?>
@@ -62,7 +85,8 @@ $pageSeo = aquellasLunasSeoPage('Configurar ubicación | Aquellas Lunas', 'Eleg�
                 <span class="location-map-help__touch">Mantené presionado para colocar el marcador · Arrastralo para ajustar</span>
             </p>
             <p id="location-map-status" class="card-note location-map-status" role="status" aria-live="polite"></p>
-            <form id="global-location-form" class="card location-form" method="post">
+            <form id="global-location-form" class="card location-form" method="post"
+                data-device-config-url="web-push/device-config.php" data-device-csrf="<?= htmlspecialchars($pushCsrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($returnTo !== null): ?><input type="hidden" name="return_to" value="<?= htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
                 <label class="control-field location-name-field"><span><span class="location-label-long">Localidad actual</span><span class="location-label-short">Localidad</span></span><input type="text" name="location_name" maxlength="80" value="<?= htmlspecialchars($location['name'], ENT_QUOTES, 'UTF-8') ?>" required></label>
                 <div class="location-technical-fields">
@@ -72,6 +96,10 @@ $pageSeo = aquellasLunasSeoPage('Configurar ubicación | Aquellas Lunas', 'Eleg�
                     <label class="control-field"><span><span class="location-label-long">Zona horaria automática</span><span class="location-label-short">Zona</span></span><input type="text" name="resolved_timezone" value="<?= htmlspecialchars($location['timezone'], ENT_QUOTES, 'UTF-8') ?>" readonly></label>
                 </div>
                 <input type="hidden" name="location_mode" value="<?= htmlspecialchars($location['mode'], ENT_QUOTES, 'UTF-8') ?>">
+                <div class="location-notification-sync" data-location-notification-sync hidden>
+                    <label><input type="checkbox" name="sync_notification_location" value="1"> <span>Actualizar también la ubicación usada para mis notificaciones en este dispositivo</span></label>
+                    <small data-notification-location-current></small>
+                </div>
                 <div class="location-actions">
                     <button id="use-browser-location" class="button compact-secondary-button" type="button"><span class="location-action-long">Usar mi ubicación</span><span class="location-action-short">Mi ubicación</span></button>
                     <button id="use-default-location" class="button compact-secondary-button" type="button"><span class="location-action-long">Usar Buenos Aires</span><span class="location-action-short">Buenos Aires</span></button>

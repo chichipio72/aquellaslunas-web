@@ -9,6 +9,7 @@ readonly FTP_USER='andres@aquellaslunas.com.ar'
 readonly ROOT_ROBOTS_REMOTE_PATH='robots.txt'
 readonly -a DEPLOY_EXPLICIT_FILES=(
     'scripts/run-scheduled-tasks.php'
+    'scripts/update-satellite-tles.php'
     'scripts/migrations/registry.php'
     'scripts/migrations/web-push-astronomy-config.sql'
     'scripts/migrations/create-web-push-astronomy-config.php'
@@ -20,6 +21,24 @@ readonly -a DEPLOY_EXPLICIT_FILES=(
     'scripts/migrations/create-web-push-astronomy-event-types.php'
     'scripts/migrations/web-push-support-id.sql'
     'scripts/migrations/create-web-push-support-id.php'
+    'scripts/migrations/site-menu-configuration.sql'
+    'scripts/migrations/create-site-menu-configuration.php'
+    'scripts/migrations/eclipse-widget-template-storage.sql'
+    'scripts/migrations/create-eclipse-widget-template-storage.php'
+    'scripts/migrations/photography-editorial.sql'
+    'scripts/migrations/create-photography-editorial.php'
+    'scripts/migrations/photography-editorial-v1-seeds.sql'
+    'scripts/migrations/create-photography-editorial-v1-seeds.php'
+    'scripts/migrations/photography-simulated-directional-twilight.sql'
+    'scripts/migrations/create-photography-simulated-directional-twilight.php'
+    'scripts/migrations/satellite-stations-menu.sql'
+    'scripts/migrations/add-satellite-stations-menu.php'
+    'scripts/migrations/sources-credits-menu.sql'
+    'scripts/migrations/add-sources-credits-menu.php'
+    'scripts/migrations/lunar-scene-presets.sql'
+    'scripts/migrations/create-lunar-scene-presets.php'
+    'scripts/migrations/publish-lunar-nodes.sql'
+    'scripts/migrations/publish-lunar-nodes.php'
     'scripts/cleanup-astronomy-request-log.php'
 )
 
@@ -197,8 +216,27 @@ put "${local_root}/scripts/migrations/web-push-astronomy-event-types.sql" -o "/s
 put "${local_root}/scripts/migrations/create-web-push-astronomy-event-types.php" -o "/scripts/migrations/create-web-push-astronomy-event-types.php"
 put "${local_root}/scripts/migrations/web-push-support-id.sql" -o "/scripts/migrations/web-push-support-id.sql"
 put "${local_root}/scripts/migrations/create-web-push-support-id.php" -o "/scripts/migrations/create-web-push-support-id.php"
+put "${local_root}/scripts/migrations/site-menu-configuration.sql" -o "/scripts/migrations/site-menu-configuration.sql"
+put "${local_root}/scripts/migrations/create-site-menu-configuration.php" -o "/scripts/migrations/create-site-menu-configuration.php"
+put "${local_root}/scripts/migrations/eclipse-widget-template-storage.sql" -o "/scripts/migrations/eclipse-widget-template-storage.sql"
+put "${local_root}/scripts/migrations/create-eclipse-widget-template-storage.php" -o "/scripts/migrations/create-eclipse-widget-template-storage.php"
+put "${local_root}/scripts/migrations/photography-editorial.sql" -o "/scripts/migrations/photography-editorial.sql"
+put "${local_root}/scripts/migrations/create-photography-editorial.php" -o "/scripts/migrations/create-photography-editorial.php"
+put "${local_root}/scripts/migrations/photography-editorial-v1-seeds.sql" -o "/scripts/migrations/photography-editorial-v1-seeds.sql"
+put "${local_root}/scripts/migrations/create-photography-editorial-v1-seeds.php" -o "/scripts/migrations/create-photography-editorial-v1-seeds.php"
+put "${local_root}/scripts/migrations/photography-simulated-directional-twilight.sql" -o "/scripts/migrations/photography-simulated-directional-twilight.sql"
+put "${local_root}/scripts/migrations/create-photography-simulated-directional-twilight.php" -o "/scripts/migrations/create-photography-simulated-directional-twilight.php"
+put "${local_root}/scripts/migrations/satellite-stations-menu.sql" -o "/scripts/migrations/satellite-stations-menu.sql"
+put "${local_root}/scripts/migrations/add-satellite-stations-menu.php" -o "/scripts/migrations/add-satellite-stations-menu.php"
+put "${local_root}/scripts/migrations/sources-credits-menu.sql" -o "/scripts/migrations/sources-credits-menu.sql"
+put "${local_root}/scripts/migrations/add-sources-credits-menu.php" -o "/scripts/migrations/add-sources-credits-menu.php"
+put "${local_root}/scripts/migrations/lunar-scene-presets.sql" -o "/scripts/migrations/lunar-scene-presets.sql"
+put "${local_root}/scripts/migrations/create-lunar-scene-presets.php" -o "/scripts/migrations/create-lunar-scene-presets.php"
+put "${local_root}/scripts/migrations/publish-lunar-nodes.sql" -o "/scripts/migrations/publish-lunar-nodes.sql"
+put "${local_root}/scripts/migrations/publish-lunar-nodes.php" -o "/scripts/migrations/publish-lunar-nodes.php"
 put "${local_root}/scripts/migrations/registry.php" -o "/scripts/migrations/registry.php"
 put "${local_root}/scripts/run-scheduled-tasks.php" -o "/scripts/run-scheduled-tasks.php"
+put "${local_root}/scripts/update-satellite-tles.php" -o "/scripts/update-satellite-tles.php"
 put "${local_root}/scripts/cleanup-astronomy-request-log.php" -o "/scripts/cleanup-astronomy-request-log.php"
 bye
 LFTP_MIGRATION_COMMANDS

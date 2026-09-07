@@ -67,11 +67,37 @@ upcomingAssert(count($calls) === 3, 'No se recorrieron los tres tramos en el esc
 upcomingAssert($calls[2] === ['2026-08-11', 16, '15-30'], 'El tercer tramo no cubre exclusivamente los días 15 a 30.');
 upcomingAssert(count($third['events']) === 1, 'Se perdió el evento del último tramo.');
 
+$calls = [];
+$prioritized = homeUpcomingProgressiveSearch($now, 'America/Argentina/Buenos_Aires', static function ($start, $days, $label) use (&$calls): array {
+    $calls[] = [$start, $days, $label];
+    if ($label === '1-7') {
+        return ['items' => array_map(
+            static fn(int $day): array => upcomingEvent(
+                (new DateTimeImmutable('2026-07-29T12:00:00-03:00'))->modify('+' . $day . ' days')->format(DateTimeInterface::ATOM),
+                'lunar_nodes',
+                'node-' . $day
+            ),
+            range(0, 5)
+        )];
+    }
+    if ($label === '8-14') {
+        return ['items' => array_map(
+            static fn(int $day): array => upcomingEvent(sprintf('2026-08-%02dT12:00:00-03:00', 4 + $day), 'conjunction', 'observable-' . $day),
+            range(0, 5)
+        )];
+    }
+    return ['items' => []];
+});
+upcomingAssert(count($calls) === 2, 'Los nodos de prioridad baja detuvieron antes de tiempo la búsqueda progresiva.');
+upcomingAssert(count(array_filter($prioritized['events'], static fn(array $event): bool => ($event['type'] ?? null) === 'lunar_nodes')) === 0, 'Los nodos desplazaron eventos más observacionales en portada.');
+
 $deduplicated = homeUpcomingValidEvents([
+    upcomingEvent('2026-07-28T23:30:00-03:00', 'moon_phase', 'exact-now'),
     upcomingEvent('2026-08-01T10:00:00Z', 'conjunction'),
     upcomingEvent('2026-08-01T10:00:00Z', 'conjunction'),
     upcomingEvent('2026-08-01T10:00:00Z', 'apsis'),
 ], $now, 'America/Argentina/Buenos_Aires');
 upcomingAssert(count($deduplicated) === 2, 'No se deduplicó por tipo y fecha/hora.');
+upcomingAssert(!in_array('exact-now', array_column($deduplicated, 'id'), true), 'Lo próximo conservó un evento que ya alcanzó su instante relevante.');
 
 echo "Búsqueda progresiva de Lo próximo: OK\n";

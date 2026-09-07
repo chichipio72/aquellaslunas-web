@@ -14,6 +14,9 @@ final readonly class SolarPosition
         public float $earthSunDistanceAu = 1.0,
         public float $apparentRadiusDegrees = 0.2666,
         public float $equationOfTimeMinutes = 0.0,
+        public float $rightAscensionDegrees = 0.0,
+        public float $declinationDegrees = 0.0,
+        public float $apparentEclipticLongitudeDegrees = 0.0,
     ) {
     }
 

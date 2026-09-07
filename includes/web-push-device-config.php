@@ -13,7 +13,10 @@ final class AstronomyPushSubscriptionAccessException extends RuntimeException
 function astronomyPushDeviceStartSession(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    session_name('aquellas_lunas_notifications');
+    $localSession = $_COOKIE['aquellas_lunas_local'] ?? null;
+    $sessionName = is_string($localSession) && preg_match('/^[A-Za-z0-9,-]{1,128}$/', $localSession) === 1
+        ? 'aquellas_lunas_local' : 'aquellas_lunas_notifications';
+    session_name($sessionName);
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
@@ -165,5 +168,48 @@ function astronomyPushSaveCurrentDevice(PDO $connection, array $subscriptionPayl
     }
     $input['notification_preferences'] = $normalizedPreferences;
     astronomyPushSaveDevice($connection, (int) $subscription['id'], $input);
+    return astronomyPushCurrentDeviceState($connection, $subscriptionPayload);
+}
+
+/** @return array<string,mixed> */
+function astronomyPushUpdateCurrentDeviceLocation(PDO $connection, array $subscriptionPayload, array $input): array
+{
+    $subscription = astronomyPushIdentifyCurrentSubscription($connection, $subscriptionPayload);
+    $subscriptionId = (int) $subscription['id'];
+    $locationName = trim((string) ($input['location_name'] ?? ''));
+    $latitude = $input['latitude'] ?? null;
+    $longitude = $input['longitude'] ?? null;
+    $timezoneName = trim((string) ($input['timezone'] ?? ''));
+    if ($locationName === '' || strlen($locationName) > 150 || preg_match('/[\x00-\x1F\x7F]/', $locationName)) {
+        throw new InvalidArgumentException('El nombre de la ubicación no es válido.');
+    }
+    if (!is_numeric($latitude) || !is_numeric($longitude)
+        || !is_finite((float) $latitude) || (float) $latitude < -90 || (float) $latitude > 90
+        || !is_finite((float) $longitude) || (float) $longitude < -180 || (float) $longitude > 180) {
+        throw new InvalidArgumentException('Las coordenadas de la ubicación no son válidas.');
+    }
+    try {
+        $timezone = new DateTimeZone($timezoneName);
+    } catch (Throwable $exception) {
+        throw new InvalidArgumentException('La zona horaria no es válida.', 0, $exception);
+    }
+    $configured = $connection->prepare(
+        'SELECT 1 FROM web_push_device_config WHERE subscription_id = :subscription_id'
+    );
+    $configured->execute(['subscription_id' => $subscriptionId]);
+    if ($configured->fetchColumn() === false) {
+        throw new AstronomyPushSubscriptionAccessException('Este dispositivo todavía no tiene notificaciones configuradas.');
+    }
+    $statement = $connection->prepare(
+        'UPDATE web_push_device_config SET location_name = :location_name, latitude = :latitude, '
+        . 'longitude = :longitude, timezone = :timezone WHERE subscription_id = :subscription_id'
+    );
+    $statement->execute([
+        'location_name' => $locationName,
+        'latitude' => (float) $latitude,
+        'longitude' => (float) $longitude,
+        'timezone' => $timezone->getName(),
+        'subscription_id' => $subscriptionId,
+    ]);
     return astronomyPushCurrentDeviceState($connection, $subscriptionPayload);
 }

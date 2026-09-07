@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "locale": "es-AR",
+    "status": "presentation_only",
+    "created_at": "2026-08-18",
+    "note": "Las traducciones no sustituyen los valores originales de moon-geology-auto.json ni moon-geology-experiment.json."
+  },
+  "values": {
+    "derived": "derivado",
+    "measured": "medido",
+    "modeled": "modelado",
+    "published_estimate": "estimación publicada",
+    "interpretation": "interpretación geológica",
+    "official_metadata": "metadato oficial",
+    "safe": "seguro",
+    "rays": "rayos",
+    "Copernican": "Copernicano",
+    "Eratosthenian": "Eratosteniano",
+    "Imbrian": "Ímbrico",
+    "Nectarian": "Nectárico",
+    "Pre-Nectarian": "Pre-Nectárico",
+    "Eratosthenian / Imbrian": "Eratosteniano / Ímbrico",
+    "Imbrian / Nectarian": "Ímbrico / Nectárico",
+    "Copernican Crater": "Cráter copernicano",
+    "Crater Unit": "Unidad de cráter",
+    "Measured rim-to-floor depth": "Profundidad medida entre borde y piso",
+    "Theoretical rim-to-floor depth": "Profundidad teórica entre borde y piso",
+    "Theoretical rim height": "Altura teórica del borde",
+    "Measured central peak height": "Altura medida del pico central",
+    "Point-in-polygon in the USGS Moon 2000 equidistant cylindrical projection": "Unión punto-en-polígono en la proyección cilíndrica equidistante Moon 2000 de USGS",
+    "The central coordinate of the named feature falls inside this mapped unit.": "La coordenada central del accidente nombrado cae dentro de esta unidad cartografiada.",
+    "Regional context at the central point; it does not assert that the complete named feature belongs to this unit.": "Es contexto regional en el punto central; no afirma que el accidente completo pertenezca a esta unidad."
+    ,"Adopted by IAU": "Adoptado por la IAU"
+    ,"Eratosthenian-Imbrian": "Eratosteniano-Ímbrico"
+    ,"Imbrian-Nectarian": "Ímbrico-Nectárico"
+    ,"Albedo Feature": "Accidente de albedo"
+    ,"Astronaut-named features": "Accidente nombrado por astronautas"
+    ,"Catena, catenae": "Cadena de cráteres"
+    ,"Crater, craters": "Cráter"
+    ,"Dorsum, dorsa": "Dorsal"
+    ,"Lacus, lacūs": "Lago"
+    ,"Mare, maria": "Mar"
+    ,"Mons, montes": "Monte"
+    ,"Oceanus, oceani": "Océano"
+    ,"Palus, paludes": "Pantano"
+    ,"Planitia, planitiae": "Planicie"
+    ,"Promontorium, promontoria": "Promontorio"
+    ,"Rima, rimae": "Rima"
+    ,"Rupes, rupēs": "Escarpe"
+    ,"Satellite Feature": "Accidente satélite"
+    ,"Sinus, sinūs": "Bahía"
+    ,"Statio": "Sitio de alunizaje"
+    ,"Vallis, valles": "Valle"
+  },
+  "sources": {
+    "usgs_unified_geology_v2": "Unified Geologic Map of the Moon (USGS)",
+    "lpi_crater_database_2015": "Lunar Impact Crater Database (LPI)"
+  },
+  "units": {
+    "Cc": {"name":"Cráter copernicano","description":"Depósitos del borde, las paredes y el piso de cráteres con bordes prominentes y nítidos, de contorno circular a poligonal. Brillo relativo alto y presencia de rayos.","interpretation":null},
+    "Csc": {"name":"Cráter secundario copernicano","description":"Cráteres de diámetro pequeño a muy pequeño, densamente distribuidos cerca o sobre el manto de eyección de otros cráteres.","interpretation":"Formas de cráter de impacto originadas por bloques expulsados durante el impacto primario."},
+    "EIp": {"name":"Meseta eratosteniana-ímbrica","description":"Forma mesetas elevadas respecto de las superficies de mare de Oceanus Procellarum, con domos, conos y materiales de manto oscuro.","interpretation":"Construcciones volcánicas, coladas y materiales piroclásticos."},
+    "Ec": {"name":"Cráter eratosteniano","description":"Cráteres circulares sin rayos, con crestas del borde nítidas a parcialmente suavizadas, eyección circunferencial parcial y albedo menor que la unidad Cc.","interpretation":"Morfología y materiales producidos por un impacto primario."},
+    "Em": {"name":"Mare eratosteniano","description":"Llanuras de bajo brillo relativo, con pocos cráteres suficientemente grandes para cartografiar, parches de pequeños domos, dorsales de cresta aguda y frentes de colada observables.","interpretation":"Coladas volcánicas relativamente delgadas y jóvenes o material piroclástico."},
+    "Esc": {"name":"Cráter secundario eratosteniano","description":"Cráteres de diámetro pequeño a muy pequeño, densamente distribuidos cerca o sobre el manto de eyección de otros cráteres.","interpretation":"Formas de cráter de impacto originadas por bloques expulsados durante el impacto primario."},
+    "INp": {"name":"Llanuras ímbrico-nectáricas","description":"Superficie lisa, plana a ondulada, con densidad moderada a alta de cráteres superpuestos.","interpretation":"Posiblemente materiales emplazados durante la formación de cuencas ímbricas y nectáricas."},
+    "INt": {"name":"Terreno ímbrico-nectárico","description":"Terreno suavemente ondulado, con densidad moderada a alta de cráteres.","interpretation":"Mezcla compleja de detritos erosivos locales y materiales eyectados por cráteres y cuencas; megaregolito."},
+    "Ib": {"name":"Cuenca ímbrica sin subdividir","description":"Terreno suavemente ondulado a accidentado con conjuntos de cráteres irregulares a circulares suavizados. También forma la cuenca exterior y la eyección del cráter Schrödinger.","interpretation":"Materiales emplazados durante la formación de cuencas de impacto multianulares."},
+    "Ic": {"name":"Cráter ímbrico sin subdividir","description":"Relieve topográfico suavizado respecto de impactos más jóvenes; generalmente menor de 40 km, con pisos anchos y planos y poca o ninguna eyección conservada.","interpretation":"Morfología suavizada y materiales de un impacto primario."},
+    "Ic1": {"name":"Cráter ímbrico inferior","description":"Descripción semejante a la unidad Ic, con cráteres cubiertos por materiales del grupo Orientale.","interpretation":"Morfología suavizada y materiales de un impacto primario, posteriores al grupo Imbrium pero anteriores al grupo Orientale."},
+    "Ic2": {"name":"Cráter ímbrico superior","description":"Descripción semejante a la unidad Ic; los cráteres se superponen a materiales del grupo Orientale.","interpretation":"Morfología suavizada y materiales de un impacto primario, posteriores al grupo Orientale pero anteriores a la unidad Im2."},
+    "Icc": {"name":"Cadena de cráteres ímbrica","description":"Conjuntos alargados, lineales a elípticos, de depresiones circulares a semicirculares suavizadas, cubiertas y a menudo superpuestas.","interpretation":"Agrupaciones de cráteres producidas por eyecciones de grandes impactos formadores de cuencas; posiblemente incluye impactos primarios."},
+    "Icf": {"name":"Cráter ímbrico de piso fracturado","description":"Pisos de cráter habitualmente abombados, con surcos o fracturas lineales a curvilíneas de anchura y profundidad variables. Algunos bloques entre fracturas fueron reorientados.","interpretation":"Materiales frágiles levantados y sometidos a extensión."},
+    "Id": {"name":"Manto oscuro ímbrico","description":"Algunos de los materiales de menor albedo cartografiados, generalmente próximos a los márgenes exteriores de grandes cuencas. Texturas festoneadas y lisas con cráteres pequeños.","interpretation":"Material piroclástico."},
+    "Ig": {"name":"Terreno acanalado ímbrico","description":"Cubre cráteres y otros terrenos de edad pre-nectárica a ímbrica. Los cráteres presentan surcos radiales en bordes y paredes, además de algunos montículos.","interpretation":"Origen incierto; posiblemente eyección de Imbrium o efecto de sacudidas sísmicas."},
+    "Iia": {"name":"Formación Alpes de Imbrium, ímbrica","description":"Material angular, en bloques y nudoso, con una superficie lisa y cubierta. Colinas y montículos muy próximos, de aproximadamente 2 a 5 km de diámetro.","interpretation":"Posiblemente eyección erosionada, roca de base deformada estructuralmente, o ambas."},
+    "Iiap": {"name":"Formación Apenninus de Imbrium, ímbrica","description":"Bloques gruesos paralelos al escarpe que bordea la cuenca Imbrium, con materiales intermedios lisos a ondulados.","interpretation":"Roca de base intensamente fracturada con eyección de Imbrium entre los bloques."},
+    "Iic": {"name":"Cráteres de Imbrium ímbricos","description":"Cráteres individuales menores de 25 km y agrupaciones o cadenas menores de 10 km, radiales a Imbrium. Rasgos topográficos moderadamente suavizados.","interpretation":"Cráteres secundarios y cadenas emplazados durante la formación de la cuenca Imbrium."},
+    "Iif": {"name":"Formación Fra Mauro de Imbrium, ímbrica","description":"Dorsales sinuosas, curvilíneas y rectas que recubren la superficie inferior. Textura localmente ondulada y monticulosa.","interpretation":"Eyección de la cuenca Imbrium y materiales del sustrato."},
+    "Im1": {"name":"Mare ímbrico inferior","description":"Superficies planas y lisas, de albedo relativamente mayor que Im2 pero menor que Ip, con alta densidad de cráteres superpuestos.","interpretation":"Lava basáltica antigua, posiblemente tan antigua como la cuenca Orientale."},
+    "Im2": {"name":"Mare ímbrico superior","description":"Superficies planas y lisas, con albedo y densidad de cráteres menores que Im1 y numerosas dorsales. Difícil de distinguir de Id.","interpretation":"Coladas de lava basáltica."},
+    "Imd": {"name":"Domo de mare ímbrico","description":"Edificios de pendiente fuerte, relieve alto y superficie rugosa, de forma dómica o cónica y a veces con cumbres perforadas.","interpretation":"Edificios volcánicos o lacolitos."},
+    "Iohi": {"name":"Formación Hevelius de Orientale, facies interna ímbrica","description":"Dorsales y depresiones curvilíneas a arremolinadas, principalmente radiales y subradiales respecto de la cuenca Orientale.","interpretation":"Manto continuo de eyección emplazado por el flujo hacia afuera de materiales calientes, turbulentos y móviles."},
+    "Ioho": {"name":"Formación Hevelius de Orientale, facies externa ímbrica","description":"Materiales arremolinados, alineados, monticulosos y lisos que forman un límite discontinuo e irregular.","interpretation":"Márgenes distales, progresivamente más delgados, de la eyección de la cuenca Orientale."},
+    "Iohs": {"name":"Formación Hevelius de Orientale, facies de cráteres secundarios","description":null,"interpretation":null},
+    "Iom": {"name":"Formación Maunder de Orientale, ímbrica","description":"Llanuras lisas a onduladas, intensamente fracturadas, con dorsales lineales anchas y domos suaves.","interpretation":"Principalmente fundido de impacto. Las dorsales y domos probablemente sean materiales originales del piso modificados por compresión."},
+    "Iork": {"name":"Formación Montes Rook de Orientale, facies nudosa ímbrica","description":"Materiales nudosos, monticulosos, ondulados y caóticos, con surcos y depresiones irregulares intersticiales.","interpretation":"Parte superior de la secuencia de eyección volcada de la cuenca Orientale."},
+    "Iorm": {"name":"Formación Montes Rook de Orientale, facies de macizos ímbrica","description":"Bloques lisos de gran relieve que marcan el segundo y tercer anillo de la cuenca.","interpretation":"Roca de base levantada estructuralmente y recubierta por una capa gruesa de eyección tardía."},
+    "Ip": {"name":"Llanuras ímbricas","description":"Terreno liso, plano a ondulado y de albedo intermedio, presente principalmente en depresiones topográficas y pisos de cráteres de edad ímbrica o anterior.","interpretation":"Origen ambiguo; probablemente eyección de Orientale y de otros grandes cráteres de impacto."},
+    "Isc": {"name":"Cráter secundario ímbrico","description":"Cráteres pequeños densamente distribuidos cerca o sobre el manto de eyección de otros cráteres.","interpretation":"Formas de cráter de impacto originadas por bloques expulsados durante el impacto primario."},
+    "It": {"name":"Terreno ímbrico","description":"Relieve bajo, baja densidad de cráteres, albedo moderado a alto y superficie moderadamente lisa.","interpretation":"Mezcla compleja de detritos erosivos locales y materiales eyectados por cráteres y cuencas; megaregolito."},
+    "Itd": {"name":"Domo de terreno ímbrico","description":"Contornos y características semejantes a cráteres de la secuencia principal, con flancos internos lisos, escasez de eyección, terrazas internas y cráteres secundarios.","interpretation":"Posibles diferencias en el material objetivo o calderas de flujos de ceniza."},
+    "Nb": {"name":"Cuenca nectárica sin subdividir","description":"Material de paredes elevadas y bloques deslizados de cuencas, además de conjuntos de colinas y dorsales suavizadas muy próximas.","interpretation":"Estructuras y materiales de eyección relacionados con impactos."},
+    "Nbl": {"name":"Cuenca nectárica alineada","description":"Dorsales agudas y elevadas, con áreas planas o depresiones profundas intermedias y colinas lisas con surcos estrechos.","interpretation":"Roca de base intensamente fallada por el impacto Imbrium."},
+    "Nbm": {"name":"Macizo de cuenca nectárica","description":"Bloques escarpados, habitualmente de 10 a 30 km, que forman las partes más altas y rugosas de dorsales arqueadas elevadas.","interpretation":"Roca de base levantada durante la formación de cuencas nectáricas."},
+    "Nbsc": {"name":"Cráteres secundarios de cuenca nectárica","description":"Agrupados en conjuntos, cadenas y alineaciones semejantes a surcos, principalmente periféricos y aproximadamente radiales a cuencas nectáricas.","interpretation":"Cráteres de impacto secundarios de cuencas nectáricas."},
+    "Nc": {"name":"Cráter nectárico","description":"Relieve topográfico muy suavizado respecto de impactos más jóvenes, con pisos anchos y planos normalmente ocupados por otra unidad y muy poca o ninguna eyección conservada.","interpretation":"Morfología suavizada y materiales de un impacto primario."},
+    "Nnj": {"name":"Formación Janssen de Nectaris, nectárica","description":"Terreno ondulado y suavizado con numerosos rasgos lineales, entre ellos dorsales, escarpes y surcos radiales a la cuenca Nectaris.","interpretation":"Eyección de la cuenca Nectaris, equivalente pero más degradada que las unidades Iif, Iohi e Ioho."},
+    "Np": {"name":"Llanuras nectáricas","description":"Terreno generalmente plano y de albedo moderado, con una población densa de cráteres grandes y antiguos.","interpretation":"Origen ambiguo; posible eyección de grandes impactos y eventos formadores de cuencas."},
+    "Nt": {"name":"Terreno nectárico","description":"Superficie moderadamente rugosa, con relieve ondulado a moderadamente escarpado y cráteres superpuestos y enterrados de distintas edades.","interpretation":"Mezcla compleja de detritos erosivos locales y materiales eyectados por cráteres y cuencas; megaregolito."},
+    "Ntp": {"name":"Terreno cubierto y llanuras nectáricas","description":"Superficies claras, onduladas o suavemente accidentadas, con más cráteres que la unidad Ip.","interpretation":"Eyección primaria y secundaria de cuencas nectáricas y grandes cráteres, equivalente a Ioho e Ip pero con mayor degradación erosiva."},
+    "pNb": {"name":"Cuenca pre-nectárica","description":"Anillos montañosos y segmentos arqueados de anillos suavizados y erosionados, incluidos borde, paredes y materiales de anillos internos.","interpretation":"Estructuras y materiales de eyección vinculados a impactos y degradados por erosión."},
+    "pNbm": {"name":"Macizo de cuenca pre-nectárica","description":"Grandes relieves montañosos dispuestos habitualmente en arcos continuos o discontinuos, que pasan gradualmente a topografías de menor escala.","interpretation":"Roca de base levantada durante la formación de cuencas."},
+    "pNc": {"name":"Cráter pre-nectárico","description":"Crestas del borde discontinuas y suavizadas, y restos redondeados, curvos o rectos del borde.","interpretation":"Morfología y materiales de un impacto primario degradados por erosión."},
+    "pNt": {"name":"Terreno pre-nectárico","description":"Terreno escarpado y diverso, con bordes parciales de cráteres degradados; transicional hacia la unidad Nt, más lisa, y las unidades pNbm y pNc, más rugosas.","interpretation":"Mezcla compleja de detritos erosivos locales y materiales eyectados por cráteres y cuencas; megaregolito."}
+  }
+}

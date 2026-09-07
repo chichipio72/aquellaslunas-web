@@ -385,7 +385,7 @@ En navegador comprobar:
 - scroll vertical, diagonales, zoom y ausencia de respuesta al mouse;
 - aviso de descubrimiento una vez mediante `localStorage`;
 - con timings y swipe debug activos, diagnóstico Touch y botón de destino; con sólo timings, panel ausente y navegación automática; con navegación deshabilitada, ausencia de script y contexto;
-- Analytics visible en Network/HTML en las nueve vistas públicas, o bloqueo local intencional documentado;
+- Analytics visible en Network/HTML en las vistas que cargan el include compartido, o bloqueo local intencional documentado;
 - imagen aparente de portada para más de una ubicación.
 
 ### Sintaxis PHP

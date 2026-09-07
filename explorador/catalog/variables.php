@@ -16,6 +16,10 @@ $extrema = static function (array $definition, string $label, int $minimumYears,
         'extrema_minimum_years' => $minimumYears, 'extrema_recommended_years' => $recommendedYears,
         'extrema_maximum_label' => $maximumLabel, 'extrema_minimum_label' => $minimumLabel];
 };
+$circular = static fn(array $definition): array => $definition + [
+    'phase_supported' => true, 'relation_supported' => true, 'extrema_supported' => false,
+    'circular_period' => 360,
+];
 
 return [
     'moon_illumination' => $variable('moon_illumination', 'Iluminación lunar', 'Iluminación', 'Luna', 'Fracción iluminada del disco lunar a las 00:00 locales.', '%', 'percent', 'global', 'moon_instant', [], 4, 10),
@@ -23,6 +27,9 @@ return [
     'moon_distance_geocentric' => $extrema($variable('moon_distance_geocentric', 'Distancia lunar geocéntrica', 'Distancia geocéntrica', 'Luna', 'Distancia desde el centro de la Tierra a las 00:00 locales.', 'km', 'distance', 'global', 'moon_instant', [], 2, 30), 'Distancia lunar geocéntrica', 2, 5, 'Apogeos diarios', 'Perigeos diarios'),
     'moon_distance_topocentric' => $extrema($variable('moon_distance_topocentric', 'Distancia lunar topocéntrica', 'Distancia topocéntrica', 'Observación local', 'Distancia desde el observador a las 00:00 locales.', 'km', 'distance', 'local', 'moon_instant', [], 2, 40), 'Distancia lunar topocéntrica', 2, 5, 'Máximos diarios de distancia topocéntrica', 'Mínimos diarios de distancia topocéntrica'),
     'moon_ecliptic_latitude' => $variable('moon_ecliptic_latitude', 'Latitud eclíptica lunar', 'Latitud eclíptica', 'Ciclos y geometría', 'Latitud eclíptica geocéntrica a las 00:00 locales.', '°', 'angle_signed', 'global', 'moon_instant', [], 4, 50),
+    'moon_ecliptic_longitude' => $circular($variable('moon_ecliptic_longitude', 'Longitud eclíptica lunar', 'Longitud eclíptica lunar', 'Ciclos y geometría', 'Longitud eclíptica geocéntrica aparente, referida al equinoccio verdadero de fecha, a las 00:00 locales.', '°', 'ecliptic_cycle_angle', 'global', 'moon_instant', [], 4, 51)),
+    'moon_node_angle' => $circular($variable('moon_node_angle', 'Ángulo Luna–nodo', 'Ángulo Luna–nodo', 'Ciclos y geometría', 'Argumento medio de latitud lunar. Indica la posición de la Luna dentro de su ciclo respecto de los nodos de su órbita. Cerca de 0° cruza el nodo ascendente y cerca de 180° el descendente.', '°', 'ecliptic_cycle_angle', 'global', 'moon_instant', [], 4, 52)),
+    'moon_mean_ascending_node_longitude' => $circular($variable('moon_mean_ascending_node_longitude', 'Longitud del nodo ascendente medio', 'Nodo ascendente medio', 'Ciclos y geometría', 'Longitud eclíptica del nodo ascendente medio de la órbita lunar, referida al equinoccio medio de fecha, a las 00:00 locales.', '°', 'ecliptic_cycle_angle', 'global', 'moon_instant', [], 4, 53)),
     'moon_right_ascension' => $variable('moon_right_ascension', 'Ascensión recta lunar', 'Ascensión recta', 'Ciclos y geometría', 'Ascensión recta geocéntrica a las 00:00 locales.', 'h', 'hours_angle', 'global', 'moon_instant', [], 5, 60),
     'moon_declination' => $variable('moon_declination', 'Declinación lunar', 'Declinación', 'Ciclos y geometría', 'Declinación geocéntrica a las 00:00 locales.', '°', 'angle_signed', 'global', 'moon_instant', [], 4, 70),
     'moon_altitude' => $variable('moon_altitude', 'Altura lunar', 'Altura lunar', 'Observación local', 'Altura topocéntrica sin refracción a las 00:00 locales.', '°', 'altitude', 'local', 'moon_instant', [], 4, 80),
@@ -33,6 +40,7 @@ return [
     'sun_azimuth' => $variable('sun_azimuth', 'Azimut solar', 'Azimut solar', 'Sol', 'Azimut topocéntrico a las 00:00 locales.', '°', 'azimuth', 'local', 'sun_instant', [], 4, 120),
     'sun_distance_km' => $variable('sun_distance_km', 'Distancia Tierra–Sol', 'Distancia Tierra–Sol', 'Sol', 'Distancia entre el centro de la Tierra y el Sol en la fecha indicada.', 'km', 'solar_distance', 'global', 'sun_instant', [], 0, 130),
     'sun_equation_of_time_minutes' => $variable('sun_equation_of_time_minutes', 'Ecuación del tiempo', 'Ecuación del tiempo', 'Sol', 'Tiempo solar aparente menos tiempo solar medio a las 00:00 locales. Un valor positivo indica que el reloj solar está adelantado respecto del tiempo solar medio; uno negativo, atrasado.', 'min', 'equation_of_time', 'global', 'sun_instant', [], 3, 140),
+    'sun_node_angle' => $circular($variable('sun_node_angle', 'Ángulo Sol–nodo', 'Ángulo Sol–nodo', 'Ciclos y geometría', 'Diferencia entre la longitud eclíptica aparente del Sol y el nodo ascendente medio lunar. Cuando se acerca a 0° o 180° se abre aproximadamente una temporada de eclipses.', '°', 'ecliptic_cycle_angle', 'global', 'sun_instant', [], 4, 141)),
     'moonrise_time' => $variable('moonrise_time', 'Hora de salida lunar', 'Salida lunar', 'Luna', 'Hora local decimal de la primera salida lunar del día.', 'hora local', 'local_time', 'local', 'moon_events', [], 4, 210),
     'moonset_time' => $variable('moonset_time', 'Hora de puesta lunar', 'Puesta lunar', 'Luna', 'Hora local decimal de la primera puesta lunar del día.', 'hora local', 'local_time', 'local', 'moon_events', [], 4, 220),
     'moonrise_azimuth' => $variable('moonrise_azimuth', 'Azimut de salida lunar', 'Azimut salida lunar', 'Observación local', 'Azimut lunar calculado en el instante de salida.', '°', 'azimuth', 'local', 'moon_events', [], 3, 230),

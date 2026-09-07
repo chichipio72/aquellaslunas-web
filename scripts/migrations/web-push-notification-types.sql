@@ -25,7 +25,7 @@ INSERT IGNORE INTO web_push_notification_types
      default_delivery_day_offset, default_quiet_policy, sort_order)
 VALUES
     ('moonrise', 'Salida de la Luna', 'Aviso previo a la salida local de la Luna.', 1, 0,
-     'La Luna sale en {lead_minutes} minutos',
+     'La Luna sale pronto',
      'Salida prevista a las {event_time} en {location_name}.', './sol-y-luna.php',
      'before_event', 15, NULL, 0, 'omit', 10),
     ('test', 'Prueba del sistema', 'Notificación real programada desde la administración.', 1, 1,

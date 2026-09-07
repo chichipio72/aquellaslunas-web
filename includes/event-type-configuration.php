@@ -85,7 +85,7 @@ function astronomyEventTypeCatalog(): array
         $add(astronomyEventTypeDefinition('persisted', 'lunar_apsis', $type, 'apsis', $type, 'orbit', $name, 'apsis', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));
     }
     foreach (['ascending_node' => 'Nodo lunar ascendente', 'descending_node' => 'Nodo lunar descendente'] as $type => $name) {
-        $add(astronomyEventTypeDefinition('persisted', 'lunar_orbit', $type, 'lunar_nodes', $type, 'orbit', $name, 'node', false, []));
+        $add(astronomyEventTypeDefinition('persisted', 'lunar_orbit', $type, 'lunar_nodes', $type, 'orbit', $name, 'node', true, [ASTRONOMY_EVENT_SURFACE_HOME_UPCOMING, ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_EVENTS]));
     }
     foreach (['libration_east' => 'Libración hacia el este', 'libration_west' => 'Libración hacia el oeste', 'libration_north' => 'Libración hacia el norte', 'libration_south' => 'Libración hacia el sur'] as $type => $name) {
         $add(astronomyEventTypeDefinition('persisted', 'lunar_libration', $type, 'libration', $type, 'librations', $name, 'libration', true, [ASTRONOMY_EVENT_SURFACE_TODAY, ASTRONOMY_EVENT_SURFACE_TONIGHT, ASTRONOMY_EVENT_SURFACE_EVENTS], true));

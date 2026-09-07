@@ -1,5 +1,12 @@
 # Entrega del motor astronómico PHP
 
+> Documento acumulativo de entrega y evolución. Para el estado integrado actual
+> de páginas, Three.js, fuentes y operación consultar
+> [`../docs/funcionalidades-y-motor.md`](../docs/funcionalidades-y-motor.md) y
+> [`../docs/infraestructura-y-operacion.md`](../docs/infraestructura-y-operacion.md).
+> Las menciones a la integración lunar inicial son históricas: hoy conviven
+> superficies Three.js delimitadas, PNG estáticos y fallbacks.
+
 ## 1. Unidad portable
 
 El directorio integrado que constituye la unidad portable es:
@@ -45,8 +52,9 @@ Requisitos declarados y comprobados:
 - `ext-gd` con soporte PNG sólo para ejecutar `MoonImageRenderer`;
 - SPL para excepciones e interfaces incluidas con PHP.
 
-La integración productiva sirve 404 PNG precalculados y rota la imagen en CSS,
-por lo que no requiere GD en runtime. El motor tampoco requiere `ext-mbstring`,
+La integración pública actual combina superficies Three.js delimitadas con la
+colección de 404 PNG y fallbacks; no invoca `MoonImageRenderer` como renderer
+principal, por lo que no requiere GD para el núcleo. El motor tampoco requiere `ext-mbstring`,
 `ext-curl`, extensiones de base de datos, procesos
 externos ni dependencias Composer adicionales. El código de `src/` no depende
 de Docker, Python, HTTP, PostgreSQL, MariaDB/MySQL, HTML ni del laboratorio.
@@ -298,8 +306,8 @@ docs/php-lunar-events.md
 docs/php-derived-observation-events.md
 docs/php-events-facade.md
 docs/php-altitude-profile.md
-docs/php-moon-image.md
-docs/php-tonight.md
+docs/funcionalidades-y-motor.md
+docs/arquitectura.md
 ```
 
 Estos documentos no son necesarios para ejecutar el motor.

@@ -52,6 +52,11 @@ function astronomyEventPercent($value): ?string
 
 function astronomyEventConjunctionObject(array $event): string
 {
+    $details = is_array($event['details'] ?? null) ? $event['details'] : [];
+    $objectName = is_string($details['object_name'] ?? null) ? trim($details['object_name']) : '';
+    if ($objectName !== '') {
+        return $objectName;
+    }
     $title = is_string($event['title'] ?? null) ? trim($event['title']) : '';
     $name = preg_replace('/^Conjunción\s+Luna\s*[–-]\s*/u', '', $title);
     return is_string($name) && $name !== '' && $name !== $title ? $name : astronomyEditorialText('event.fallback.object');
@@ -520,6 +525,20 @@ function astronomyEventPresentation(array $event, string $timezoneName): array
                 ? astronomyEventMinuteQuantity(abs((int) round((float) $details['difference_minutes'])))
                 : null,
             'Altura lunar' => ($value = astronomyEventNumber($details['moon_altitude_degrees'] ?? null, 1)) !== null ? $value . '°' : null,
+        ]);
+        return astronomyEventApplyConfiguredBaseName($event, $presentation);
+    }
+
+    if ($type === 'lunar_nodes' && in_array($subtype, ['ascending_node', 'descending_node'], true)) {
+        $direction = $subtype === 'ascending_node' ? 'ascending' : 'descending';
+        $presentation['title'] = astronomyEditorialText('event.node.' . $direction . '.title');
+        $presentation['summary'] = astronomyEditorialText('event.node.' . $direction . '.summary');
+        $presentation['explanation'] = astronomyEditorialText('event.node.eclipse_explanation');
+        $presentation['technical_details'] = astronomyEventTechnicalDetails([
+            'Tipo de nodo' => astronomyEditorialText('event.node.' . $direction . '.label'),
+            'Distancia lunar' => ($value = astronomyEventNumber($details['moon_distance_km'] ?? null, 0)) !== null ? $value . ' km' : null,
+            'Longitud eclíptica' => ($value = astronomyEventNumber($details['ecliptic_longitude_degrees'] ?? null, 2)) !== null ? $value . '°' : null,
+            'Latitud eclíptica' => ($value = astronomyEventNumber($details['ecliptic_latitude_degrees'] ?? null, 3)) !== null ? $value . '°' : null,
         ]);
         return astronomyEventApplyConfiguredBaseName($event, $presentation);
     }

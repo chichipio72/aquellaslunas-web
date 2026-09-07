@@ -41,7 +41,11 @@ eclipseDetailAssert(astronomyEclipseDetailId($event) === astronomyEclipseDetailI
 
 ob_start();
 renderAstronomyEclipseDetailTrigger($event, 'Datos técnicos');
-renderAstronomyEclipseDetailTemplate($event, 'America/Argentina/Buenos_Aires', 'Buenos Aires', 'https://example.test/eclipses.php');
+renderAstronomyEclipseDetailTemplate($event, 'America/Argentina/Buenos_Aires', 'Buenos Aires', 'https://example.test/eclipses.php', null, [
+    'latitude' => -34.6037,
+    'longitude' => -58.3816,
+    'elevation_meters' => 0,
+]);
 renderAstronomyEclipseModal();
 $html = ob_get_clean();
 eclipseDetailAssert(substr_count($html, 'eclipse-detail-' . astronomyEclipseDetailId($event)) >= 2, 'Acción y plantilla no comparten identificador.');
@@ -49,6 +53,7 @@ eclipseDetailAssert(str_contains($html, 'Datos técnicos'), 'Falta la acción un
 eclipseDetailAssert(str_contains($html, 'No visible desde tu ubicación'), 'Falta el aviso explícito de no visibilidad.');
 eclipseDetailAssert(!str_contains($html, 'eclipse-detail-world-map'), 'El mapa ausente dejó un bloque vacío.');
 eclipseDetailAssert(str_contains($html, 'Agendar evento'), 'El modal no incluye la opción de agenda.');
+eclipseDetailAssert(str_contains($html, '<iframe') && str_contains($html, 'date=2027-02-06'), 'El detalle no reemplazó la fotografía por el widget contextual.');
 eclipseDetailAssert(substr_count($html, '<dialog id="eclipses-modal"') === 1, 'El modal compartido se duplicó.');
 
 echo "Detalle compartido de eclipses: OK\n";

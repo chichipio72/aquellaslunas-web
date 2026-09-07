@@ -9,12 +9,17 @@ if (!is_string($html)) {
     throw new RuntimeException('No se pudo preparar la interfaz del Explorador.');
 }
 
-$html = str_replace(
-    '<link rel="stylesheet" href="assets/explorador.css?v=20260804-1">',
-    '<link rel="stylesheet" href="assets/explorador.css?v=20260804-1">' . "\n"
-        . '    <link rel="stylesheet" href="assets/pruebas-interfaz.css?v=20260805-3&amp;layout=12">',
-    $html
-);
+$stylesheetInsertions = 0;
+$html = preg_replace(
+    '#(<link rel="stylesheet" href="assets/explorador\.css\?v=[^"]+">)#',
+    '$1' . "\n" . '    <link rel="stylesheet" href="assets/pruebas-interfaz.css?v=20260902-1&amp;layout=13">',
+    $html,
+    1,
+    $stylesheetInsertions
+) ?? $html;
+if ($stylesheetInsertions !== 1) {
+    throw new RuntimeException('No se pudo integrar la hoja de estilos de la interfaz principal del Explorador.');
+}
 $html = str_replace('<body class="explorer-page"', '<body class="explorer-page interface-test-page"', $html);
 $html = preg_replace_callback(
     '#<div class="date-grid">\s*'
@@ -45,7 +50,7 @@ $html = preg_replace_callback(
 ) ?? $html;
 $html = preg_replace(
     '#(<script src="assets/explorador\.js\?v=[^"]+"></script>)#',
-    '<script src="assets/pruebas-interfaz.js?v=20260805-3&amp;layout=12"></script>' . "\n" . '$1',
+    '<script src="assets/pruebas-interfaz.js?v=20260902-1&amp;layout=13"></script>' . "\n" . '$1',
     $html,
     1
 ) ?? $html;

@@ -9,6 +9,7 @@
     let lastInstallSource = 'browser';
     let installIntentActive = false;
     let installIntentTimer = null;
+    let installOutcomePending = false;
     if (!('deferredInstallPrompt' in window)) window.deferredInstallPrompt = null;
 
     function canUseStorage() {
@@ -152,17 +153,75 @@
         });
     }
 
-    function updateEmbeddedTriggers(context) {
-        if (isInstalledApp()) {
-            document.querySelectorAll('[data-install-trigger]').forEach(function (trigger) {
-                trigger.hidden = true;
-            });
-            return;
+    function getInstallExperienceState() {
+        const platform = getPlatform();
+        const browser = getBrowser();
+        const embedded = getEmbeddedBrowserContext();
+        if (isInstalledApp() || installOutcomePending) {
+            return { kind: 'installed', visible: false };
         }
-        if (!context.embedded) return;
+        if (embedded.embedded) {
+            return {
+                kind: 'open_external_browser',
+                visible: true,
+                label: embedded.isIOS ? 'Cómo abrir en Safari' : 'Abrir en el navegador',
+                title: 'Abrí Aquellas Lunas en tu navegador',
+                copy: `El navegador interno de ${embedded.providerLabel} no permite instalar la aplicación ni agregar un acceso directo.`,
+                help: embeddedInstructions(embedded),
+            };
+        }
+        if (platform.isIOS) {
+            return {
+                kind: 'ios_home_screen',
+                visible: true,
+                label: 'Agregar a pantalla de inicio',
+                title: 'Agregar Aquellas Lunas a la pantalla de inicio',
+                copy: 'En iPhone y iPad esta acción se completa manualmente desde Safari.',
+                help: 'Abrí Compartir, elegí “Agregar a pantalla de inicio” y confirmá con Agregar.',
+            };
+        }
+        if (window.deferredInstallPrompt) {
+            return {
+                kind: 'pwa',
+                visible: true,
+                label: 'Instalar aplicación',
+                title: 'Instalar Aquellas Lunas',
+                copy: 'Instalá Aquellas Lunas como aplicación para abrirla en modo independiente.',
+                help: '',
+            };
+        }
+        if (platform.isAndroid) {
+            return {
+                kind: 'shortcut',
+                visible: true,
+                label: 'Agregar acceso directo',
+                title: 'Agregar un acceso directo',
+                copy: 'El navegador no ofrece ahora la instalación de la aplicación. Podés crear un acceso directo manualmente.',
+                help: 'Abrí el menú del navegador y elegí “Agregar a pantalla de inicio” o “Agregar a pantalla principal”.',
+            };
+        }
+        if (platform.isDesktop && ['chrome', 'edge'].includes(browser)) {
+            return {
+                kind: 'shortcut',
+                visible: true,
+                label: 'Agregar acceso directo',
+                title: 'Agregar un acceso directo',
+                copy: 'El navegador no ofrece ahora la instalación de la aplicación. Podés crear un acceso directo manualmente.',
+                help: browser === 'edge'
+                    ? 'Abrí el menú de Edge y buscá la opción para crear un acceso directo a esta página.'
+                    : 'Abrí el menú de Chrome, entrá en “Transmitir, guardar y compartir” y elegí “Crear acceso directo”.',
+            };
+        }
+        return { kind: 'unavailable', visible: false };
+    }
+
+    function updateInstallTriggers(state) {
         document.querySelectorAll('[data-install-trigger]').forEach(function (trigger) {
-            trigger.textContent = context.isAndroid ? 'Abrir en el navegador' : 'Cómo abrir en Safari';
-            trigger.setAttribute('aria-label', context.isAndroid ? 'Abrir Aquellas Lunas en el navegador' : 'Ver cómo abrir Aquellas Lunas en Safari');
+            trigger.hidden = !state.visible;
+            if (!state.visible) return;
+            trigger.textContent = state.label;
+            trigger.setAttribute('aria-label', state.label + ' para Aquellas Lunas');
+            trigger.dataset.installState = state.kind;
         });
     }
 
@@ -175,16 +234,16 @@
         const status = document.querySelector('[data-install-status]');
         const title = document.querySelector('[data-install-title]');
         const copy = document.querySelector('[data-install-copy]');
-        const platform = getPlatform();
         const embedded = getEmbeddedBrowserContext();
+        const state = getInstallExperienceState();
 
-        updateEmbeddedTriggers(embedded);
+        updateInstallTriggers(state);
 
         if (!card || !actionButton) {
             return;
         }
 
-        if (isInstalledApp()) {
+        if (!state.visible) {
             card.hidden = true;
             if (status) {
                 status.textContent = '';
@@ -192,21 +251,15 @@
             return;
         }
 
-        if (embedded.embedded) {
+        if (state.kind === 'open_external_browser') {
             if (embeddedNoticeDismissed()) {
                 card.hidden = true;
                 return;
             }
             card.hidden = false;
-            if (title) {
-                title.textContent = 'Abrí Aquellas Lunas en tu navegador';
-            }
-            if (copy) {
-                copy.textContent = embedded.isIOS
-                    ? `Para instalar Aquellas Lunas como app, abrila primero en Safari. El navegador interno de ${embedded.providerLabel} no permite completar la instalación.`
-                    : `Para instalar Aquellas Lunas como app, abrila primero en tu navegador. El navegador interno de ${embedded.providerLabel} no permite completar la instalación.`;
-            }
-            actionButton.textContent = embedded.isAndroid ? 'Abrir en el navegador' : 'Ver cómo abrir en Safari';
+            if (title) title.textContent = state.title;
+            if (copy) copy.textContent = state.copy;
+            actionButton.textContent = state.label;
             if (secondaryButton) secondaryButton.hidden = true;
             if (helpToggle) helpToggle.hidden = true;
             if (helpPanel) {
@@ -226,68 +279,12 @@
         }
 
         card.hidden = false;
-
-        if (platform.isIOS) {
-            actionButton.textContent = 'Agregar a pantalla de inicio';
-            if (secondaryButton) {
-                secondaryButton.hidden = true;
-            }
-            if (helpToggle) {
-                helpToggle.hidden = false;
-            }
-            if (copy) {
-                copy.textContent = 'Guardá Aquellas Lunas en tu dispositivo para abrirla con un toque desde la pantalla de inicio.';
-            }
-            if (title) {
-                title.textContent = 'Tené Aquellas Lunas a mano';
-            }
-            if (helpPanel) {
-                helpPanel.hidden = true;
-            }
-            return;
-        }
-
-        if (platform.isAndroid) {
-            actionButton.textContent = 'Instalar';
-            if (secondaryButton) {
-                secondaryButton.hidden = true;
-            }
-            if (helpToggle) {
-                helpToggle.hidden = true;
-            }
-            if (copy) {
-                copy.textContent = 'Instalá la web como aplicación en tu Android para abrirla desde la pantalla de inicio.';
-            }
-            if (title) {
-                title.textContent = 'Tené Aquellas Lunas a mano';
-            }
-            if (helpPanel) {
-                helpPanel.hidden = true;
-            }
-            return;
-        }
-
-        if (platform.isDesktop) {
-            actionButton.textContent = 'Instalar como aplicación';
-            if (secondaryButton) {
-                secondaryButton.hidden = false;
-            }
-            if (helpToggle) {
-                helpToggle.hidden = true;
-            }
-            if (copy) {
-                copy.textContent = 'Guardá la web como una app de escritorio o como favorita para volver a abrirla rápido.';
-            }
-            if (title) {
-                title.textContent = 'Tené Aquellas Lunas a mano';
-            }
-            if (helpPanel) {
-                helpPanel.hidden = true;
-            }
-            return;
-        }
-
-        card.hidden = true;
+        actionButton.textContent = state.label;
+        if (secondaryButton) secondaryButton.hidden = true;
+        if (helpToggle) helpToggle.hidden = true;
+        if (copy) copy.textContent = state.copy;
+        if (title) title.textContent = state.title;
+        if (helpPanel) helpPanel.hidden = true;
     }
 
     function showTemporaryStatus(message) {
@@ -422,10 +419,11 @@
 
     function showEmbeddedNotice(trigger, context) {
         if (embeddedNoticeDismissed()) return;
+        const state = getInstallExperienceState();
         showInstallNotice(trigger, {
-            title: 'Abrí Aquellas Lunas en tu navegador',
-            copy: `El navegador interno de ${context.providerLabel} no permite completar la instalación.`,
-            help: embeddedInstructions(context),
+            title: state.title,
+            copy: state.copy,
+            help: state.help,
             external: context.isAndroid,
         });
     }
@@ -473,6 +471,7 @@
             prompt.prompt();
             const choice = await prompt.userChoice;
             if (choice?.outcome === 'accepted') {
+                installOutcomePending = true;
                 if (!installAcceptedTracked) {
                     installAcceptedTracked = true;
                     trackInstallEvent('pwa_install_accepted', source, 'user_choice');
@@ -491,12 +490,12 @@
 
     async function runInstallAction(event, trigger) {
         event.preventDefault();
-        const platform = getPlatform();
         const embedded = getEmbeddedBrowserContext();
+        const state = getInstallExperienceState();
         const source = installSource(trigger);
         lastInstallSource = source;
-        if (isInstalledApp()) return;
-        if (embedded.embedded) {
+        if (state.kind === 'installed' || state.kind === 'unavailable') return;
+        if (state.kind === 'open_external_browser') {
             trackInstallEvent('pwa_embedded_browser_notice', source, embedded.provider || 'embedded');
             const card = document.querySelector('[data-install-card]');
             if (!card || card.hidden) showEmbeddedNotice(trigger, embedded);
@@ -508,42 +507,27 @@
             }
             return;
         }
-        if (platform.isIOS) {
-            trackInstallEvent('pwa_ios_instructions', source, 'open_instructions');
-            showHelpPanel();
-            showTemporaryStatus('Abrí el menú de compartir para agregar la web a la pantalla de inicio.');
-            const card = document.querySelector('[data-install-card]');
-            if (source === 'menu' && (!card || card.hidden)) {
-                showInstallNotice(trigger, {
-                    title: 'Instalá Aquellas Lunas desde Safari',
-                    copy: 'Abrí el menú Compartir y elegí “Agregar a pantalla de inicio”.',
-                    help: 'Después confirmá con Agregar.',
-                    external: false,
-                });
-            }
+        if (state.kind === 'ios_home_screen' || state.kind === 'shortcut') {
+            const eventName = state.kind === 'ios_home_screen' ? 'pwa_ios_instructions' : 'pwa_shortcut_instructions';
+            trackInstallEvent(eventName, source, 'open_instructions');
+            showInstallNotice(trigger, {
+                title: state.title,
+                copy: state.copy,
+                help: state.help,
+                external: false,
+            });
+            showTemporaryStatus(state.help);
             return;
         }
-
-        trackInstallEvent('pwa_install_prompt', source, window.deferredInstallPrompt ? 'prompt_available' : 'prompt_unavailable');
-        if (window.deferredInstallPrompt) {
+        if (state.kind === 'pwa') {
+            trackInstallEvent('pwa_install_prompt', source, 'prompt_available');
             const outcome = await requestNativeInstall(source);
             if (outcome === 'accepted') showTemporaryStatus('La instalación quedó solicitada.');
-            else if (outcome === 'dismissed') showTemporaryStatus('La instalación no se completó.');
+            else if (outcome === 'dismissed') showTemporaryStatus('La instalación no se completó. Podés agregar un acceso directo desde el menú del navegador.');
             else showTemporaryStatus('No se pudo abrir el diálogo de instalación.');
+            updateCardContent();
             return;
         }
-
-        if (platform.isAndroid) {
-            showTemporaryStatus('Tu navegador todavía no ofrece la instalación desde esta página.');
-            return;
-        }
-
-        if (platform.isDesktop) {
-            showTemporaryStatus('Tu navegador no ofrece la instalación como app en este momento.');
-            return;
-        }
-
-        showTemporaryStatus('Esta opción no está disponible en este dispositivo.');
     }
 
     function showFavoritesHelp(source) {
@@ -666,6 +650,7 @@
     });
 
     window.addEventListener('appinstalled', function () {
+        installOutcomePending = true;
         if (!installAcceptedTracked) {
             installAcceptedTracked = true;
             trackInstallEvent('pwa_install_accepted', lastInstallSource, 'appinstalled');
@@ -674,12 +659,22 @@
         if (card) {
             card.hidden = true;
         }
+        document.querySelectorAll('[data-install-trigger]').forEach(function (trigger) {
+            trigger.hidden = true;
+        });
         closeInstallIntentDialog();
         finishInstallIntent();
         clearDismissedUntil();
     });
 
-    window.aquellasLunasInstallContext = { getEmbeddedBrowserContext, addInstallIntent, androidChromeIntent, hasInstallIntent, isInstalledApp };
+    window.aquellasLunasInstallContext = {
+        getEmbeddedBrowserContext,
+        getInstallExperienceState,
+        addInstallIntent,
+        androidChromeIntent,
+        hasInstallIntent,
+        isInstalledApp,
+    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);

@@ -4,6 +4,7 @@ require_once __DIR__ . '/event-presentation.php';
 require_once __DIR__ . '/calendar-event.php';
 require_once __DIR__ . '/asset-url.php';
 require_once __DIR__ . '/date-format.php';
+require_once __DIR__ . '/eclipse-widget-embed.php';
 
 function astronomyEclipseDetailModel(array $event, string $timezoneName): array
 {
@@ -184,7 +185,8 @@ function renderAstronomyEclipseDetailTemplate(
     string $timezoneName,
     string $locationLabel,
     string $pageUrl,
-    ?array $image = null
+    ?array $image = null,
+    ?array $location = null
 ): void {
     $id = astronomyEclipseDetailId($event);
     $templateId = 'eclipse-detail-' . $id;
@@ -198,7 +200,8 @@ function renderAstronomyEclipseDetailTemplate(
                 <h2><?= htmlspecialchars($model['title']) ?></h2>
                 <p><?= htmlspecialchars($model['date_label']) ?> · <?= htmlspecialchars($model['time_label']) ?> (hora local)</p>
             </header>
-            <?php if ($image !== null): ?><figure class="eclipse-detail-image"><img src="<?= htmlspecialchars($image['url']) ?>" alt="<?= htmlspecialchars($model['title']) ?>" loading="lazy"><figcaption><?= htmlspecialchars($image['label']) ?></figcaption></figure><?php endif; ?>
+            <?php $widgetRendered = $location !== null && renderAstronomyEclipseWidget($event, $timezoneName, $location, $model['title']); ?>
+            <?php if (!$widgetRendered && $image !== null): ?><figure class="eclipse-detail-image"><img src="<?= htmlspecialchars($image['url']) ?>" alt="<?= htmlspecialchars($model['title']) ?>" loading="lazy"><figcaption><?= htmlspecialchars($image['label']) ?></figcaption></figure><?php endif; ?>
             <?php if ($model['general_rows'] !== []): ?><section class="eclipse-detail-general" aria-labelledby="<?= $templateId ?>-general"><h3 id="<?= $templateId ?>-general">Datos generales</h3><dl class="eclipse-detail-facts"><?php foreach ($model['general_rows'] as $row): ?><div><dt><?= htmlspecialchars($row['label']) ?></dt><dd><?= htmlspecialchars($row['value']) ?></dd></div><?php endforeach; ?></dl></section><?php endif; ?>
             <section class="eclipse-detail-local" aria-labelledby="<?= $templateId ?>-local">
                 <h3 id="<?= $templateId ?>-local">Desde tu ubicación</h3>

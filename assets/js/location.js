@@ -87,6 +87,89 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+document.addEventListener('DOMContentLoaded', async () => {
+  const form = document.getElementById('global-location-form');
+  const syncPanel = form?.querySelector('[data-location-notification-sync]');
+  const syncInput = form?.elements.sync_notification_location;
+  const currentLabel = form?.querySelector('[data-notification-location-current]');
+  if (!form || !syncPanel || !syncInput || !('serviceWorker' in navigator)) return;
+
+  const configUrl = form.dataset.deviceConfigUrl || '';
+  const csrfToken = form.dataset.deviceCsrf || '';
+  let subscription = null;
+  const pushRequest = async (action, extra = {}) => {
+    const response = await fetch(configUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({action, csrf_token: csrfToken, subscription: subscription.toJSON(), ...extra}),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) throw new Error('No se pudo sincronizar la ubicación de las notificaciones.');
+    return result.state;
+  };
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('./');
+    subscription = await registration?.pushManager?.getSubscription();
+    if (!subscription) return;
+    const state = await pushRequest('read');
+    if (state?.configured !== true || !state.device) return;
+    currentLabel.textContent = `Actualmente: ${state.device.location_name}`;
+    syncPanel.hidden = false;
+  } catch (_) {
+    return;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    if (!syncInput.checked || !subscription) return;
+    event.preventDefault();
+    const submitter = event.submitter;
+    if (submitter) submitter.disabled = true;
+    try {
+      const response = await fetch(form.action || window.location.href, {
+        method: 'POST',
+        headers: {'Accept': 'application/json'},
+        credentials: 'same-origin',
+        body: new FormData(form),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true || !result.location || !result.redirect) {
+        throw new Error(typeof result.message === 'string' ? result.message : 'No se pudo guardar la ubicación.');
+      }
+      try {
+        await pushRequest('update_location', {location: {
+          location_name: result.location.name,
+          latitude: result.location.latitude,
+          longitude: result.location.longitude,
+          timezone: result.location.timezone,
+        }});
+      } catch (_) {
+        const status = document.getElementById('location-map-status');
+        if (status) {
+          status.textContent = 'La ubicación general se guardó, pero no se pudo actualizar la ubicación de las notificaciones.';
+          status.classList.add('is-error');
+        }
+        if (submitter) submitter.disabled = false;
+        syncInput.checked = false;
+        return;
+      }
+      const target = new URL(result.redirect, window.location.href);
+      if (target.pathname === window.location.pathname && target.searchParams.get('saved') === '1') {
+        target.searchParams.set('notification_sync', 'ok');
+      }
+      window.location.assign(target.href);
+    } catch (error) {
+      const status = document.getElementById('location-map-status');
+      if (status) {
+        status.textContent = error.message;
+        status.classList.add('is-error');
+      }
+      if (submitter) submitter.disabled = false;
+    }
+  });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const panel = document.querySelector('[data-location-intro]');
   const trigger = document.querySelector('[data-location-intro-trigger]');

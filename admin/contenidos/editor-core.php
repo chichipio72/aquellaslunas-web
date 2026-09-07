@@ -5,6 +5,256 @@ require_once __DIR__ . '/../../includes/web-database.php';
 
 const CONTENT_EDITOR_CSRF_KEY = 'content_editor_csrf';
 const CONTENT_PACKAGE_FORMAT_VERSION = 1;
+const CONTENT_REVIEW_FORMAT_VERSION = 1;
+
+/**
+ * @return array{version: int, articulos: array<int, array{slug: string, titulo: string, visible: bool, resumen: string, palabras_clave: array<int, string>, relaciones: array<int, string>}>}
+ */
+function contentEditorDbReviewExport(PDO $connection): array
+{
+    $statement = $connection->query(
+        'SELECT id, slug, titulo, visible, resumen FROM contenido_articulos ORDER BY titulo ASC, slug ASC'
+    );
+    $words = $connection->prepare(
+        'SELECT palabra_clave FROM contenido_articulos_palabras_clave WHERE articulo_id = :id ORDER BY orden ASC, palabra_clave ASC'
+    );
+    $relations = $connection->prepare(
+        'SELECT slug_relacionado FROM contenido_articulos_relaciones WHERE articulo_id = :id ORDER BY orden ASC, slug_relacionado ASC'
+    );
+    $articles = [];
+    foreach ($statement as $row) {
+        $articleId = (int) $row['id'];
+        $words->execute(['id' => $articleId]);
+        $relations->execute(['id' => $articleId]);
+        $articles[] = [
+            'slug' => (string) $row['slug'],
+            'titulo' => (string) $row['titulo'],
+            'visible' => (int) $row['visible'] === 1,
+            'resumen' => (string) $row['resumen'],
+            'palabras_clave' => array_map('strval', $words->fetchAll(PDO::FETCH_COLUMN)),
+            'relaciones' => array_map('strval', $relations->fetchAll(PDO::FETCH_COLUMN)),
+        ];
+    }
+    return ['version' => CONTENT_REVIEW_FORMAT_VERSION, 'articulos' => $articles];
+}
+
+function contentEditorReviewJson(PDO $connection): string
+{
+    $json = json_encode(
+        contentEditorDbReviewExport($connection),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
+    if (!is_string($json)) {
+        throw new RuntimeException('No se pudo generar el JSON de revisión editorial.');
+    }
+    return $json . "\n";
+}
+
+/** @return array<int, string>|null */
+function contentEditorReviewStringList($value): ?array
+{
+    if (!is_array($value) || !array_is_list($value)) {
+        return null;
+    }
+    $result = [];
+    $seen = [];
+    foreach ($value as $item) {
+        if (!is_string($item)) {
+            return null;
+        }
+        $item = trim($item);
+        if ($item === '' || isset($seen[$item])) {
+            continue;
+        }
+        $seen[$item] = true;
+        $result[] = $item;
+    }
+    return $result;
+}
+
+/** @return array<int, string>|null */
+function contentEditorReviewRelationList($value, array &$duplicates): ?array
+{
+    $duplicates = [];
+    if (!is_array($value) || !array_is_list($value)) {
+        return null;
+    }
+    $result = [];
+    $seen = [];
+    foreach ($value as $item) {
+        if (!is_string($item)) {
+            return null;
+        }
+        $item = trim($item);
+        if ($item === '') {
+            continue;
+        }
+        if (isset($seen[$item])) {
+            $duplicates[] = $item;
+            continue;
+        }
+        $seen[$item] = true;
+        $result[] = $item;
+    }
+    return $result;
+}
+
+/**
+ * @return array{valid: bool, errors: array<int, array{field: string, message: string}>, changes: array<int, array>, summary: array}
+ */
+function contentEditorDbPreviewReview(PDO $connection, string $json): array
+{
+    $errors = [];
+    try {
+        $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+    } catch (Throwable $exception) {
+        return ['valid' => false, 'errors' => [astronomyContentError('json', 'El JSON no es válido: ' . $exception->getMessage())], 'changes' => [], 'summary' => []];
+    }
+    if (!is_array($decoded) || array_is_list($decoded)) {
+        $errors[] = astronomyContentError('json', 'La raíz debe ser un objeto JSON.');
+    }
+    if (($decoded['version'] ?? null) !== CONTENT_REVIEW_FORMAT_VERSION) {
+        $errors[] = astronomyContentError('version', 'La versión de formato no está soportada. Se esperaba la versión ' . CONTENT_REVIEW_FORMAT_VERSION . '.');
+    }
+    if (!isset($decoded['articulos']) || !is_array($decoded['articulos']) || !array_is_list($decoded['articulos'])) {
+        $errors[] = astronomyContentError('articulos', 'articulos debe ser un array.');
+    }
+    $rootKeys = is_array($decoded) ? array_diff(array_keys($decoded), ['version', 'articulos']) : [];
+    if ($rootKeys !== []) {
+        $errors[] = astronomyContentError('json', 'La raíz contiene campos no admitidos: ' . implode(', ', $rootKeys) . '.');
+    }
+    if ($errors !== []) {
+        return ['valid' => false, 'errors' => $errors, 'changes' => [], 'summary' => []];
+    }
+
+    $catalog = [];
+    foreach (contentEditorDbReviewExport($connection)['articulos'] as $article) {
+        $catalog[$article['slug']] = $article;
+    }
+    $allowed = ['slug', 'titulo', 'visible', 'resumen', 'palabras_clave', 'relaciones'];
+    $seenSlugs = [];
+    $changes = [];
+    $missing = [];
+    $unchanged = 0;
+    $wordsAdded = $wordsRemoved = $relationsAdded = $relationsRemoved = 0;
+    foreach ($decoded['articulos'] as $index => $article) {
+        $field = 'articulos.' . $index;
+        if (!is_array($article) || array_is_list($article)) {
+            $errors[] = astronomyContentError($field, 'Cada artículo debe ser un objeto.');
+            continue;
+        }
+        $unknown = array_diff(array_keys($article), $allowed);
+        if ($unknown !== []) {
+            $errors[] = astronomyContentError($field, 'Contiene campos no admitidos: ' . implode(', ', $unknown) . '.');
+        }
+        $slug = $article['slug'] ?? null;
+        if (!is_string($slug) || trim($slug) === '') {
+            $errors[] = astronomyContentError($field . '.slug', 'slug debe ser un string no vacío.');
+            continue;
+        }
+        $slug = trim($slug);
+        if (isset($seenSlugs[$slug])) {
+            $errors[] = astronomyContentError($field . '.slug', 'El slug está repetido en el archivo.');
+            continue;
+        }
+        $seenSlugs[$slug] = true;
+        $newWords = contentEditorReviewStringList($article['palabras_clave'] ?? null);
+        $relationDuplicates = [];
+        $newRelations = contentEditorReviewRelationList($article['relaciones'] ?? null, $relationDuplicates);
+        if ($newWords === null) {
+            $errors[] = astronomyContentError($field . '.palabras_clave', 'Debe ser un array de strings.');
+        }
+        if ($newRelations === null) {
+            $errors[] = astronomyContentError($field . '.relaciones', 'Debe ser un array de strings.');
+        }
+        foreach ($relationDuplicates as $duplicate) {
+            $errors[] = astronomyContentError($field . '.relaciones', 'La relación “' . $duplicate . '” está duplicada.');
+        }
+        if (!isset($catalog[$slug])) {
+            $missing[] = $slug;
+            $errors[] = astronomyContentError($field . '.slug', 'No existe un artículo con el slug “' . $slug . '”.');
+            continue;
+        }
+        if ($newWords === null || $newRelations === null) {
+            continue;
+        }
+        foreach ($newRelations as $relationIndex => $relatedSlug) {
+            if ($relatedSlug === $slug) {
+                $errors[] = astronomyContentError($field . '.relaciones.' . $relationIndex, 'No se permite relacionar un artículo consigo mismo.');
+            } elseif (!isset($catalog[$relatedSlug])) {
+                $errors[] = astronomyContentError($field . '.relaciones.' . $relationIndex, 'No existe un artículo con el slug relacionado “' . $relatedSlug . '”.');
+            }
+        }
+        if ($errors !== []) {
+            continue;
+        }
+        $current = $catalog[$slug];
+        if ($current['palabras_clave'] === $newWords && $current['relaciones'] === $newRelations) {
+            $unchanged++;
+            continue;
+        }
+        $addedWords = array_values(array_diff($newWords, $current['palabras_clave']));
+        $removedWords = array_values(array_diff($current['palabras_clave'], $newWords));
+        $addedRelations = array_values(array_diff($newRelations, $current['relaciones']));
+        $removedRelations = array_values(array_diff($current['relaciones'], $newRelations));
+        $wordsAdded += count($addedWords);
+        $wordsRemoved += count($removedWords);
+        $relationsAdded += count($addedRelations);
+        $relationsRemoved += count($removedRelations);
+        $changes[] = [
+            'slug' => $slug,
+            'palabras_clave' => $newWords,
+            'relaciones' => $newRelations,
+            'palabras_agregadas' => $addedWords,
+            'palabras_eliminadas' => $removedWords,
+            'relaciones_agregadas' => $addedRelations,
+            'relaciones_eliminadas' => $removedRelations,
+        ];
+    }
+    return [
+        'valid' => $errors === [],
+        'errors' => $errors,
+        'changes' => $changes,
+        'summary' => [
+            'encontrados' => count($decoded['articulos']) - count($missing),
+            'sin_cambios' => $unchanged,
+            'modificados' => count($changes),
+            'slugs_inexistentes' => $missing,
+            'palabras_agregadas' => $wordsAdded,
+            'palabras_eliminadas' => $wordsRemoved,
+            'relaciones_agregadas' => $relationsAdded,
+            'relaciones_eliminadas' => $relationsRemoved,
+        ],
+    ];
+}
+
+function contentEditorDbApplyReview(PDO $connection, string $json): array
+{
+    $preview = contentEditorDbPreviewReview($connection, $json);
+    if (!$preview['valid']) {
+        return ['applied' => false, 'errors' => $preview['errors'], 'summary' => $preview['summary']];
+    }
+    try {
+        $connection->beginTransaction();
+        foreach ($preview['changes'] as $change) {
+            $articleId = contentEditorDbFindArticleIdBySlug($connection, $change['slug']);
+            if ($articleId === null) {
+                throw new RuntimeException('El artículo ' . $change['slug'] . ' dejó de existir antes de confirmar.');
+            }
+            $connection->prepare('DELETE FROM contenido_articulos_palabras_clave WHERE articulo_id = :id')->execute(['id' => $articleId]);
+            $connection->prepare('DELETE FROM contenido_articulos_relaciones WHERE articulo_id = :id')->execute(['id' => $articleId]);
+            contentEditorDbInsertWords($connection, $articleId, $change['palabras_clave']);
+            contentEditorDbInsertRelations($connection, $articleId, $change['relaciones']);
+        }
+        $connection->commit();
+        return ['applied' => true, 'errors' => [], 'summary' => $preview['summary']];
+    } catch (Throwable $exception) {
+        if ($connection->inTransaction()) {
+            $connection->rollBack();
+        }
+        return ['applied' => false, 'errors' => [astronomyContentError('mysql', 'No se aplicó ningún cambio. Detalle: ' . $exception->getMessage())], 'summary' => $preview['summary']];
+    }
+}
 
 /**
  * @return array<int, array{slug: string, titulo: string, resumen: string, visible: bool, has_main_image: bool, actualizado_en: string, trivias_count: int, sabias_que_count: int}>
@@ -519,6 +769,12 @@ function contentEditorDbSaveArticle(PDO $connection, string $originalSlug, strin
     $slug = trim($slug);
     $originalSlug = trim($originalSlug);
     $errors = contentEditorValidateDbCandidate($slug, $raw);
+    $errors = array_merge($errors, contentEditorDbValidateRelations(
+        $connection,
+        $slug,
+        is_array($raw['relaciones'] ?? null) ? $raw['relaciones'] : [],
+        $isNew ? null : $originalSlug
+    ));
     if (!$isNew && $originalSlug === '') {
         $errors[] = astronomyContentError('original_slug', 'Falta el slug original para actualizar el artículo.');
     }
@@ -596,6 +852,32 @@ function contentEditorDbSaveArticle(PDO $connection, string $originalSlug, strin
             'errors' => [astronomyContentError('mysql', 'No se pudo guardar en MySQL. Detalle: ' . $exception->getMessage())],
         ];
     }
+}
+
+/** @return array<int, array{field:string,message:string}> */
+function contentEditorDbValidateRelations(PDO $connection, string $sourceSlug, array $relations, ?string $originalSlug = null): array
+{
+    $errors = [];
+    $seen = [];
+    $exists = $connection->prepare('SELECT 1 FROM contenido_articulos WHERE slug = :slug LIMIT 1');
+    foreach (array_values($relations) as $index => $relatedSlug) {
+        $relatedSlug = trim((string) $relatedSlug);
+        $field = 'relaciones.' . $index;
+        if ($relatedSlug === $sourceSlug || ($originalSlug !== null && $relatedSlug === $originalSlug)) {
+            $errors[] = astronomyContentError($field, 'No se permite relacionar un artículo consigo mismo.');
+            continue;
+        }
+        if (isset($seen[$relatedSlug])) {
+            $errors[] = astronomyContentError($field, 'La relación está duplicada.');
+            continue;
+        }
+        $seen[$relatedSlug] = true;
+        $exists->execute(['slug' => $relatedSlug]);
+        if ($exists->fetchColumn() === false) {
+            $errors[] = astronomyContentError($field, 'No existe un artículo con el slug “' . $relatedSlug . '”.');
+        }
+    }
+    return $errors;
 }
 
 /**
@@ -837,6 +1119,74 @@ function contentEditorPackageExample(): array
             ['codigo' => 'ejemplo-sabias-2', 'visible' => true, 'frase' => '¿Sabías que siempre vemos casi la misma cara de la Luna?', 'detalle' => 'Detalle completo del segundo dato curioso.', 'imagen' => null],
         ],
     ];
+}
+
+function contentEditorPackageFromRaw(string $slug, array $raw): array
+{
+    $trivias = [];
+    foreach (array_values(is_array($raw['trivias'] ?? null) ? $raw['trivias'] : []) as $trivia) {
+        if (!is_array($trivia)) {
+            continue;
+        }
+        $options = [];
+        foreach (array_values(is_array($trivia['opciones'] ?? null) ? $trivia['opciones'] : []) as $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+            $correct = array_key_exists('explicacion', $option);
+            $options[] = [
+                'texto' => (string) ($option['texto'] ?? ''),
+                'correcta' => $correct,
+                'explicacion' => $correct ? (string) ($option['explicacion'] ?? '') : null,
+            ];
+        }
+        $trivias[] = [
+            'codigo' => (string) ($trivia['id'] ?? ''),
+            'visible' => (bool) ($trivia['visible'] ?? false),
+            'pregunta' => (string) ($trivia['pregunta'] ?? ''),
+            'imagen' => contentEditorNullableText($trivia['imagen'] ?? null),
+            'opciones' => $options,
+        ];
+    }
+
+    $facts = [];
+    foreach (array_values(is_array($raw['sabias_que'] ?? null) ? $raw['sabias_que'] : []) as $fact) {
+        if (!is_array($fact)) {
+            continue;
+        }
+        $facts[] = [
+            'codigo' => (string) ($fact['id'] ?? ''),
+            'visible' => (bool) ($fact['visible'] ?? false),
+            'frase' => (string) ($fact['titulo'] ?? ''),
+            'detalle' => (string) ($fact['respuesta'] ?? ''),
+            'imagen' => contentEditorNullableText($fact['imagen'] ?? null),
+        ];
+    }
+
+    return [
+        'version' => CONTENT_PACKAGE_FORMAT_VERSION,
+        'articulo' => [
+            'slug' => $slug,
+            'version' => max(1, (int) ($raw['version'] ?? 1)),
+            'visible' => (bool) ($raw['visible'] ?? false),
+            'titulo' => (string) ($raw['titulo'] ?? ''),
+            'resumen' => (string) ($raw['resumen'] ?? ''),
+            'imagen_principal' => contentEditorNullableText($raw['imagen'] ?? null),
+            'palabras_clave' => array_values(is_array($raw['palabras_clave'] ?? null) ? $raw['palabras_clave'] : []),
+            'relaciones' => array_values(is_array($raw['relaciones'] ?? null) ? $raw['relaciones'] : []),
+            'markdown' => (string) ($raw['articulo'] ?? ''),
+        ],
+        'trivias' => $trivias,
+        'sabias_que' => $facts,
+    ];
+}
+
+function contentEditorPackageJson(string $slug, array $raw): string
+{
+    return json_encode(
+        contentEditorPackageFromRaw($slug, $raw),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    );
 }
 
 function contentEditorPackageExampleJson(): string

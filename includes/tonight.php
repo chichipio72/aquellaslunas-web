@@ -11,10 +11,11 @@ function astronomyTonightRequest(
     string $date,
     string $detail,
     string $label,
-    int $timeout = 12
+    int $timeout = 12,
+    ?DateTimeImmutable $now = null
 ): ?array {
     try {
-        $decoded = astronomyDataTonight($location, $date, $detail, $label, $timeout);
+        $decoded = astronomyDataTonight($location, $date, $detail, $label, $timeout, $now);
     } catch (Throwable $exception) {
         error_log('Aquellas Lunas tonight error: ' . $exception->getMessage());
         return null;

@@ -22,6 +22,8 @@ final readonly class LunarPosition
         public float $rightAscensionDegrees,
         public float $declinationDegrees,
         public float $solarElongationDegrees = 0.0,
+        public float $meanAscendingNodeLongitudeDegrees = 0.0,
+        public float $meanArgumentOfLatitudeDegrees = 0.0,
     ) {
     }
 

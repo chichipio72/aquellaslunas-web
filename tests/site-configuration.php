@@ -115,6 +115,17 @@ try {
     siteConfigurationAssert(($reloaded['menu.administration.enabled'] ?? true) === false, 'No se guardó la visibilidad de Administración.');
     siteConfigurationAssert(($reloaded['home.install.enabled'] ?? true) === false, 'No se guardó la actualización de portada.');
 
+    $solarTemplate = 'https://aquellaslunas.com.ar/astro/embeds/eclipse-solar-real.php?controls=1&future_visual=7';
+    astronomySiteConfigUpdateValues($connection, [
+        'eclipse.upcoming_notice.enabled' => true,
+        'eclipse.upcoming_notice.days' => 14,
+        'eclipse.widget.solar_url' => $solarTemplate,
+    ]);
+    $reloaded = astronomySiteConfigLoadAll();
+    siteConfigurationAssert(($reloaded['eclipse.upcoming_notice.enabled'] ?? false) === true, 'No se guardó el flag de avisos de eclipses.');
+    siteConfigurationAssert(($reloaded['eclipse.upcoming_notice.days'] ?? 0) === 14, 'No se guardó la anticipación numérica.');
+    siteConfigurationAssert(($reloaded['eclipse.widget.solar_url'] ?? '') === $solarTemplate, 'No se guardó la URL plantilla completa.');
+
     $fallbackValue = astronomySiteConfigBool(
         'menu.events.enabled',
         false,

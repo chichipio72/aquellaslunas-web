@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/editorial-configuration.php';
+require_once __DIR__ . '/event-date-header.php';
 
 function homeUpcomingProfileReset(): void
 {
@@ -62,7 +63,7 @@ function homeUpcomingValidEvents(array $events, DateTimeImmutable $now, string $
         }
         $date = homeUpcomingEventDateTime($event['datetime'] ?? null, $timezoneName);
         $key = homeUpcomingEventKey($event);
-        if ($date === null || $date < $now || $key === null || !astronomyEarthshineEventIsDisplayable($event)) {
+        if (!astronomyEventIsFuture($date, $now) || $key === null || !astronomyEarthshineEventIsDisplayable($event)) {
             continue;
         }
         $unique[$key] ??= $event;
@@ -74,6 +75,31 @@ function homeUpcomingValidEvents(array $events, DateTimeImmutable $now, string $
         return ($firstDate?->getTimestamp() ?? PHP_INT_MAX) <=> ($secondDate?->getTimestamp() ?? PHP_INT_MAX);
     });
     return $result;
+}
+
+function homeUpcomingEventIsLowPriority(array $event): bool
+{
+    return ($event['type'] ?? null) === 'lunar_nodes';
+}
+
+function homeUpcomingPreferredEvents(array $events, int $limit, string $timezoneName): array
+{
+    $regular = [];
+    $lowPriority = [];
+    foreach ($events as $event) {
+        if (homeUpcomingEventIsLowPriority($event)) {
+            $lowPriority[] = $event;
+        } else {
+            $regular[] = $event;
+        }
+    }
+    $selected = array_slice([...$regular, ...$lowPriority], 0, $limit);
+    usort($selected, static function (array $first, array $second) use ($timezoneName): int {
+        $firstDate = homeUpcomingEventDateTime($first['datetime'] ?? null, $timezoneName);
+        $secondDate = homeUpcomingEventDateTime($second['datetime'] ?? null, $timezoneName);
+        return ($firstDate?->getTimestamp() ?? PHP_INT_MAX) <=> ($secondDate?->getTimestamp() ?? PHP_INT_MAX);
+    });
+    return $selected;
 }
 
 /**
@@ -134,12 +160,13 @@ function homeUpcomingProgressiveSearch(
             'valid_after_merge' => count($valid),
             'discarded_after_merge' => count($collected) - count($valid),
         ]);
-        if (count($valid) >= $limit) {
+        $regularCount = count(array_filter($valid, static fn(array $event): bool => !homeUpcomingEventIsLowPriority($event)));
+        if ($regularCount >= $limit) {
             break;
         }
     }
     $sliceStarted = hrtime(true);
-    $selected = array_slice($valid, 0, $limit);
+    $selected = homeUpcomingPreferredEvents($valid, $limit, $timezoneName);
     homeUpcomingProfileAdd('selección final', (hrtime(true) - $sliceStarted) / 1_000_000);
     homeUpcomingProfileCount('eventos seleccionados', count($selected));
     return ['events' => $selected, 'queries' => $queries];

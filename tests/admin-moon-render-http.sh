@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+base_url="${1:-http://localhost}"
+work_dir="$(mktemp -d)"
+trap 'rm -rf "$work_dir"' EXIT
+
+status="$(curl -sS -o "$work_dir/unauth" -D "$work_dir/unauth-headers" -w '%{http_code}' "$base_url/admin/luna-portada/")"
+test "$status" = "303"
+grep -Eqi '^Location: \../login\.php' "$work_dir/unauth-headers"
+
+if runuser -u www-data -- true >/dev/null 2>&1; then
+  session_id="$(runuser -u www-data -- php -r 'require "/var/www/html/includes/store-admin-auth.php"; session_id("admin-moon-http-" . bin2hex(random_bytes(12))); startStoreAdminSession(); $_SESSION[STORE_ADMIN_SESSION_KEY] = true; session_write_close(); echo session_id();')"
+else
+  session_id="$(docker exec -i --user www-data web-astro php -r 'require "/var/www/html/includes/store-admin-auth.php"; session_id("admin-moon-http-" . bin2hex(random_bytes(12))); startStoreAdminSession(); $_SESSION[STORE_ADMIN_SESSION_KEY] = true; session_write_close(); echo session_id();')"
+fi
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/auth" -D "$work_dir/auth-headers" -w '%{http_code}' "$base_url/admin/luna-portada/")"
+test "$status" = "200"
+grep -Eqi '^Cache-Control: no-store' "$work_dir/auth-headers"
+grep -q '<h1>Luna de portada</h1>' "$work_dir/auth"
+grep -q 'href="../luna-portada/" aria-current="page"' "$work_dir/auth"
+grep -q 'name="settings\[home.moon_three.sun_intensity\]"' "$work_dir/auth"
+grep -q 'name="settings\[home.moon_three.relief_mode\]"' "$work_dir/auth"
+grep -q 'name="settings\[home.moon_three.texture_contrast\]"' "$work_dir/auth"
+grep -q 'name="settings\[home.moon_three.size_percent\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.sun_intensity\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.background_color\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.background_brightness\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.background_gradient\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_mode\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_intensity\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_radius\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_softness\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_color\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_directional_weight\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_symmetric_weight\]"' "$work_dir/auth"
+grep -q 'name="settings\[favorite.moon_three.glow_full_moon_boost\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.sun_intensity\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.relief_mode\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.size_percent\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.high_res_relief_enabled\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.high_res_mode\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.high_res_zoom_threshold\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.high_res_normal_scale_x\]"' "$work_dir/auth"
+grep -q 'name="settings\[interactive.moon_three.high_res_normal_scale_y\]"' "$work_dir/auth"
+grep -q '<h2>Luna interactiva</h2>' "$work_dir/auth"
+grep -q 'data-moon-admin-selector' "$work_dir/auth"
+grep -q 'data-moon-admin-panel="home"' "$work_dir/auth"
+grep -q 'data-moon-admin-panel="favorite" hidden' "$work_dir/auth"
+grep -q 'data-moon-admin-panel="interactive" hidden' "$work_dir/auth"
+grep -q 'data-moon-settings-form data-moon-scope="home"' "$work_dir/auth"
+grep -q 'data-moon-settings-form data-moon-scope="favorite"' "$work_dir/auth"
+grep -q 'data-moon-settings-form data-moon-scope="interactive"' "$work_dir/auth"
+grep -q 'refreshMoonSettingsPreview' "$work_dir/auth"
+grep -q 'data-moon-wallpaper-preview' "$work_dir/auth"
+test "$(grep -o 'data-moon-admin-preview' "$work_dir/auth" | wc -l)" = "3"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/interactive-view" -w '%{http_code}' "$base_url/admin/luna-portada/?view=interactive")"
+test "$status" = "200"
+grep -q 'data-moon-admin-panel="home" hidden' "$work_dir/interactive-view"
+grep -q 'data-moon-admin-panel="favorite" hidden' "$work_dir/interactive-view"
+grep -q 'data-moon-admin-panel="interactive"' "$work_dir/interactive-view"
+! grep -q 'data-moon-admin-panel="interactive" hidden' "$work_dir/interactive-view"
+grep -q 'name="preview_offset" min="-15" max="15" step="1" value="0"' "$work_dir/auth"
+grep -q 'Estos valores afectan únicamente la Luna grande' "$work_dir/auth"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -H 'Accept: application/json' -o "$work_dir/preview-json" -w '%{http_code}' "$base_url/admin/luna-portada/?preview_json=1&preview_offset=7")"
+test "$status" = "200"
+grep -q '"ok":true' "$work_dir/preview-json"
+grep -q '"offset":7' "$work_dir/preview-json"
+grep -q '"geometry"' "$work_dir/preview-json"
+
+status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/invalid" -w '%{http_code}' -X POST --data-urlencode 'csrf_token=invalid' "$base_url/admin/luna-portada/index.php")"
+test "$status" = "200"
+grep -q 'token CSRF no es válido' "$work_dir/invalid"
+
+echo 'admin moon render HTTP tests: ok'

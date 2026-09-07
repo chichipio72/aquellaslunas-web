@@ -12,9 +12,12 @@ require_once __DIR__ . '/includes/favicon-links.php';
 require_once __DIR__ . '/includes/analytics.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/tonight.php';
+require_once __DIR__ . '/includes/home-tonight-scene.php';
+require_once __DIR__ . '/includes/moon-crater-recommendations.php';
 require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/event-type-configuration.php';
 require_once __DIR__ . '/includes/editorial-configuration.php';
+require_once __DIR__ . '/includes/eclipse-widget-embed.php';
 
 sendDynamicNoCacheHeaders();
 
@@ -33,7 +36,8 @@ try {
         $date,
         'full',
         'tonight full',
-        12
+        12,
+        $now
     );
     if ($tonightData === null) {
         $apiErrorMessage = 'No pudimos cargar el cielo de esta noche.';
@@ -48,7 +52,8 @@ try {
                 $date,
                 'full',
                 'tonight full next',
-                12
+                12,
+                $now
             );
         }
     }
@@ -74,6 +79,9 @@ try {
 
 $sections = $tonightData !== null ? astronomyTonightPreparedSections($tonightData, $now, $timezoneName) : [];
 $moonEncounters = $tonightData !== null ? astronomyTonightMoonEncounters($tonightData, $tonightEvents, $now, $timezoneName) : [];
+$tonightHighlight = homeTonightHighlightModel($tonightData, $tonightEvents, $tonightEvents, $now, $timezoneName, (float) $location['latitude'], (float) $location['longitude'], $location);
+$tonightMoonScene = $tonightHighlight['scene'];
+$tonightLunarEclipse = $tonightHighlight['eclipse'];
 $sections = astronomyTonightApplyMoonEditorialPriority(
     $sections,
     $tonightData !== null && astronomyTonightHasRelevantMoonEvent($tonightData, $tonightEvents, $timezoneName)
@@ -84,6 +92,12 @@ usort($featuredStars, static fn(array $a, array $b): int => ((float) ($a['magnit
 $featuredStars = array_slice($featuredStars, 0, (int) astronomyEditorialNumber('tonight.stars.display_max'));
 $featuredStarIds = array_column($featuredStars, 'id');
 $remainingStars = array_values(array_filter($sections['stars'] ?? [], static fn(array $star): bool => !in_array($star['id'] ?? null, $featuredStarIds, true)));
+$tonightCraterRecommendations = [];
+try {
+    $tonightCraterRecommendations = moonCraterRecommendations($tonightData, $location, $now, 5);
+} catch (Throwable $exception) {
+    error_log('Aquellas Lunas crater recommendations error: ' . $exception->getMessage());
+}
 $nightStartLabel = $tonightData !== null ? astronomyTonightTime($tonightData['night']['start'] ?? null, $timezoneName) : null;
 $nightEndLabel = $tonightData !== null ? astronomyTonightTime($tonightData['night']['end'] ?? null, $timezoneName) : null;
 $pageSeo = aquellasLunasSeoPage(
@@ -106,6 +120,7 @@ $pageSeo = aquellasLunasSeoPage(
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyEditorialFrontendConfiguration(); ?>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/cloud-cover.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/tonight-moon-scene.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyMobileSwipeNavigationScript('tonight'); ?>
@@ -153,14 +168,17 @@ $pageSeo = aquellasLunasSeoPage(
                     <p class="tonight-empty" role="status">No hay objetos observables para mostrar durante esta noche.</p>
                 <?php else: ?>
                     <div class="tonight-sections">
-                        <?php if ($moonEncounters !== []): ?><section class="tonight-section" aria-labelledby="tonight-moon-encounters-title">
-                            <h2 id="tonight-moon-encounters-title"><?= htmlspecialchars(astronomyEditorialText('tonight.moon_encounter.section_title')) ?></h2>
-                            <div class="tonight-object-list"><?php foreach ($moonEncounters as $encounter): ?>
-                                <article class="tonight-object">
-                                    <h3><?= htmlspecialchars(astronomyTonightMoonEncounterTitle($encounter)) ?></h3>
-                                    <p><?= htmlspecialchars(astronomyTonightMoonEncounterText($encounter)) ?></p>
-                                </article>
-                            <?php endforeach; ?></div>
+                        <?php if ($moonEncounters !== [] || $tonightLunarEclipse !== null): ?><section class="tonight-section tonight-moon-encounters<?= $tonightLunarEclipse !== null ? ' tonight-moon-encounters--eclipse' : '' ?>" aria-labelledby="tonight-moon-encounters-title">
+                            <h2 id="tonight-moon-encounters-title"><?= htmlspecialchars($tonightLunarEclipse !== null ? astronomyEditorialText('tonight.lunar_eclipse.section_title') : astronomyEditorialText('tonight.moon_encounter.section_title')) ?></h2>
+                            <div class="tonight-moon-encounters__layout">
+                                <div class="tonight-object-list tonight-object-list--moon-encounters"><?php if ($tonightLunarEclipse !== null): ?><article class="tonight-object tonight-object--highlight"><h3><?= htmlspecialchars(astronomyEditorialText('tonight.lunar_eclipse.card_title'), ENT_QUOTES, 'UTF-8') ?></h3><p><?= htmlspecialchars((string) $tonightHighlight['eclipse_text'], ENT_QUOTES, 'UTF-8') ?></p></article><?php endif; ?><?php foreach ($moonEncounters as $encounter): ?>
+                                    <article class="tonight-object">
+                                        <h3><?= htmlspecialchars(astronomyTonightMoonEncounterTitle($encounter)) ?></h3>
+                                        <p><?= htmlspecialchars(astronomyTonightMoonEncounterText($encounter)) ?></p>
+                                    </article>
+                                <?php endforeach; ?></div>
+                                <?php if ($tonightLunarEclipse !== null): ?><div><?php renderAstronomyEclipseWidget($tonightLunarEclipse, $timezoneName, $location, astronomyEditorialText('tonight.lunar_eclipse.card_title'), ['autoplay' => true, 'controls' => false]); ?></div><?php elseif ($tonightMoonScene !== null): ?><div><div class="tonight-moon-scene-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="tonight-moon-scene-dialog" aria-label="Ampliar esquema de la Luna y los astros cercanos" data-tonight-moon-scene-open><?php renderHomeTonightMoonScene($tonightMoonScene, false); ?><span class="tonight-moon-scene-trigger__hint">Tocá para ampliar</span></div><?php renderPhotographyEventLink(is_string($tonightMoonScene['photography_url'] ?? null) ? $tonightMoonScene['photography_url'] : null, 'home-tonight-scene__photography'); ?></div><?php endif; ?>
+                            </div>
                         </section><?php endif; ?>
                         <?php if ($highlights !== []): ?><section class="tonight-section tonight-highlights" aria-labelledby="tonight-highlights-title">
                             <h2 id="tonight-highlights-title">Lo mejor para mirar esta noche</h2>
@@ -212,10 +230,12 @@ $pageSeo = aquellasLunasSeoPage(
                 <?php endif; ?>
             <?php endif; ?>
 
+            <?php renderMoonCraterRecommendations($tonightCraterRecommendations); ?>
             <?php renderAstronomyExploreSky('tonight'); ?>
             <?php renderAstronomyTimings(); ?>
         </div>
     </main>
+    <?php if ($tonightMoonScene !== null && $moonEncounters !== []): ?><dialog id="tonight-moon-scene-dialog" class="tonight-moon-scene-dialog" aria-label="Esquema ampliado de la Luna y los astros cercanos" data-tonight-moon-scene-dialog><div class="tonight-moon-scene-dialog__surface"><button type="button" class="tonight-moon-scene-dialog__close" aria-label="Cerrar esquema ampliado" data-tonight-moon-scene-close>×</button><div data-tonight-moon-scene-content></div></div></dialog><?php endif; ?>
     <?php renderAstronomySiteFooter(); ?>
 </body>
 </html>

@@ -18,6 +18,9 @@ require_once __DIR__ . '/includes/astronomy-icon.php';
 require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/moon-phase-presentation.php';
 require_once __DIR__ . '/includes/moon-images.php';
+require_once __DIR__ . '/includes/moon-three-render.php';
+require_once __DIR__ . '/includes/tonight.php';
+require_once __DIR__ . '/includes/home-tonight-scene.php';
 sendDynamicNoCacheHeaders();
 
 function todayDateTime($value, string $timezone): ?DateTimeImmutable
@@ -153,7 +156,7 @@ $visiblePageTitle = $isToday
     : 'El cielo el ' . todayLongDate($parsedDate);
 $common = ['latitude' => $latitude, 'longitude' => $longitude, 'timezone' => $timezoneName];
 $usingCustomLocation = ($location['mode'] ?? 'default') !== 'default';
-$daily = $nextDaily = $directions = $eventsData = $phasesData = null;
+$daily = $nextDaily = $directions = $eventsData = $phasesData = $todayTonightData = null;
 $apiError = false;
 $eventTypes = implode(',', astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_TODAY));
 
@@ -166,6 +169,8 @@ try {
 } catch (RuntimeException $exception) {
     error_log('Aquellas Lunas today astronomy error: ' . $exception->getMessage());
 }
+$tonightSceneDate = $isToday && (int) $now->format('H') < 12 ? $now->modify('-1 day')->format('Y-m-d') : $requestedDate;
+$todayTonightData = astronomyTonightRequest(null, $location, $tonightSceneDate, 'summary', 'today moon scene', 12, $now);
 if (!is_array($daily['moon'] ?? null) || !is_array($daily['sun'] ?? null)) {
     $daily = null;
     $apiError = true;
@@ -183,11 +188,29 @@ $visualLightData['_sun'] = [
 $phase = astronomyMoonPhaseLabelForLocalDate($requestedDate, $timezoneName, $phasesData['items'] ?? []) ?? 'Fase no disponible';
 $illumination = is_numeric($moon['illumination_percent'] ?? null) ? (int) round((float) $moon['illumination_percent']) : null;
 $isSupermoon = is_numeric($moon['apparent_size_percent'] ?? null) && (float) $moon['apparent_size_percent'] >= astronomySupermoonMinApparentSizePercent();
-$moonImageInstant = $parsedDate->setTime(12, 0);
+$moonImageInstant = $isToday ? $now : $parsedDate->setTime(12, 0);
 $moonImageUrl = 'moon-image.php?' . http_build_query($common + ['datetime' => $moonImageInstant->format(DateTimeInterface::ATOM)]);
 recordMoonImageDiagnostic('today moon image', $moon['illumination_percent'] ?? null, $moon['age_days'] ?? null, (float) $latitude);
 $moonOrientation = moonApparentRotation($moonImageInstant, (float) $latitude, (float) $longitude, $timezoneName);
 $moonCssRotation = $moonOrientation['css_degrees'] ?? 0.0;
+$todayMoonThreePayload = null;
+$todayMoonThreePreparationStarted = hrtime(true);
+if (!$apiError) {
+    try {
+        $todayMoonThreePayload = moonThreeRenderPayload(
+            $moonImageInstant,
+            new AstronomyEngine\Facade\AstronomyObserver((float) $latitude, (float) $longitude, $timezoneName, (float) ($location['elevation_meters'] ?? 0.0)),
+        );
+    } catch (Throwable $exception) {
+        error_log('Aquellas Lunas today Three.js Moon error: ' . $exception->getMessage());
+    }
+}
+if (astronomyTimingsEnabled()) {
+    $GLOBALS['home_moon_three_diagnostic'] = [
+        'server_ms' => (hrtime(true) - $todayMoonThreePreparationStarted) / 1_000_000,
+        'status' => $todayMoonThreePayload !== null ? 'preparada' : 'fallback',
+    ];
+}
 $moonProfileUrl = 'altitude-profile.php?' . http_build_query(['target' => 'moon', 'date' => $requestedDate] + $common);
 $sunProfileUrl = 'altitude-profile.php?' . http_build_query(['target' => 'sun', 'date' => $requestedDate] + $common);
 $moonSummary = $daily !== null ? todayMoonSummary($moon, $timezoneName, $isToday ? $now : $parsedDate, $isToday) : '';
@@ -233,6 +256,7 @@ $events = array_values(array_filter($eventsData['items'] ?? [], static function 
     return is_array($event) && astronomyEventDateTime($event['datetime'] ?? null, $timezoneName)?->format('Y-m-d') === $requestedDate;
 }));
 $events = astronomyFilterEventsForSurface($events, ASTRONOMY_EVENT_SURFACE_TODAY);
+$todayMoonScene = homeTonightMoonSceneModel($todayTonightData, $events, $now, $timezoneName, (float) $latitude, (float) $longitude, $location);
 $locationMessage = astronomyLocationStatusMessage((string) ($_GET['location_status'] ?? ''));
 $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la Luna, el Sol, la luz y las condiciones del cielo para una fecha y ubicación.', '/cielo-de-hoy.php', 'webpage');
 ?>
@@ -256,6 +280,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/today-visual-experiment.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/page-recovery.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/navigation-indicator.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+    <?php if ($todayMoonThreePayload !== null): ?><script type="module" src="<?= htmlspecialchars(versionedAssetUrl('assets/js/moon-three-render.js'), ENT_QUOTES, 'UTF-8') ?>"></script><?php endif; ?>
     <?php renderAstronomyMobileSwipeNavigationScript('today'); ?>
 </head>
 <body class="today-visual-experiment" data-api-state="<?= $apiError ? 'error' : 'ok' ?>" data-cloud-cover-latitude="<?= htmlspecialchars((string) $latitude) ?>" data-cloud-cover-longitude="<?= htmlspecialchars((string) $longitude) ?>" data-cloud-cover-timezone="<?= htmlspecialchars($timezoneName) ?>" data-cloud-cover-cache-scope="<?= htmlspecialchars($requestedDate) ?>" data-today-date="<?= htmlspecialchars($requestedDate) ?>" data-moon-intervals="<?= htmlspecialchars(json_encode($moon['visibility_intervals'] ?? []), ENT_QUOTES, 'UTF-8') ?>" data-today-light-periods="<?= htmlspecialchars(json_encode($visualLightData, JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"<?= astronomyMobileSwipeNavigationAttributes('today') ?>>
@@ -273,7 +298,7 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
             <?php if ($locationMessage !== ''): ?><p class="status-info"><?= htmlspecialchars($locationMessage) ?></p><?php endif; ?>
             <?php if ($apiError): ?><div class="api-error-notice" data-api-error role="alert"><p>No pudimos actualizar los datos astronómicos.</p><button type="button" class="button compact-secondary-button" data-api-retry>Reintentar</button></div><?php else: ?>
             <div class="today-summary__body">
-                <div class="today-moon-image-frame moon-apparent-orientation" data-moon-rotation-degrees="<?= htmlspecialchars((string) $moonCssRotation) ?>"><img class="today-moon-image" src="<?= htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') ?>" width="320" height="320" alt="Apariencia de la Luna el <?= htmlspecialchars(todayLongDate($parsedDate)) ?>" style="--moon-apparent-rotation: <?= htmlspecialchars((string) $moonCssRotation) ?>deg"></div>
+                <div class="today-moon-image-frame moon-apparent-orientation<?= $todayMoonThreePayload !== null ? ' moon-three-render' : '' ?>" data-moon-rotation-degrees="<?= htmlspecialchars((string) $moonCssRotation) ?>"<?= $todayMoonThreePayload !== null ? ' data-moon-three data-moon-three-state="loading" role="img" aria-label="Apariencia de la Luna el ' . htmlspecialchars(todayLongDate($parsedDate), ENT_QUOTES, 'UTF-8') . ' desde ' . htmlspecialchars($locationLabel, ENT_QUOTES, 'UTF-8') . '"' : '' ?>><img class="today-moon-image moon-three-render__fallback" <?= $todayMoonThreePayload !== null ? 'data-fallback-src="' . htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') . '" hidden' : 'src="' . htmlspecialchars($moonImageUrl, ENT_QUOTES, 'UTF-8') . '"' ?> width="320" height="320" alt="<?= $todayMoonThreePayload !== null ? '' : 'Apariencia de la Luna el ' . htmlspecialchars(todayLongDate($parsedDate), ENT_QUOTES, 'UTF-8') ?>" style="--moon-apparent-rotation: <?= htmlspecialchars((string) $moonCssRotation) ?>deg"><?php if ($todayMoonThreePayload !== null): ?><script type="application/json" data-moon-three-payload><?= json_encode($todayMoonThreePayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script><?php endif; ?></div>
                 <div class="today-summary__copy">
                     <h2><?= htmlspecialchars($phase) ?></h2>
                     <p class="today-lead"><?= htmlspecialchars($moonSummary) ?></p>
@@ -322,9 +347,12 @@ $pageSeo = aquellasLunasSeoPage('El cielo hoy | Aquellas Lunas', 'Resumen de la 
             </section>
         </article>
 
-        <?php if ($events !== []): ?><article class="today-card atmosphere-card--night" aria-labelledby="today-events-title">
+        <?php if ($events !== [] || $todayMoonScene !== null): ?><article class="today-card atmosphere-card--night" aria-labelledby="today-events-title">
             <h2 id="today-events-title">Qué sucede hoy</h2>
-            <div class="today-events"><?php foreach ($events as $event): $eventDate = astronomyEventDateTime($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $isEveningFullMoonObservation = ($event['type'] ?? '') === 'full_moon_observation' && ($event['subtype'] ?? '') === 'evening'; ?><section><?php renderAstronomyIcon($event, $latitude, 'today-event-icon'); ?><time datetime="<?= htmlspecialchars($eventDate?->format(DateTimeInterface::ATOM) ?? '') ?>"><?= htmlspecialchars($eventDate?->format('H:i') ?? '—') ?></time><div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if (($presentation['visibility'] ?? '') !== ''): ?><p><?= htmlspecialchars($presentation['visibility']) ?></p><?php endif; ?><?php if ($isEveningFullMoonObservation): ?><p class="today-event-editorial"><?= htmlspecialchars(astronomyEditorialText('today.venus_belt.full_moon')) ?></p><?php endif; ?></div></section><?php endforeach; ?></div>
+            <div class="today-events-layout<?= $events === [] ? ' today-events-layout--scene-only' : '' ?>">
+                <?php if ($events !== []): ?><div class="today-events"><?php foreach ($events as $event): $eventDate = astronomyEventDateTime($event['datetime'] ?? null, $timezoneName); $presentation = astronomyEventPresentation($event, $timezoneName); $isEveningFullMoonObservation = ($event['type'] ?? '') === 'full_moon_observation' && ($event['subtype'] ?? '') === 'evening'; ?><section><?php renderAstronomyIcon($event, $latitude, 'today-event-icon'); ?><time datetime="<?= htmlspecialchars($eventDate?->format(DateTimeInterface::ATOM) ?? '') ?>"><?= htmlspecialchars($eventDate?->format('H:i') ?? '—') ?></time><div><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?><?php if (($presentation['visibility'] ?? '') !== ''): ?><p><?= htmlspecialchars($presentation['visibility']) ?></p><?php endif; ?><?php if ($isEveningFullMoonObservation): ?><p class="today-event-editorial"><?= htmlspecialchars(astronomyEditorialText('today.venus_belt.full_moon')) ?></p><?php endif; ?></div></section><?php endforeach; ?></div><?php endif; ?>
+                <?php if ($todayMoonScene !== null): ?><div class="today-events__moon-scene"><?php renderHomeTonightMoonScene($todayMoonScene); ?></div><?php endif; ?>
+            </div>
         </article><?php endif; ?>
 
         <?php if ($isToday): ?><article class="today-card today-conditions atmosphere-card--night" aria-labelledby="today-conditions-title" data-today-conditions>

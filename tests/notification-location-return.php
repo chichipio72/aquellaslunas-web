@@ -55,9 +55,11 @@ try {
         && str_contains($settingsScript, "if (!device && !locationReady)"),
         'La ubicación propia no conserva prioridad sobre el valor general inicial.');
     notificationLocationAssert(is_string($settingsPage)
-        && str_contains($settingsPage, '?notification_location_changed=1')
+        && str_contains($settingsPage, "'notification_location_changed' => '1'")
         && str_contains($settingsPage, 'type="hidden" name="latitude"')
-        && !str_contains($settingsPage, 'data-use-current-location'),
+        && str_contains($settingsPage, "? 'Cambiar ubicación' : 'Elegir ubicación'")
+        && !str_contains($settingsPage, 'data-location-map')
+        && !str_contains($settingsPage, 'name="location_name" maxlength='),
         'La interfaz pública no usa exclusivamente el selector común de ubicación.');
     $typesPosition = strpos($settingsPage, 'id="notification-types-heading"');
     $quietPosition = strpos($settingsPage, 'id="notification-quiet-heading"');

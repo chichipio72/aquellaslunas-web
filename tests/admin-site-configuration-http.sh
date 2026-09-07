@@ -19,18 +19,23 @@ fi
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/auth" -D "$work_dir/auth-headers" -w '%{http_code}' "$base_url/admin/configuracion-sitio/")"
 test "$status" = "200"
 grep -Eqi '^Cache-Control: no-store' "$work_dir/auth-headers"
-grep -q '<h1>Visibilidad de secciones</h1>' "$work_dir/auth"
+grep -q '<h1>Menú y secciones</h1>' "$work_dir/auth"
 grep -q 'href="../configuracion-sitio/" aria-current="page"' "$work_dir/auth"
-grep -q '<strong>Visibilidad de secciones</strong>' "$work_dir/auth"
+grep -q '<strong>Menú y secciones</strong>' "$work_dir/auth"
 grep -q 'href="../contenidos/"' "$work_dir/auth"
 grep -q 'href="../fotos.php"' "$work_dir/auth"
 grep -q 'href="../laboratorio-astronomico.php"' "$work_dir/auth"
 grep -q 'name="settings\[content.enabled\]"' "$work_dir/auth"
-grep -q 'name="settings\[menu.today.enabled\]"' "$work_dir/auth"
-grep -q 'name="settings\[menu.administration.enabled\]"' "$work_dir/auth"
-grep -q 'name="settings\[menu.explorer.enabled\]"' "$work_dir/auth"
+grep -q 'name="sections\[today\]\[group_id\]"' "$work_dir/auth"
+grep -q 'name="sections\[today\]\[public_visible\]"' "$work_dir/auth"
+grep -q 'name="sections\[today\]\[admin_visible\]"' "$work_dir/auth"
+grep -q 'name="groups\[events\]\[label\]"' "$work_dir/auth"
 grep -q 'name="settings\[home.today.enabled\]"' "$work_dir/auth"
 grep -q 'name="settings\[home.satellite_transits.enabled\]"' "$work_dir/auth"
+grep -q 'name="eclipse_settings\[enabled\]"' "$work_dir/auth"
+grep -q 'name="eclipse_settings\[days\]"' "$work_dir/auth"
+grep -q 'name="eclipse_settings\[solar_url\]"' "$work_dir/auth"
+grep -q 'name="eclipse_settings\[lunar_url\]"' "$work_dir/auth"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/csrf-invalid" -w '%{http_code}' -X POST \
   --data-urlencode 'csrf_token=token-invalido' \
@@ -44,20 +49,8 @@ test "${#csrf_token}" = "64"
 
 status="$(curl -sS -H "Cookie: aquellas_lunas_admin=$session_id" -o "$work_dir/save" -D "$work_dir/save-headers" -w '%{http_code}' -X POST \
   --data-urlencode "csrf_token=$csrf_token" \
+  --data-urlencode 'mode=save_flags' \
   --data-urlencode 'settings[content.enabled]=1' \
-  --data-urlencode 'settings[menu.home.enabled]=1' \
-  --data-urlencode 'settings[menu.today.enabled]=1' \
-  --data-urlencode 'settings[menu.tonight.enabled]=1' \
-  --data-urlencode 'settings[menu.sun_moon.enabled]=1' \
-  --data-urlencode 'settings[menu.events.enabled]=1' \
-  --data-urlencode 'settings[menu.eclipses.enabled]=1' \
-  --data-urlencode 'settings[menu.planner.enabled]=1' \
-  --data-urlencode 'settings[menu.explorer.enabled]=1' \
-  --data-urlencode 'settings[menu.content.enabled]=1' \
-  --data-urlencode 'settings[menu.location.enabled]=1' \
-  --data-urlencode 'settings[menu.capabilities.enabled]=1' \
-  --data-urlencode 'settings[menu.about.enabled]=1' \
-  --data-urlencode 'settings[menu.administration.enabled]=1' \
   --data-urlencode 'settings[home.today.enabled]=1' \
   --data-urlencode 'settings[home.tonight.enabled]=1' \
   --data-urlencode 'settings[home.phases.enabled]=1' \

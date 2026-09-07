@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "coordinate_system": "IAU Moon, planetocentric, positive east, -180..180",
+    "nomenclature_source": "Gazetteer of Planetary Nomenclature, IAU/USGS",
+    "nomenclature_source_url": "https://planetarynames.wr.usgs.gov/Page/MOON/target",
+    "nomenclature_snapshot": "2026-08-17",
+    "landing_sources": [
+      "https://www.nasa.gov/wp-content/uploads/2023/12/nasa-usg-lunar-historic-sites-reva.pdf",
+      "https://nssdc.gsfc.nasa.gov/planetary/lunar/"
+    ]
+  },
+  "features": [
+    {"name":"Tycho","layer":"craters","type":"Crater","lat":-43.2958,"lon":-11.2153,"diameter_km":85.29,"importance":1,"source_id":6163},
+    {"name":"Copernicus","layer":"craters","type":"Crater","lat":9.6209,"lon":-20.0786,"diameter_km":96.07,"importance":1,"source_id":1296},
+    {"name":"Plato","layer":"craters","type":"Crater","lat":51.6192,"lon":-9.3825,"diameter_km":100.68,"importance":1,"source_id":4757},
+    {"name":"Clavius","layer":"craters","type":"Crater","lat":-58.6228,"lon":-14.7275,"diameter_km":230.77,"importance":1,"source_id":1236},
+    {"name":"Aristarchus","layer":"craters","type":"Crater","lat":23.7299,"lon":-47.4901,"diameter_km":39.99,"importance":1,"source_id":380},
+    {"name":"Theophilus","layer":"craters","type":"Crater","lat":-11.4524,"lon":26.2847,"diameter_km":98.59,"importance":1,"source_id":5965},
+    {"name":"Langrenus","layer":"craters","type":"Crater","lat":-8.8604,"lon":61.038,"diameter_km":131.98,"importance":2,"source_id":3273},
+    {"name":"Eratosthenes","layer":"craters","type":"Crater","lat":14.4737,"lon":-11.3162,"diameter_km":58.77,"importance":2,"source_id":1820},
+    {"name":"Archimedes","layer":"craters","type":"Crater","lat":29.7172,"lon":-3.9931,"diameter_km":81.04,"importance":2,"source_id":350},
+    {"name":"Ptolemaeus","layer":"craters","type":"Crater","lat":-9.1605,"lon":-1.8373,"diameter_km":153.67,"importance":2,"source_id":4860},
+    {"name":"Grimaldi","layer":"craters","type":"Crater","lat":-5.38,"lon":-68.36,"diameter_km":235,"importance":2,"source_id":2252},
+    {"name":"Gassendi","layer":"craters","type":"Crater","lat":-17.5546,"lon":-39.9637,"diameter_km":111.39,"importance":2,"source_id":2111},
+    {"name":"Posidonius","layer":"craters","type":"Crater","lat":31.8783,"lon":29.9913,"diameter_km":95.06,"importance":2,"source_id":4808},
+    {"name":"Aristoteles","layer":"craters","type":"Crater","lat":50.243,"lon":17.32,"diameter_km":87.57,"importance":2,"source_id":382},
+    {"name":"Eudoxus","layer":"craters","type":"Crater","lat":44.2656,"lon":16.2257,"diameter_km":70.16,"importance":2,"source_id":1863},
+    {"name":"Kepler","layer":"craters","type":"Crater","lat":8.121,"lon":-38.0087,"diameter_km":29.49,"importance":2,"source_id":2990},
+
+    {"name":"Mare Imbrium","layer":"maria","type":"Mare","lat":34.7244,"lon":-14.9086,"diameter_km":1145.53,"importance":1,"source_id":3678},
+    {"name":"Mare Serenitatis","layer":"maria","type":"Mare","lat":27.2879,"lon":18.3596,"diameter_km":674.28,"importance":1,"source_id":3686},
+    {"name":"Mare Tranquillitatis","layer":"maria","type":"Mare","lat":8.3487,"lon":30.8346,"diameter_km":875.75,"importance":1,"source_id":3691},
+    {"name":"Mare Crisium","layer":"maria","type":"Mare","lat":16.1774,"lon":59.1037,"diameter_km":555.92,"importance":1,"source_id":3671},
+    {"name":"Oceanus Procellarum","layer":"maria","type":"Oceanus","lat":20.6714,"lon":-56.6774,"diameter_km":2592.24,"importance":1,"source_id":4395},
+    {"name":"Mare Fecunditatis","layer":"maria","type":"Mare","lat":-7.835,"lon":53.6691,"diameter_km":840.35,"importance":2,"source_id":3673},
+    {"name":"Mare Nectaris","layer":"maria","type":"Mare","lat":-15.1852,"lon":34.6021,"diameter_km":339.39,"importance":2,"source_id":3683},
+    {"name":"Mare Nubium","layer":"maria","type":"Mare","lat":-20.5894,"lon":-17.2872,"diameter_km":714.5,"importance":2,"source_id":3684},
+    {"name":"Mare Humorum","layer":"maria","type":"Mare","lat":-24.4785,"lon":-38.5716,"diameter_km":419.67,"importance":2,"source_id":3677},
+    {"name":"Mare Frigoris","layer":"maria","type":"Mare","lat":57.5923,"lon":-0.0064,"diameter_km":1446.41,"importance":2,"source_id":3674},
+    {"name":"Mare Vaporum","layer":"maria","type":"Mare","lat":13.2,"lon":4.09,"diameter_km":242.46,"importance":2,"source_id":3694},
+    {"name":"Sinus Iridum","layer":"maria","type":"Sinus","lat":45.0101,"lon":-31.6653,"diameter_km":249.29,"importance":2,"source_id":5565},
+
+    {"name":"Montes Apenninus","layer":"other","type":"Montes","lat":19.8714,"lon":0.0253,"diameter_km":599.67,"importance":1,"source_id":4004},
+    {"name":"Vallis Schroteri","layer":"other","type":"Vallis","lat":26.1555,"lon":-51.5805,"diameter_km":168.35,"importance":1},
+    {"name":"Rupes Recta","layer":"other","type":"Rupes","lat":-21.6748,"lon":-7.7019,"diameter_km":115.95,"importance":2,"source_id":5230},
+    {"name":"Rima Hadley","layer":"other","type":"Rima","lat":25.7159,"lon":3.1467,"diameter_km":116.09,"importance":2,"source_id":5064},
+    {"name":"Mons Huygens","layer":"other","type":"Mons","lat":19.9188,"lon":-2.8571,"diameter_km":41.97,"importance":2,"source_id":3987},
+
+    {"name":"Apolo 11","layer":"landings","type":"Alunizaje","lat":0.67408,"lon":23.47297,"importance":1,"mission_year":1969},
+    {"name":"Apolo 12","layer":"landings","type":"Alunizaje","lat":-3.01239,"lon":-23.42157,"importance":1,"mission_year":1969},
+    {"name":"Apolo 14","layer":"landings","type":"Alunizaje","lat":-3.6453,"lon":-17.47136,"importance":1,"mission_year":1971},
+    {"name":"Apolo 15","layer":"landings","type":"Alunizaje","lat":26.13222,"lon":3.63386,"importance":1,"mission_year":1971},
+    {"name":"Apolo 16","layer":"landings","type":"Alunizaje","lat":-8.97301,"lon":15.50019,"importance":1,"mission_year":1972},
+    {"name":"Apolo 17","layer":"landings","type":"Alunizaje","lat":20.1908,"lon":30.77168,"importance":1,"mission_year":1972},
+    {"name":"Luna 9","layer":"landings","type":"Alunizaje","lat":7.08,"lon":-64.37,"importance":1,"mission_year":1966},
+    {"name":"Luna 13","layer":"landings","type":"Alunizaje","lat":18.87,"lon":-62.05,"importance":2,"mission_year":1966},
+    {"name":"Surveyor 1","layer":"landings","type":"Alunizaje","lat":-2.474,"lon":-43.339,"importance":2,"mission_year":1966},
+    {"name":"Surveyor 3","layer":"landings","type":"Alunizaje","lat":-3.016,"lon":-23.418,"importance":2,"mission_year":1967},
+    {"name":"Luna 16","layer":"landings","type":"Alunizaje","lat":-0.68,"lon":56.3,"importance":2,"mission_year":1970},
+    {"name":"Lunojod 1 · Luna 17","layer":"landings","type":"Alunizaje","lat":38.237,"lon":-35.001,"importance":2,"mission_year":1970},
+    {"name":"Chang’e 3","layer":"landings","type":"Alunizaje","lat":44.1214,"lon":-19.5116,"importance":1,"mission_year":2013},
+    {"name":"Chang’e 4","layer":"landings","type":"Alunizaje","lat":-45.457,"lon":177.589,"importance":1,"mission_year":2019},
+    {"name":"Chang’e 5","layer":"landings","type":"Alunizaje","lat":43.0576,"lon":-51.9161,"importance":2,"mission_year":2020},
+    {"name":"Chandrayaan-3","layer":"landings","type":"Alunizaje","lat":-69.373,"lon":32.319,"importance":1,"mission_year":2023},
+    {"name":"SLIM","layer":"landings","type":"Alunizaje","lat":-13.315,"lon":25.251,"importance":2,"mission_year":2024}
+  ]
+}

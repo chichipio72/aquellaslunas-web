@@ -16,7 +16,7 @@ RUN apt-get update \
         unzip \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) curl mbstring intl mysqli pdo pdo_mysql exif gd \
-    && a2enmod rewrite \
+    && a2enmod rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
 COPY php.ini /usr/local/etc/php/conf.d/99-custom.ini

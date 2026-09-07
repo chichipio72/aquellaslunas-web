@@ -5,6 +5,7 @@ declare(strict_types=1);
 use AstronomyEngine\Facade\AstronomyEventsFacade;
 use AstronomyEngine\Facade\AstronomyObserver;
 use AstronomyEngine\Satellite\CachedCelesTrakTleProvider;
+use AstronomyEngine\Satellite\CelesTrakTleDownloader;
 use AstronomyEngine\Satellite\SatelliteTransitService;
 use AstronomyEngine\Satellite\SatelliteTransitEvent;
 
@@ -143,7 +144,9 @@ function astronomyPushSatelliteTransitEvents(array $device, DateTimeImmutable $n
             ?: dirname(__DIR__) . '/astronomy-engine/cache/satellite/tle-cache.json');
         $ttl = (int) (getenv('ASTRONOMY_TLE_CACHE_TTL_SECONDS')
             ?: CachedCelesTrakTleProvider::DEFAULT_TTL_SECONDS);
-        $service = new SatelliteTransitService(new CachedCelesTrakTleProvider($cachePath, $ttl));
+        $service = new SatelliteTransitService(new CachedCelesTrakTleProvider(
+            $cachePath, $ttl, new CelesTrakTleDownloader(3), null, false
+        ));
     }
     $observer = astronomyPushProviderObserver($device);
     $result = $service->search($observer, astronomyPushUtc($nowUtc), 48, $satellites, $targets);

@@ -68,17 +68,71 @@ try {
         'La preferencia moonrise no tomó el valor predeterminado esperado.');
 
     $edited = astronomyPushSaveCurrentDevice($connection, $subscription, [
-        'device_name' => 'Teléfono editado', 'notifications_enabled' => false,
+        'device_name' => 'Teléfono editado', 'notifications_enabled' => true,
         'location_name' => 'San Isidro', 'latitude' => '-34.47', 'longitude' => '-58.51',
-        'timezone' => 'America/Argentina/Buenos_Aires', 'quiet_hours_enabled' => false,
+        'timezone' => 'America/Argentina/Buenos_Aires', 'quiet_hours_enabled' => true,
         'quiet_start_local' => '23:00', 'quiet_end_local' => '08:00',
-        'notification_preferences' => [],
+        'notification_preferences' => ['moonrise' => true],
     ]);
     pushDeviceAssert($edited['device']['device_name'] === 'Teléfono editado'
-        && $edited['device']['notifications_enabled'] === false,
+        && $edited['device']['notifications_enabled'] === true,
         'La edición posterior no se conservó.');
     pushDeviceAssert($edited['device']['support_id'] === $supportId,
         'El ID de soporte cambió al editar la configuración.');
+
+    $technicalBefore = $connection->prepare(
+        'SELECT id, endpoint, endpoint_hash, p256dh, auth, active FROM web_push_subscriptions WHERE endpoint = :endpoint'
+    );
+    $technicalBefore->execute(['endpoint' => $subscription['endpoint']]);
+    $technicalBefore = $technicalBefore->fetch();
+    $preferencesBefore = $connection->prepare(
+        'SELECT notification_type, enabled, schedule_mode, lead_minutes, delivery_local_time, delivery_day_offset, quiet_policy, parameters_json '
+        . 'FROM web_push_notification_preferences WHERE subscription_id = (SELECT id FROM web_push_subscriptions WHERE endpoint = :endpoint) '
+        . 'ORDER BY notification_type'
+    );
+    $preferencesBefore->execute(['endpoint' => $subscription['endpoint']]);
+    $preferencesBefore = $preferencesBefore->fetchAll();
+    $devicePolicyBefore = $connection->prepare(
+        'SELECT support_id, device_name, notifications_enabled, quiet_hours_enabled, quiet_start_local, quiet_end_local '
+        . 'FROM web_push_device_config WHERE subscription_id = (SELECT id FROM web_push_subscriptions WHERE endpoint = :endpoint)'
+    );
+    $devicePolicyBefore->execute(['endpoint' => $subscription['endpoint']]);
+    $devicePolicyBefore = $devicePolicyBefore->fetch();
+    $locationUpdated = astronomyPushUpdateCurrentDeviceLocation($connection, $subscription, [
+        'location_name' => 'Villa Ventana', 'latitude' => -38.09, 'longitude' => -61.93,
+        'timezone' => 'America/Argentina/Buenos_Aires',
+    ]);
+    pushDeviceAssert($locationUpdated['device']['location_name'] === 'Villa Ventana'
+        && $locationUpdated['device']['latitude'] === -38.09
+        && $locationUpdated['device']['longitude'] === -61.93
+        && $locationUpdated['device']['timezone'] === 'America/Argentina/Buenos_Aires',
+        'No se actualizaron los cuatro campos de ubicación del dispositivo actual.');
+    $technicalAfter = $connection->prepare(
+        'SELECT id, endpoint, endpoint_hash, p256dh, auth, active FROM web_push_subscriptions WHERE endpoint = :endpoint'
+    );
+    $technicalAfter->execute(['endpoint' => $subscription['endpoint']]);
+    pushDeviceAssert($technicalBefore === $technicalAfter->fetch(),
+        'La sincronización modificó la suscripción técnica o su estado activo.');
+    $preferencesAfter = $connection->prepare(
+        'SELECT notification_type, enabled, schedule_mode, lead_minutes, delivery_local_time, delivery_day_offset, quiet_policy, parameters_json '
+        . 'FROM web_push_notification_preferences WHERE subscription_id = (SELECT id FROM web_push_subscriptions WHERE endpoint = :endpoint) '
+        . 'ORDER BY notification_type'
+    );
+    $preferencesAfter->execute(['endpoint' => $subscription['endpoint']]);
+    pushDeviceAssert($preferencesBefore === $preferencesAfter->fetchAll(),
+        'La sincronización modificó preferencias de avisos.');
+    $devicePolicyAfter = $connection->prepare(
+        'SELECT support_id, device_name, notifications_enabled, quiet_hours_enabled, quiet_start_local, quiet_end_local '
+        . 'FROM web_push_device_config WHERE subscription_id = (SELECT id FROM web_push_subscriptions WHERE endpoint = :endpoint)'
+    );
+    $devicePolicyAfter->execute(['endpoint' => $subscription['endpoint']]);
+    pushDeviceAssert($devicePolicyBefore === $devicePolicyAfter->fetch(),
+        'La sincronización modificó la identidad, la activación o No molestar del dispositivo.');
+    $eligibleMoonrise = astronomyPushConfiguredDevices($connection, (int) $technicalBefore['id']);
+    pushDeviceAssert(count($eligibleMoonrise) === 1
+        && $eligibleMoonrise[0]['notification_type'] === 'moonrise'
+        && $eligibleMoonrise[0]['location_name'] === 'Villa Ventana',
+        'La suscripción existente dejó de ser elegible para moonrise al adoptar la ubicación general.');
 
     $wrongKeys = $subscription;
     $wrongKeys['keys']['auth'] = pushDeviceBase64Url(str_repeat("\x03", 16));
@@ -86,6 +140,26 @@ try {
     try { astronomyPushCurrentDeviceState($connection, $wrongKeys); }
     catch (AstronomyPushSubscriptionAccessException) { $denied = true; }
     pushDeviceAssert($denied, 'Se identificó una suscripción con credenciales distintas.');
+    $wrongUpdateDenied = false;
+    try {
+        astronomyPushUpdateCurrentDeviceLocation($connection, $wrongKeys, [
+            'location_name' => 'Ataque', 'latitude' => 1, 'longitude' => 1, 'timezone' => 'UTC',
+        ]);
+    } catch (AstronomyPushSubscriptionAccessException) { $wrongUpdateDenied = true; }
+    pushDeviceAssert($wrongUpdateDenied
+        && astronomyPushCurrentDeviceState($connection, $subscription)['device']['location_name'] === 'Villa Ventana',
+        'Credenciales ajenas permitieron modificar la ubicación del dispositivo.');
+
+    $unconfigured = pushDeviceSubscription(bin2hex(random_bytes(6)));
+    astronomyWebPushSaveSubscription($connection, astronomyWebPushValidateSubscription($unconfigured), 'Test');
+    $missingDenied = false;
+    try {
+        astronomyPushUpdateCurrentDeviceLocation($connection, $unconfigured, [
+            'location_name' => 'No crear', 'latitude' => 0, 'longitude' => 0, 'timezone' => 'UTC',
+        ]);
+    } catch (AstronomyPushSubscriptionAccessException) { $missingDenied = true; }
+    pushDeviceAssert($missingDenied && astronomyPushCurrentDeviceState($connection, $unconfigured)['configured'] === false,
+        'La página de ubicación creó una configuración de notificaciones inexistente.');
 
     $invalidType = false;
     try {
@@ -145,6 +219,8 @@ pushDeviceAssert($subscriptionElevenBefore === $subscriptionElevenAfter,
 
 $page = file_get_contents(__DIR__ . '/../notificaciones.php');
 $script = file_get_contents(__DIR__ . '/../assets/js/notification-settings.js');
+$locationPage = file_get_contents(__DIR__ . '/../ubicacion.php');
+$locationScript = file_get_contents(__DIR__ . '/../assets/js/location.js');
 pushDeviceAssert(is_string($page) && !str_contains($page, 'subscription_id'),
     'La página pública usa un ID de suscripción como credencial.');
 pushDeviceAssert(is_string($script) && !str_contains($script, 'navigator.geolocation.getCurrentPosition')
@@ -153,5 +229,17 @@ pushDeviceAssert(is_string($script) && !str_contains($script, 'navigator.geoloca
     'Faltan estados o ayuda PWA, o se reintrodujo una ubicación paralela en el cliente.');
 pushDeviceAssert(!str_contains($script, 'p256dh') && !str_contains($script, '.auth'),
     'El cliente manipula innecesariamente secretos de la suscripción.');
+pushDeviceAssert(is_string($locationPage)
+    && str_contains($locationPage, 'data-location-notification-sync hidden')
+    && str_contains($locationPage, 'Actualizar también la ubicación usada para mis notificaciones en este dispositivo')
+    && !str_contains($locationPage, 'subscription_id'),
+    'La opción de ubicación no parte oculta o usa un ID de suscripción inseguro.');
+pushDeviceAssert(is_string($locationScript)
+    && str_contains($locationScript, "getRegistration('./')")
+    && str_contains($locationScript, 'getSubscription()')
+    && str_contains($locationScript, "state?.configured !== true")
+    && !str_contains($locationScript, 'pushManager.subscribe')
+    && !str_contains($locationScript, 'unsubscribe()'),
+    'La ubicación no limita la opción a una suscripción configurada o altera el ciclo técnico Push.');
 
 echo "OK web push device config\n";

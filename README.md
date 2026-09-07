@@ -70,6 +70,68 @@ Documentación complementaria:
 - Los metadatos, canonical y JSON-LD se resuelven desde [includes/seo.php](includes/seo.php). Cada página define su propio título, descripción y ruta antes de cargar el encabezado común.
 - Para agregar una página nueva, define un arreglo SEO con `aquellasLunasSeoPage(...)` y pasa ese arreglo a `renderSeoHead(...)` en el `<head>`.
 - [sitemap.php](sitemap.php) genera `/astro/sitemap.xml` mediante la regla de Apache. Las páginas públicas generales se mantienen allí y los artículos válidos y visibles se incorporan automáticamente desde MySQL.
+- Los artículos públicos usan `index, follow`, canonical individual
+  `/contenido.php?slug=...`, esquema `Article` y `BreadcrumbList`. El índice sin
+  consulta usa `index, follow`; una búsqueda `contenidos.php?q=...` conserva su
+  canonical en el índice pero usa `noindex, follow`.
+- Las trivias públicas envían `trivia_view`, `trivia_answer` y
+  `trivia_article_click`. Incluyen `trivia_codigo`, `articulo_slug` cuando existe,
+  `correcta` y `opcion` según el evento. Una vista se cuenta una vez al alcanzar
+  25 % de visibilidad y una respuesta sólo en la primera selección.
+
+## Contenidos públicos y embeds
+
+El catálogo público se carga desde MySQL. `contenidos.php` ofrece índice y búsqueda;
+`contenido.php?slug=...` presenta el artículo, breadcrumb visible y hasta tres
+relacionados definidos por `contenido_articulos_relaciones`. Las relaciones son
+editoriales, dirigidas y ordenadas: no se infieren desde palabras clave ni en sentido
+inverso. Sólo enlazan destinos válidos y visibles.
+
+La URL de un artículo publicado se considera estable. El administrador permite editar
+el slug por motivos técnicos, pero advierte que hacerlo rompe la URL pública; no hay
+historial de slugs ni redirección automática.
+
+El Markdown no acepta HTML o iframes libres. Los embeds entran mediante
+`[[embed url="..."]]` y una allowlist HTTPS de host y prefijo: actualmente
+`chichipiosblog.com.ar/astronomia/` y los widgets propios bajo
+`aquellaslunas.com.ar/astro/embeds/`. El servidor fija `sandbox`, referrer policy,
+carga diferida y título. El contenedor ocupa el ancho editorial disponible y adapta
+su altura en móvil. La página individual admite 1050 px; texto, imágenes y embeds se
+centran dentro de una columna de hasta 60 rem.
+
+## Instalación PWA
+
+La tarjeta de portada y la acción **Instalar Aquellas Lunas** del menú comparten
+`assets/js/install-prompt.js`. En Android normal usan `beforeinstallprompt`; en
+iOS/Safari muestran los pasos de Compartir → Agregar a pantalla de inicio. Cuando la
+web ya corre en `standalone` o `fullscreen`, o `navigator.standalone` está activo,
+se ocultan ambos accesos.
+
+Instagram y Facebook se detectan de forma conservadora por User-Agent. En Android,
+el CTA intenta abrir Chrome mediante un `intent:` que conserva la URL y añade
+`install=1`; ya en Chrome, un diálogo continúa el flujo sólo cuando llega
+`beforeinstallprompt`, o informa que aún no está disponible. En iOS no se intenta
+abrir Safari automáticamente: se muestran instrucciones. Descartar la tarjeta de
+portada la oculta durante 30 días, pero no desactiva la instalación desde el menú;
+el aviso específico del navegador embebido dura sólo la sesión.
+
+## Observación en portada y “Esta noche”
+
+`TonightCalculator` calcula encuentros observables Luna–planetas/estrellas con un
+umbral máximo de 10° y descarta muestras pasadas respecto del reloj vigente. La
+redacción prioriza planetas —hasta dos— y sólo usa la estrella más cercana cuando no
+hay planetas. La escena angular Luna + astros aparece únicamente si existe al menos
+otro planeta o estrella válido dentro de 10°; reutiliza las miniaturas lunares, su
+rotación aparente y el motor astronómico actual, con símbolos diferenciados y
+etiquetas. Portada y página detallada comparten `includes/home-tonight-scene.php`.
+
+La portada ofrece campanas contextuales para salida lunar, eclipses, conjunciones
+lunares y tránsitos ISS/Tiangong. Cada campana abre la configuración de toda la
+categoría correspondiente; no suscribe al evento puntual junto al que aparece.
+
+Después de tres horas, la portada muestra un aviso de datos potencialmente
+desactualizados y permite recargar manualmente. El cálculo usa `window.siteTimeContext`:
+en debug respeta la fecha/hora simulada fija y en uso normal toma el reloj real.
 
 ## Configuración de la API
 
@@ -183,7 +245,10 @@ MERCADO_PAGO_FAILURE_URL=https://aquellaslunas.com.ar/astro/tienda/pago-fallido.
 MERCADO_PAGO_NOTIFICATION_URL=https://aquellaslunas.com.ar/astro/webhooks/mercado-pago.php
 ```
 
-El piloto Web Push se prueba únicamente desde `/admin/notificaciones-prueba.php`. El envío PHP usa las dependencias reproducibles de `composer.lock`; generar `vendor/` antes de desplegar con:
+El piloto Web Push se configura públicamente por dispositivo desde
+`/notificaciones.php`; `/admin/notificaciones-prueba.php` queda para envíos de prueba
+y `/admin/notificaciones-astronomicas.php` para supervisión y correcciones. El envío
+PHP usa las dependencias reproducibles de `composer.lock`; generar `vendor/` antes de desplegar con:
 
 ```bash
 docker run --rm -u 1000:1000 -v /srv/proyectos/astronomia/web:/app -w /app composer:2 install --no-dev --optimize-autoloader
@@ -201,7 +266,15 @@ Los derivados de tienda usan 800 px, calidad 72 y una marca semitransparente rep
 
 `galeria.php` presenta las fotos disponibles que ya tienen `archivo_preview_tienda`, ordenadas por creación descendente. La cuadrícula y el modal usan siempre esa versión comercial; no exponen la variante de contenido, originales ni rutas internas.
 
-El portal privado vive bajo `admin/` y no aparece en la navegación pública. Su menú compartido contiene Inicio, Contenidos, Visibilidad de secciones, Visibilidad de eventos, Fuentes astronómicas, Galería, Laboratorio y Notificaciones de prueba; “Cerrar sesión” permanece separado. Los títulos del panel y los encabezados de cada módulo respetan esos mismos nombres y todas las vistas administrativas reutilizan el favicon público. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa la sesión `aquellas_lunas_admin` y exige CSRF en todos los cambios. Contenidos, visibilidad, reglas y fuentes escriben en `WEB_DB`; el laboratorio sólo consulta `datos_astronomicos`. La arquitectura administrativa completa se describe en [Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
+El portal privado vive bajo `admin/`; durante el piloto su acceso puede estar visible
+en el menú público mediante la configuración de secciones, sin que eso conceda acceso.
+Su navegación compartida reúne los módulos operativos vigentes y mantiene “Cerrar
+sesión” separado. Los títulos y encabezados reutilizan esos nombres y el favicon
+público. Autentica contra `STORE_ADMIN_USER` y `STORE_ADMIN_PASSWORD_HASH`, usa la
+sesión `aquellas_lunas_admin` y exige CSRF en todos los cambios. Contenidos,
+visibilidad, reglas y fuentes escriben en `WEB_DB`; el laboratorio sólo consulta
+`datos_astronomicos`. La arquitectura administrativa completa se describe en
+[Administración y Laboratorio Astronómico](docs/administracion-y-laboratorio.md).
 
 La galería permite listar, ocultar/publicar, administrar precios y editar título, descripción y palabras clave de una foto. Los campos editoriales opcionales se guardan como texto plano o `NULL`; no se modifican EXIF, JSON técnico, monedas, previews, archivos ni historial de pedidos.
 
@@ -234,8 +307,10 @@ embed oficial de Instagram. Las URLs se editan en el arreglo `$instagramPosts`, 
 del inicio de esa página; el renderer acepta la URL sencilla con la ruta de la cuenta
 y la normaliza al permalink canónico requerido por el embed.
 
-**Galería** depende de `menu.gallery.enabled`. **Pruebas visuales** aparece en local
-o para un administrador autenticado y responde 404 para los demás.
+La presencia de **Galería** y **Pruebas visuales** en el menú depende de la doble
+visibilidad almacenada en `site_menu_sections`. Inicialmente ambas están disponibles
+para administradores y no para público. Las restricciones técnicas de acceso directo
+a Pruebas visuales siguen dependiendo de `canUseSiteDebugTools()`.
 
 La detección general está en `includes/api-config.php`: `appEnvironment()`,
 `isLocalEnvironment()`, `isProductionEnvironment()` y `canUseSiteDebugTools()`.
@@ -466,9 +541,16 @@ Inicio muestra la cobertura nubosa actual en “La Luna ahora”, e inicio y `ev
 ### Navegación y encabezado
 
 Las páginas públicas usan `includes/site-header.php`: muestran **Aquellas Lunas**, la
-localidad global enlazada y un panel de menú. `includes/site-sections.php` centraliza
-orden, URL, estado activo y participación en swipe. Inicio, Esta noche, Sol y Luna,
+localidad global enlazada y un panel de menú. `includes/site-menu.php` mantiene el
+catálogo estable de URLs y carga grupos, orden y doble visibilidad desde MySQL;
+`includes/site-sections.php` compone el estado activo y la participación en swipe. Inicio, Esta noche, Sol y Luna,
 Planificador y Eventos forman el recorrido no circular; las demás páginas quedan fuera.
+
+El contenido editorial de `que-podes-hacer.php` se edita en
+`content-data/que-podes-hacer.json`. El archivo estructura hero, tarjetas principales,
+tarjetas especiales y cierre mediante párrafos y listas; no admite HTML. El renderer
+validado está en `includes/capabilities-content.php`. `content-data/` se despliega pero
+queda bloqueado para acceso HTTP.
 
 En pantallas de hasta 767 px, izquierda avanza y derecha retrocede. Touch Events sigue la trayectoria principal; Pointer Events sirve de respaldo y diagnóstico, sin doble decisión. Se mantienen 80 px, 700 ms y relación 1,5. `touch-action: pan-y pinch-zoom`, listeners pasivos y ausencia de `preventDefault()` preservan scroll vertical y zoom.
 
@@ -549,8 +631,8 @@ $filename = sprintf('moon_%03d_%s_%s.png', $percent, $direction, $hemisphere);
 
 La tabla no solicita una imagen a la API por fila. Sirve estos PNG como assets estáticos y `versionedAssetUrl()` agrega la versión de `filemtime`; son aptos para caché larga porque una modificación cambia la URL. Si falta un archivo, el helper registra el error y reserva un espacio controlado.
 
-La portada reutiliza la misma matriz y el mismo criterio desde
-`assets/images/moon-phases-large/`, con 404 PNG de 240×240. Se generan con el
+La colección grande conserva 404 PNG de 240×240 para las páginas y fallbacks que
+usan `moon-image.php`. Se generan con el
 mismo modo `percentage`, cambiando `--size 240` y usando
 `--terminator-softness 0.05`. `moon-image.php` calcula iluminación y edad con
 la fachada PHP, selecciona el asset por porcentaje, dirección y hemisferio, y
@@ -565,9 +647,67 @@ runtime sirve la colección estática y aplica la orientación aparente con CSS.
 
 ### 2. Imagen lunar de la portada
 
-La portada carga `moon-image.php`, un endpoint PHP del mismo origen. Administración
-permite elegir la colección precalculada o la API como fuente primaria; la otra
-queda como fallback y el PNG pequeño es siempre el último recurso.
+La Luna grande de “El cielo hoy” usa `assets/js/moon-three-render.js`. PHP inserta
+la geometría de `MoonDiskAppearanceCalculator` y los valores guardados mediante
+`includes/moon-three-render.php`; el módulo carga albedo y relieve únicamente en
+esa tarjeta y realiza un render estático. El `moon-image.php` anterior permanece
+como fallback si WebGL o las texturas fallan. La página detallada y el resto de
+las imágenes lunares continúan usando el sistema PNG existente.
+
+Los parámetros visuales viven en `admin_configuracion_sitio` con claves
+`home.moon_three.*` y se editan en `/admin/luna-portada/`.
+
+La sección `/luna-fecha-favorita.php` reutiliza ese mismo componente con una fecha
+y hora explícitas y la ubicación global. El estado queda en la URL y el navegador
+compone localmente wallpapers PNG 1080 × 1920 y 1920 × 1080, sin generar imágenes
+en PHP. Su apariencia usa claves independientes `favorite.moon_three.*`, editadas
+en una segunda sección de `/admin/luna-portada/`; la primera inicialización copia
+los valores vigentes de portada y añade color, brillo y degradado horizontal del fondo.
+Esa configuración incluye además un resplandor 2D opcional que combina una capa
+direccional, orientada por el limbo brillante, con otra simétrica que aumenta con
+la fracción iluminada y puede reforzarse cerca de la Luna llena.
+
+La herramienta `/luna-interactiva.php` parte de la misma geometría y mapas, pero
+añade rotación exploratoria, zoom y capas independientes de cráteres, mares, otros
+accidentes y alunizajes. Los puntos se conservan en coordenadas lunares 3D y sus
+etiquetas HTML se proyectan y reacomodan en cada movimiento; los del hemisferio
+opuesto a la cámara se ocultan. El catálogo local curado está en
+`assets/data/moon-features.json`, con nomenclatura IAU/USGS y sitios NASA/NSSDC.
+Fecha, hora, capas, detalle, giro y zoom permanecen en la URL y `embed=1` ofrece
+la vista sin encabezado ni pie. El visor alterna entre iluminación solar realista
+y luz frontal completa; esta última permanece junto a la cámara al girar para que
+todo hemisferio explorado pueda leerse sin modificar la geometría astronómica.
+
+Los embeds lunares para artículos usan URLs independientes y no se publican en el
+menú ni en el sitemap:
+
+- `/embeds/libracion-lunar.php`: animación cliente de 121 muestras astronómicas
+  topocéntricas, orientada para la ubicación vigente, con exportación WebM 16:9 y 9:16,
+  con `mode`, `autoplay`, `speed`, `zoom` y `controls`;
+- `/embeds/luna-interactiva.php`: wrapper del motor interactivo existente con
+  orientación, zoom, capas, detalle, iluminación, `rotation` y `controls`;
+- `/embeds/fases-tierra-luna.php`: comparación a escala aparente aproximada de
+  la Luna vista desde la Tierra y la Tierra vista desde la Luna. Acepta `fecha`,
+  `hora`, `autoplay`, `speed` y `controls`; las iluminaciones son recíprocas y
+  la Tierra usa la textura NASA Blue Marble local. Luz principal, ambiente,
+  exposición y rugosidad se parametrizan por separado; la Luna añade escala X/Y
+  de su normal map.
+- `/embeds/eclipse-lunar-real.php` y `/embeds/eclipse-solar-real.php`: eclipses
+  seleccionados por fecha y coordenadas, con geometría calculada en PHP. El solar
+  separa sus capas fotográficas aproximadas mediante niveles visuales 0–10 para
+  corona, prominencias y perlas/diamante; esos niveles no alteran la astronomía.
+
+Las apariencias públicas de esos dos widgets pueden definirse como URLs plantilla
+en `/admin/configuracion-sitio/`. Portada y los detalles de Eventos lunares y
+Eclipses reutilizan la consulta configurada, reemplazando sólo fecha y ubicación.
+
+`/admin/widgets-lunares/` permite configurar los widgets, ver el iframe real y copiar
+la URL o el código de inserción. El sistema de contenidos permite exclusivamente
+estas rutas propias bajo `https://aquellaslunas.com.ar/astro/embeds/` además del
+proveedor astronómico externo ya autorizado.
+
+El contrato siguiente corresponde a `moon-image.php`, conservado para el
+fallback de portada y para las demás superficies lunares:
 
 ```text
 /v1/moon/image
@@ -649,7 +789,7 @@ El popover abre con puntero, foco o toque, se cierra con Escape o interacción e
 │   └── moon-images.php
 ├── admin/
 │   ├── contenidos/                 # editor e importación JSON
-│   ├── configuracion-sitio/        # visibilidad de secciones
+│   ├── configuracion-sitio/        # menú, grupos y visibilidad contextual
 │   ├── presentacion/               # tipos de eventos y reglas/mensajes
 │   ├── fotos.php
 │   └── laboratorio-astronomico.php

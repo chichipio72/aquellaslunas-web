@@ -53,4 +53,94 @@ return [
             runWebPushSupportIdMigration($connection);
         },
     ],
+    [
+        'id' => '20260817_site_menu_configuration',
+        'mode' => 'automatic',
+        'blocks_tasks' => true,
+        'checksum_file' => __DIR__ . '/site-menu-configuration.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-site-menu-configuration.php';
+            runSiteMenuConfigurationMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260819_eclipse_widget_template_storage',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/eclipse-widget-template-storage.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-eclipse-widget-template-storage.php';
+            runEclipseWidgetTemplateStorageMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260820_photography_editorial',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/photography-editorial.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-photography-editorial.php';
+            runPhotographyEditorialMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260820_photography_editorial_v1_seeds',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/photography-editorial-v1-seeds.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-photography-editorial-v1-seeds.php';
+            runPhotographyEditorialV1SeedsMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260821_photography_simulated_directional_twilight',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/photography-simulated-directional-twilight.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-photography-simulated-directional-twilight.php';
+            runPhotographySimulatedDirectionalTwilightMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260822_satellite_stations_menu',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/satellite-stations-menu.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/add-satellite-stations-menu.php';
+            runSatelliteStationsMenuMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260823_sources_credits_menu',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/sources-credits-menu.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/add-sources-credits-menu.php';
+            runSourcesCreditsMenuMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260906_lunar_scene_presets',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/lunar-scene-presets.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/create-lunar-scene-presets.php';
+            runLunarScenePresetsMigration($connection);
+        },
+    ],
+    [
+        'id' => '20260906_publish_lunar_nodes',
+        'mode' => 'automatic',
+        'blocks_tasks' => false,
+        'checksum_file' => __DIR__ . '/publish-lunar-nodes.sql',
+        'run' => static function (PDO $connection): void {
+            require_once __DIR__ . '/publish-lunar-nodes.php';
+            runPublishLunarNodesMigration($connection);
+        },
+    ],
 ];

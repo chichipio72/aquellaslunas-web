@@ -108,7 +108,7 @@ Las páginas HTML muestran timings en producción exclusivamente a una sesión a
 
 El intervalo técnico de perfiles se valida entre 5 y 60 minutos. Superluna, salida lunar y los demás criterios editoriales se gestionan desde **Reglas y mensajes** con rangos cerrados; no deben duplicarse en la configuración externa. Las opciones móviles aceptan `true/false`, `1/0`, `yes/no` y `on/off`. La tabla completa está en [configuracion.md](configuracion.md).
 
-Analytics no usa este archivo: `includes/analytics.php` carga siempre `G-GFZJ3D3MF3` en las nueve vistas públicas. No hay una bandera separada por entorno.
+Analytics no usa este archivo: `includes/analytics.php` carga el ID público fijo en las vistas que incorporan el include compartido. No hay una bandera separada por entorno.
 
 El `.env` local es exclusivo de Docker Compose, está excluido por el script y no reemplaza esta configuración externa de producción.
 
@@ -206,6 +206,14 @@ se carga desde `includes/api-client.php` mediante un autoloader PSR-4 manual;
 por lo tanto no requiere incluir `vendor/`. La opción `--include-vendor` queda
 reservada para las dependencias Composer de otras funciones, como Web Push.
 
+### Migraciones recientes aún no verificadas en producción (2026-09-07)
+
+`scripts/migrations/registry.php` ya registra `20260906_lunar_scene_presets` y
+`20260906_publish_lunar_nodes`. Sus cuatro archivos PHP/SQL ya forman parte de la
+allowlist y fueron confirmados mediante `--list-local`. El hosting todavía puede
+tener sólo el registry anterior sin esas implementaciones; revisar `--dry-run`,
+desplegar explícitamente y comprobar una ejecución exitosa del scheduler.
+
 ## Despliegue real
 
 ```bash
@@ -287,7 +295,7 @@ Revisar:
 - directivas `no-store/no-cache` en las vistas dinámicas;
 - carga de CSS y JavaScript bajo `/astro/assets/`;
 - favicon SVG/ICO/PNG y Apple Touch Icon con query `v=<filemtime>`;
-- etiqueta de Analytics `G-GFZJ3D3MF3` en las nueve vistas públicas;
+- etiqueta de Analytics configurada por `includes/analytics.php` en las vistas públicas aplicables;
 - imagen lunar aparente mediante `moon-image.php`;
 - perfiles solar y lunar mediante dos solicitudes independientes a `/astro/altitude-profile.php`, con tres series, `Cache-Control: no-store` y sin URL interna de API en el HTML/JSON;
 - miniaturas estáticas;

@@ -37,6 +37,13 @@ function astronomyIconKey(array $event): string
     if ($type === 'apsis') {
         return in_array($subtype, ['perigee', 'apogee'], true) ? $subtype : 'distance';
     }
+    if ($type === 'lunar_nodes') {
+        return match ($subtype) {
+            'ascending_node' => 'node-ascending',
+            'descending_node' => 'node-descending',
+            default => 'generic',
+        };
+    }
     return match ($type) {
         'earthshine' => 'moon-earthshine',
         'eclipse' => 'eclipse',
@@ -62,6 +69,8 @@ function astronomyIconLabel(string $key): string
         'perigee' => 'Perigeo',
         'apogee' => 'Apogeo',
         'distance' => 'Distancia lunar',
+        'node-ascending' => 'Nodo ascendente',
+        'node-descending' => 'Nodo descendente',
         'eclipse' => 'Eclipse',
         default => 'Evento astronómico',
     };

@@ -19,8 +19,11 @@ require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/eclipse-detail-component.php';
 require_once __DIR__ . '/includes/event-type-configuration.php';
 require_once __DIR__ . '/includes/event-presentation.php';
+require_once __DIR__ . '/includes/event-infographic.php';
+require_once __DIR__ . '/includes/store-admin-auth.php';
 
 sendDynamicNoCacheHeaders();
+$showEventInfographicLinks = storeAdminHasValidSessionCookie();
 
 const ECLIPSES_IMAGE_SOL_PARTIAL_PATH = 'assets/images/contenido/SolParcial.jpg';
 const ECLIPSES_IMAGE_SOL_TOTAL_PATH = 'assets/images/contenido/SolTotal.jpg';
@@ -579,6 +582,7 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/event-infographics.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/eclipses.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/calendar-scheduler.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
@@ -662,6 +666,7 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
                                 'explanation' => '',
                             ];
                             $calendarEvent = astronomyCalendarEventData($event, $calendarPresentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php'));
+                            $infographicUrl = astronomyEventInfographicUrl($event, $timezoneName);
                             ?>
                             <li class="eclipse-item<?= $isVisible ? '' : ' eclipse-item--not-visible' ?>">
                                 <button type="button" class="eclipse-item-trigger" data-eclipse-modal-open data-eclipse-id="<?= htmlspecialchars(astronomyEclipseDetailId($event)) ?>" data-template-id="<?= htmlspecialchars($templateId) ?>" aria-label="Abrir detalle de <?= htmlspecialchars($typeLabel) ?> del <?= htmlspecialchars($dateLabel) ?>">
@@ -675,7 +680,8 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
                                     <?php if (!$isVisible): ?><p class="eclipse-badge" aria-label="Evento no visible desde la ubicación seleccionada">No visible</p><?php endif; ?>
                                 </button>
                                 <?php renderAstronomyCalendarLink($calendarEvent, 'calendar-action--eclipse'); ?>
-                                <?php renderAstronomyEclipseDetailTemplate($event, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php')); ?>
+                                <?php if ($showEventInfographicLinks && $infographicUrl !== null): ?><a class="event-infographic-link" href="<?= htmlspecialchars($infographicUrl, ENT_QUOTES, 'UTF-8') ?>">Crear infografía</a><?php endif; ?>
+                                <?php renderAstronomyEclipseDetailTemplate($event, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php'), null, $location); ?>
 
                             </li>
                         <?php endforeach; ?>

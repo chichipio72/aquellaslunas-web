@@ -18,6 +18,20 @@ $lockPath = sys_get_temp_dir() . '/aquellas-lunas-lock-test-' . $suffix . '.lock
 $now = new DateTimeImmutable('2099-08-04 12:00:00', new DateTimeZone('UTC'));
 
 try {
+    $missingChecksumReported = false;
+    try {
+        scheduledTaskMigrationChecksum([
+            'id' => '20990803_test_missing_checksum',
+            'checksum_file' => __DIR__ . '/fixtures/missing-migration.sql',
+        ]);
+    } catch (RuntimeException $exception) {
+        $missingChecksumReported = $exception->getMessage() ===
+            'No se pudo calcular la firma de la migración 20990803_test_missing_checksum '
+            . '(scripts/migrations/missing-migration.sql).';
+    }
+    orchestratorAssert($missingChecksumReported,
+        'El error de checksum no identifica la migración y el archivo que fallaron.');
+
     $migrationCalls = 0;
     $notificationCalls = 0;
     $registry = [[

@@ -144,6 +144,9 @@ final class SeriesBuilder
                     'moon_distance_geocentric' => $position->distanceKilometers,
                     'moon_distance_topocentric' => $position->topocentricDistanceKilometers,
                     'moon_ecliptic_latitude' => $position->eclipticLatitudeDegrees,
+                    'moon_ecliptic_longitude' => $position->eclipticLongitudeDegrees,
+                    'moon_node_angle' => $position->meanArgumentOfLatitudeDegrees,
+                    'moon_mean_ascending_node_longitude' => $position->meanAscendingNodeLongitudeDegrees,
                     'moon_right_ascension' => $position->rightAscensionDegrees / 15,
                     'moon_declination' => $position->declinationDegrees,
                     'moon_altitude' => $position->altitudeDegrees,
@@ -169,6 +172,8 @@ final class SeriesBuilder
                     'sun_azimuth' => $position->azimuthDegrees,
                     'sun_distance_km' => $position->earthSunDistanceKilometers(),
                     'sun_equation_of_time_minutes' => $position->equationOfTimeMinutes,
+                    'sun_node_angle' => self::normalizeDegrees($position->apparentEclipticLongitudeDegrees
+                        - MeeusLunarCalculator::meanAscendingNodeLongitude($instant)),
                 ];
                 $processed++;
                 self::reportProgress($progress, 'solar_instant', $processed, $workCount, $lastProgressAt, $processed === $workCount);
@@ -339,6 +344,12 @@ final class SeriesBuilder
     {
         if (!$date) return null;
         return (int) $date->format('G') + (int) $date->format('i') / 60 + (int) $date->format('s') / 3600;
+    }
+
+    private static function normalizeDegrees(float $value): float
+    {
+        $value = fmod($value, 360.0);
+        return $value < 0.0 ? $value + 360.0 : $value;
     }
 
     private static function reportProgress(?callable $progress, string $stage, int $processed, int $total, float &$lastAt, bool $force): void

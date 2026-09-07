@@ -54,6 +54,7 @@ final class MeeusLunarCalculator
         $m = $this->normalize(357.5291092 + 35999.0502909*$t - 0.0001536*$t*$t + $t*$t*$t/24490000.0);
         $mp = $this->normalize(134.9633964 + 477198.8675055*$t + 0.0087414*$t*$t + $t*$t*$t/69699.0 - $t**4/14712000.0);
         $f = $this->normalize(93.2720950 + 483202.0175233*$t - 0.0036539*$t*$t - $t*$t*$t/3526000.0 + $t**4/863310000.0);
+        $meanAscendingNode = self::meanAscendingNodeLongitudeForCenturies($t);
         $e = 1.0 - 0.002516*$t - 0.0000074*$t*$t;
         $sumLongitude = $sumDistance = 0.0;
         foreach (self::LONGITUDE_DISTANCE_TERMS as [$dc,$mc,$mpc,$fc,$lc,$rc]) {
@@ -123,8 +124,23 @@ final class MeeusLunarCalculator
             rad2deg($altitude), $azimuth, $geocentricDistance, $topocentricDistance, $cycle,
             $illumination, $cycle/360.0*self::SYNODIC_MONTH_DAYS, $this->phaseName($cycle),
             $moonLongitude, $moonLatitude, $this->normalize(rad2deg($ra)), rad2deg($declination),
-            $solarElongation
+            $solarElongation, $meanAscendingNode, $f
         );
+    }
+
+    /** Mean ascending-node longitude (Meeus fundamental argument), referred to the mean equinox of date. */
+    public static function meanAscendingNodeLongitude(DateTimeImmutable $dateTime): float
+    {
+        $utc = $dateTime->setTimezone(new DateTimeZone('UTC'));
+        $jd = 2440587.5 + (float) $utc->format('U.u') / 86400.0;
+        return self::meanAscendingNodeLongitudeForCenturies(($jd - 2451545.0) / 36525.0);
+    }
+
+    private static function meanAscendingNodeLongitudeForCenturies(float $t): float
+    {
+        $value = fmod(125.0445479 - 1934.1362891*$t + 0.0020754*$t*$t
+            + $t*$t*$t/467441.0 - $t**4/60616000.0, 360.0);
+        return $value < 0.0 ? $value + 360.0 : $value;
     }
 
     /** @return array{float,float} */

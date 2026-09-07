@@ -22,5 +22,9 @@
         return segments;
     }
 
-    window.ExplorerTimeSeriesSegments = {splitAtMidnight};
+    function splitCircular(values, period = 360) {
+        return splitAtMidnight(values, period / 2);
+    }
+
+    window.ExplorerTimeSeriesSegments = {splitAtMidnight, splitCircular};
 })();

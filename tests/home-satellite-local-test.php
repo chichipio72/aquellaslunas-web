@@ -108,6 +108,22 @@ homeSatelliteLocalAssert(count($allPriorityIds) === count(array_unique($allPrior
 homeSatelliteLocalAssert(count(homeSatelliteLocalTestReference()) >= count($sectionCases) + 3,
     'La referencia local no enumera los modos públicos de prueba.');
 
+$viewerEvent = $priorityUpcoming[0];
+$viewerUrl = homeSatelliteViewerUrl($viewerEvent);
+homeSatelliteLocalAssert(str_contains($viewerUrl, 'iss-y-tiangong.php?')
+    && str_contains($viewerUrl, 'station=' . $viewerEvent->satellite)
+    && str_contains($viewerUrl, 'time='),
+    'El evento satelital no enlazó el visor con estación e instante.');
+ob_start();
+renderHomeSatelliteEventItems([$viewerEvent], 'America/Argentina/Buenos_Aires', $fallbackNow);
+$viewerHtml = (string) ob_get_clean();
+homeSatelliteLocalAssert(substr_count($viewerHtml, 'Ver ISS y Tiangong') === 1,
+    'La acción contextual del visor falta o está duplicada.');
+$lunarPresentation = homeSatelliteEventPresentation($priorityTonight[0], 'America/Argentina/Buenos_Aires', $fallbackNow);
+homeSatelliteLocalAssert(str_starts_with((string) $lunarPresentation['target_altitude'], 'Luna a ')
+    && str_contains((string) $lunarPresentation['target_altitude'], ' horizonte.'),
+    'El evento lunar no informa la altura topocéntrica de la Luna.');
+
 putenv('APP_ENV=production');
 homeSatelliteLocalAssert(homeSatelliteLocalTestMode('historical') === null
     && homeSatelliteLocalTestMode('synthetic-solar') === null

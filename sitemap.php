@@ -14,14 +14,18 @@ function aquellasLunasSitemapEntries(array $catalog): array
     $paths = [
         '/',
         '/sol-y-luna.php',
+        '/luna-fecha-favorita.php',
+        '/luna-interactiva.php',
         '/cielo-de-hoy.php',
         '/cielo-de-esta-noche.php',
         '/eventos.php',
         '/planificador.php',
+        '/fotografia.php',
         '/eclipses.php',
         '/ubicacion.php',
         '/canciones-a-la-luna.php',
         '/que-podes-hacer.php',
+        '/fuentes-y-creditos.php',
         '/acerca-del-sitio.php',
         '/contenidos.php',
     ];

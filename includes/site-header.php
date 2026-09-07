@@ -18,9 +18,13 @@ function renderAstronomySiteHeader(string $currentSectionId, ?array $location = 
     $locationIsInitial = !$locationConfirmed && ($location['mode'] ?? 'default') === 'default';
     $showLocationIntro = $locationIsInitial
         && (!astronomyLocationIntroWasSeen() || ($location['stored_invalid'] ?? false) === true);
-    $returnPath = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/');
+    $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+    $returnPath = (string) (parse_url($requestUri, PHP_URL_PATH) ?: '/');
+    if (in_array($currentSectionId, ['favorite_moon', 'interactive_moon', 'photography'], true)) {
+        $returnPath = astronomyLocationReturnPath($requestUri) ?? $returnPath;
+    }
     $locationUrl = astronomyInternalUrl($rootPrefix . 'ubicacion.php');
-    if ($currentSectionId === 'notifications') {
+    if (in_array($currentSectionId, ['notifications', 'favorite_moon', 'interactive_moon', 'photography'], true)) {
         $safeReturnPath = astronomyLocationReturnPath($returnPath);
         if ($safeReturnPath !== null) {
             $locationUrl .= (str_contains($locationUrl, '?') ? '&' : '?')

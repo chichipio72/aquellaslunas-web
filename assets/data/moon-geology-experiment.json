@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "status": "experimental_not_integrated",
+    "created_at": "2026-08-18",
+    "purpose": "Diez fichas piloto para descubrir un modelo de enriquecimiento lunar a partir de datos reales.",
+    "coordinate_system": "IAU Moon, planetocentric latitude, positive-east longitude, -180..180",
+    "null_policy": "null significa que no se localizo un valor suficientemente respaldado; no debe inferirse del tipo o del nombre.",
+    "evidence_kinds": {
+      "measured": "medicion instrumental o de muestra",
+      "derived": "resultado calculado desde observaciones, con metodo identificable",
+      "modeled": "resultado de un modelo fisico o empirico",
+      "published_estimate": "estimacion publicada por una fuente cientifica",
+      "official_metadata": "dato de catalogo o mision oficial",
+      "interpretation": "interpretacion geologica publicada"
+    },
+    "important_scope_note": "Orientale designa aqui la cuenca de impacto de 930 km. Mare Orientale (IAU 3685, 294.16 km) es solamente el mare interior asociado.",
+    "usgs_map_join": {
+      "performed": false,
+      "reason": "El producto GIS global fue descargado y revisado, pero en esta prueba no se asignaron unidades por coordenada sin ejecutar y validar una union espacial planetaria. Los campos unit_symbol quedan null deliberadamente."
+    }
+  },
+  "sources": {
+    "iau_moon": {"title":"Gazetteer of Planetary Nomenclature: Moon","publisher":"IAU/USGS","url":"https://planetarynames.wr.usgs.gov/Page/MOON/target"},
+    "usgs_global_2020": {"title":"Unified Geologic Map of the Moon, 1:5M, version 2","authors":"Fortezzo, Spudis y Harrel","year":2020,"publisher":"USGS Astrogeology","url":"https://astrogeology.usgs.gov/search/map/Moon/Geology/Unified_Geologic_Map_of_the_Moon_GIS_v2/","doi":null},
+    "wilhelms_1987": {"title":"The Geologic History of the Moon","authors":"Wilhelms, McCauley y Trask","year":1987,"publisher":"USGS","doi":"10.3133/pp1348","url":"https://www.usgs.gov/publications/geologic-history-moon"},
+    "grail_orientale": {"title":"Gravity Field of the Orientale Basin from the GRAIL Mission","authors":"Zuber et al.","year":2016,"publisher":"Science / NASA NTRS","url":"https://ntrs.nasa.gov/citations/20170002335"},
+    "orientale_m3": {"title":"Lunar mare deposits associated with the Orientale impact basin","authors":"Whitten et al.","year":2011,"publisher":"USGS publication record","url":"https://www.usgs.gov/publications/lunar-mare-deposits-associated-orientale-impact-basin-new-insights-mineralogy-history"},
+    "nasa_crater_ages": {"title":"NASA's Moon Data Sheds Light on Earth's Asteroid Impact History","year":2019,"publisher":"NASA","url":"https://www.nasa.gov/missions/nasas-moon-data-sheds-light-on-earths-asteroid-impact-history/"},
+    "ntrs_copernicus": {"title":"Ar-40 - Ar-39 Geochronology on Apollo 12 Regolith","year":2003,"publisher":"NASA NTRS","url":"https://ntrs.nasa.gov/citations/20040062366"},
+    "nasa_tycho": {"title":"Tycho Crater on the Moon","year":2019,"publisher":"NASA/GSFC/ASU","url":"https://science.nasa.gov/resource/tycho-crater-on-the-moon-labeled/"},
+    "nasa_tycho_model": {"title":"Moon - Tycho","year":2025,"publisher":"NASA","url":"https://science.nasa.gov/3d-resources/moon-tycho/"},
+    "plato_2012": {"title":"The Geology of the Plato Region of the Moon","authors":"Trang et al.","year":2012,"publisher":"LPSC 43","url":"https://www.lpi.usra.edu/meetings/lpsc2012/pdf/1792.pdf"},
+    "lpi_impact_db": {"title":"Lunar Impact Crater Database (2015)","authors":"Losiak et al.; revisiones de Oehman","year":2015,"publisher":"LPI","url":"https://www.lpi.usra.edu/scientific-databases/"},
+    "lpi_rilles": {"title":"Atlas of Lunar Sinuous Rilles","authors":"Hurwitz, Head y Hiesinger","year":2013,"publisher":"LPI","url":"https://www.lpi.usra.edu/lunar/rilles/"},
+    "lpi_hadley": {"title":"Apollo 15 Lunar Samples and landing-site geology","publisher":"LPI","url":"https://www.lpi.usra.edu/lunar/missions/apollo/apollo_15/samples/index.shtml"},
+    "lpi_vallis": {"title":"Clementine Mission Images: Aristarchus Plateau","publisher":"LPI","url":"https://www.lpi.usra.edu/lunar/missions/clementine/images/"},
+    "nasa_lola": {"title":"LRO LOLA Data Products","publisher":"NASA PDS Geosciences Node","url":"https://pds-geosciences.wustl.edu/missions/lro/lola.htm","doi":"10.17189/1520642"},
+    "apollo11_geology": {"title":"The geology and petrology of the Apollo 11 landing site","authors":"Beaty y Albee","year":1980,"publisher":"NASA NTRS","url":"https://ntrs.nasa.gov/citations/19820038718"},
+    "apollo11_map": {"title":"Geologic Map of Apollo Landing Site 2","authors":"Grolier","year":1970,"publisher":"USGS","url":"https://store.usgs.gov/product/26349","series":"I-619"},
+    "apollo17_map": {"title":"Geologic maps of the Taurus-Littrow region","authors":"Scott, Lucchitta y Carr","year":1972,"publisher":"USGS","doi":"10.3133/i800","url":"https://pubs.usgs.gov/publication/i800"},
+    "apollo17_nasa": {"title":"Apollo 17 Mission Details","publisher":"NASA","url":"https://www.nasa.gov/missions/apollo/apollo-17-mission-details/"},
+    "apollo17_science": {"title":"Apollo 17 Landing Site, The Taurus-Littrow Valley","publisher":"NASA/GSFC/ASU","url":"https://science.nasa.gov/resource/apollo-17-landing-site-the-taurus-littrow-valley/"},
+    "apollo_sites_coords": {"title":"Lunar Historic Sites","publisher":"NASA/USGS","url":"https://www.nasa.gov/wp-content/uploads/2023/12/nasa-usg-lunar-historic-sites-reva.pdf"}
+  },
+  "objects": [
+    {
+      "local_id":"pilot:mare-imbrium","name":"Mare Imbrium","entity_scope":"named_mare",
+      "identity":{"iau_feature_id":3678,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/3678","type":"Mare","latitude_deg":34.7244,"longitude_deg_east":-14.9086,"dimension_km":1145.53,"dimension_meaning":"extension nominal del accidente nombrado, no diametro de una forma circular","approval_status":"Adopted by IAU","approval_date":1935,"name_origin":"Sea of Rains","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"Cuenca excavada por un gran impacto y posteriormente rellenada en varios episodios por lavas basalticas de mare.","evidence":"interpretation","sources":["wilhelms_1987"]},"classification":"mare basaltico dentro de cuenca multianular","geologic_system":{"value":"impacto de cuenca: Imbrico temprano; rellenos basalticos: principalmente Imbrico tardio y Eratosteniano","evidence":"published_estimate","sources":["wilhelms_1987"]},"absolute_age":{"value_min_ga":3.80,"value_max_ga":3.85,"applies_to":"formacion de la cuenca, no a todos los basaltos del mare","evidence":"published_estimate","sources":["wilhelms_1987"]},"materials":[{"value":"basaltos de mare sobre corteza y depositos de impacto","evidence":"interpretation","sources":["wilhelms_1987"]}],"usgs_map_unit":{"unit_symbol":null,"reason":"union espacial no ejecutada"},"context":"Las unidades oscuras visibles no son una unica colada ni poseen una edad unica."},
+      "topography":{"center_elevation_m":null,"relief_m":null,"depth_m":null,"recommended_derivation":"muestreo regional de LOLA/SLDEM y perfiles de los anillos; no usar el diametro IAU como mascara","source_product":"LOLA GDR / SLDEM","sources":["nasa_lola"]},
+      "morphology":{"features":["llanuras basalticas","dorsales de mare","restos de anillos montañosos parcialmente sepultados"]},
+      "limitations":["La edad de la cuenca no es la edad de todo Mare Imbrium.","La coordenada central puede caer sobre una sola de muchas unidades basalticas."]
+    },
+    {
+      "local_id":"pilot:orientale-basin","name":"Orientale","entity_scope":"impact_basin_not_identical_to_iau_mare",
+      "identity":{"iau_feature_id":null,"associated_iau_feature":{"id":3685,"name":"Mare Orientale","url":"https://planetarynames.wr.usgs.gov/Feature/3685","latitude_deg":-19.87,"longitude_deg_east":-94.67,"dimension_km":294.16,"approval_date":1964,"name_origin":"Eastern Sea"},"type":"multi-ring impact basin","latitude_deg":-19.9,"longitude_deg_east":-95.0,"dimension_km":930,"dimension_meaning":"diametro aproximado del anillo exterior de la cuenca","evidence":"measured","sources":["grail_orientale"]},
+      "geology":{"formation_process":{"value":"Impacto gigante; rebote y colapso de la cavidad transitoria formaron anillos concentricos y redistribuyeron corteza.","evidence":"interpretation","sources":["grail_orientale"]},"classification":"cuenca de impacto multianular, la gran cuenca lunar mas joven y mejor preservada","geologic_system":"Imbrico temprano","absolute_age":{"value_ga":3.8,"precision":"aproximada","evidence":"published_estimate","sources":["grail_orientale","wilhelms_1987"]},"materials":[{"value":"fundido de impacto, ejecta de cuenca y parches posteriores de basalto de mare","evidence":"interpretation","sources":["grail_orientale","orientale_m3"]}],"mare_emplacement_age_ga":{"range":[1.66,3.70],"applies_to":"diversos depositos basalticos de la region, no a la cuenca","evidence":"derived","method":"edades modelo por conteo de crateres y analisis M3","sources":["orientale_m3"]},"usgs_map_unit":{"unit_symbol":null,"reason":"una cuenca de 930 km atraviesa muchas unidades; una unidad central seria engañosa"}},
+      "topography":{"excavated_volume_km3":{"value":3400000,"uncertainty_km3":200000,"evidence":"derived","method":"inversion de gravedad GRAIL","resolution_km":"3-5","sources":["grail_orientale"]},"transient_crater_diameter_km":{"range":[320,460],"evidence":"modeled","method":"gravedad GRAIL y modelos de formacion","sources":["grail_orientale"]},"center_elevation_m":null},
+      "morphology":{"features":["tres anillos principales","fallas profundas asociadas a los dos anillos exteriores","mare interior parcial","depositos extensos de ejecta"]},
+      "limitations":["Mare Orientale y cuenca Orientale no son la misma entidad.","El diametro depende del anillo usado para definir la cuenca."]
+    },
+    {
+      "local_id":"pilot:copernicus","name":"Copernicus","entity_scope":"named_crater",
+      "identity":{"iau_feature_id":1296,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/1296","type":"Crater","latitude_deg":9.6209,"longitude_deg_east":-20.0786,"dimension_km":96.07,"approval_status":"Adopted by IAU","approval_date":1935,"name_origin":"Nicolaus Copernicus, Polish astronomer","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"crater de impacto complejo","evidence":"interpretation","sources":["wilhelms_1987"]},"classification":"crater complejo con sistema de rayos","geologic_system":"Copernicano","absolute_age":{"value_ma":797,"evidence":"published_estimate","method":"cronologia por abundancia de rocas termicamente expuestas con LRO Diviner","sources":["nasa_crater_ages"]},"independent_age":{"value_ma":800,"uncertainty_ma":15,"evidence":"published_estimate","method":"reinicio 40Ar/39Ar en fragmento Apollo 12 interpretado como ejecta de Copernicus","sources":["ntrs_copernicus"]},"usgs_map_unit":{"unit_symbol":null,"reason":"union espacial no ejecutada"}},
+      "topography":{"depth_m":null,"rim_height_m":null,"central_peak_height_m":null,"recommended_derivation":"perfil LOLA/SLDEM con medianas de piso, borde y terreno exterior","sources":["nasa_lola"]},
+      "morphology":{"features":["paredes aterrazadas","grupo de picos centrales","piso con fundido de impacto","ejecta y rayos brillantes"]},
+      "limitations":["La edad radiometrica depende de atribuir correctamente material de Apollo 12 a Copernicus."]
+    },
+    {
+      "local_id":"pilot:tycho","name":"Tycho","entity_scope":"named_crater",
+      "identity":{"iau_feature_id":6163,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/6163","type":"Crater","latitude_deg":-43.2958,"longitude_deg_east":-11.2153,"dimension_km":85.29,"approval_status":"Adopted by IAU","approval_date":1935,"name_origin":"Tycho Brahe, Danish astronomer","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"crater de impacto complejo","evidence":"interpretation","sources":["nasa_tycho"]},"classification":"crater complejo joven con rayos","geologic_system":"Copernicano","absolute_age":{"value_ma":108,"precision":"aproximada y condicionada a la procedencia de las muestras","evidence":"published_estimate","method":"edades radiometricas de vidrios de impacto de Apollo 17 atribuidos a ejecta de Tycho","sources":["nasa_tycho"]},"materials":[{"value":"fundido de impacto preservado en el piso","evidence":"interpretation","sources":["nasa_tycho"]}],"usgs_map_unit":{"unit_symbol":null,"reason":"union espacial no ejecutada"}},
+      "topography":{"floor_to_rim_m":{"value":4700,"evidence":"derived","method":"modelo topografico NASA publicado","sources":["nasa_tycho_model"]},"central_peak_above_floor_m":{"value":2000,"evidence":"derived","method":"modelo topografico NASA publicado","sources":["nasa_tycho_model"]},"center_elevation_m":null},
+      "morphology":{"features":["rayos globalmente prominentes","paredes aterrazadas","picos centrales","piso con fundido de impacto"]},
+      "limitations":["Tycho no fue muestreado directamente; la edad depende del enlace entre muestras lejanas y sus rayos."]
+    },
+    {
+      "local_id":"pilot:plato","name":"Plato","entity_scope":"named_crater",
+      "identity":{"iau_feature_id":4757,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/4757","type":"Crater","latitude_deg":51.6192,"longitude_deg_east":-9.3825,"dimension_km":100.68,"approval_status":"Adopted by IAU","approval_date":1935,"name_origin":"Plato, Greek philosopher","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"impacto complejo seguido por relleno volcanico del piso","evidence":"interpretation","sources":["plato_2012"]},"classification":"crater complejo de piso inundado por mare","geologic_system":{"crater":"Imbrico","floor_fill":"Eratosteniano"},"absolute_age":{"crater":null,"floor_fill_ga":{"value":2.8,"evidence":"published_estimate","method":"edad modelo del mare interior citada por Trang et al.","sources":["plato_2012"]}},"materials":[{"value":"basalto de mare en el piso; materiales de tierras altas en borde y entorno","evidence":"interpretation","sources":["plato_2012"]}],"usgs_map_unit":{"unit_symbol":null,"reason":"el centro representaria el relleno volcanico, no la edad del crater"}},
+      "topography":{"depth_m":null,"rim_height_m":null,"recommended_derivation":"separar piso basaltico, borde y exterior al medir con LOLA/SLDEM","sources":["nasa_lola"]},
+      "morphology":{"features":["piso oscuro y liso rellenado por mare","borde montañoso","halo oscuro de radar","rimas y cadenas de crateres en el entorno"]},
+      "limitations":["Una sola edad no describe tanto la excavacion del crater como su relleno posterior."]
+    },
+    {
+      "local_id":"pilot:mons-huygens","name":"Mons Huygens","entity_scope":"named_mountain",
+      "identity":{"iau_feature_id":3987,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/3987","type":"Mons","latitude_deg":19.9188,"longitude_deg_east":-2.8571,"dimension_km":41.97,"approval_status":"Adopted by IAU","approval_date":1961,"name_origin":"Christiaan Huygens, Dutch astronomer, mathematician and physicist","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"bloque de corteza levantado como parte del anillo montañoso de la cuenca Imbrium","evidence":"interpretation","sources":["wilhelms_1987"]},"classification":"pico de anillo de cuenca de impacto, no volcan","geologic_system":"Imbrico temprano","absolute_age":{"value":null,"note":"se puede asociar temporalmente al evento Imbrium, pero no se localizo una datacion propia del mons"},"materials":{"value":"material cortical de tierras altas excavado y desplazado por el impacto Imbrium","evidence":"interpretation","sources":["wilhelms_1987"]},"usgs_map_unit":{"unit_symbol":null,"reason":"union espacial no ejecutada"}},
+      "topography":{"summit_elevation_m":null,"height_above_local_mare_m":null,"recommended_derivation":"maximo LOLA dentro del poligono IAU menos mediana de una corona exterior; conservar ambos datums","sources":["nasa_lola"]},
+      "morphology":{"features":["relieve positivo abrupto","alineacion con Montes Apenninus y el anillo de Imbrium"]},
+      "limitations":["La cifra popular de altura no se incorporo sin verificar datum, producto y metodo."]
+    },
+    {
+      "local_id":"pilot:vallis-schroteri","name":"Vallis Schröteri","entity_scope":"named_valley_sinuous_rille_system",
+      "identity":{"iau_feature_id":6300,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/6300","type":"Vallis","latitude_deg":26.1555,"longitude_deg_east":-51.5805,"dimension_km":185.32,"approval_status":"Adopted by IAU","approval_date":1961,"name_origin":"Schroeter's Valley","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"canal volcanico excavado o modificado por lavas de baja viscosidad desde una fuente tipo cabeza de cobra","evidence":"interpretation","sources":["lpi_vallis","lpi_rilles"]},"classification":"mayor sistema de rima sinuosa lunar","geologic_system":null,"absolute_age":null,"context":"Aristarchus Plateau, una meseta elevada, inclinada y fracturada con volcanismo efusivo y explosivo.","materials":{"value":"terreno volcanico y lavas basalticas en el sistema del Aristarchus Plateau","evidence":"interpretation","sources":["lpi_vallis"]},"usgs_map_unit":{"unit_symbol":null,"reason":"una linea de 185 km cruza mas de una unidad"}},
+      "topography":{"length_km":{"value":160,"evidence":"measured","method":"cartografia Clementine","sources":["lpi_vallis"]},"maximum_width_km":{"value":11,"evidence":"measured","sources":["lpi_vallis"]},"depth_m":{"value":1000,"evidence":"derived","method":"altimetria Clementine publicada por LPI","sources":["lpi_vallis"]}},
+      "morphology":{"features":["trayectoria sinuosa","fuente en cabeza de cobra","canal interior","entorno con depositos volcanicos"]},
+      "limitations":["El diametro IAU y la longitud cartografica publicada no representan exactamente la misma medida."]
+    },
+    {
+      "local_id":"pilot:rima-hadley","name":"Rima Hadley","entity_scope":"named_sinuous_rille",
+      "identity":{"iau_feature_id":5064,"iau_feature_url":"https://planetarynames.wr.usgs.gov/Feature/5064","type":"Rima","latitude_deg":25.7159,"longitude_deg_east":3.1467,"dimension_km":116.09,"approval_status":"Adopted by IAU","approval_date":1964,"name_origin":"Named from nearby Mons Hadley","evidence":"official_metadata","sources":["iau_moon"]},
+      "geology":{"formation_process":{"value":"canal volcanico, probablemente con tramos originados como tubo de lava cuyo techo colapso","evidence":"interpretation","sources":["lpi_hadley"]},"classification":"rima sinuosa volcanica","geologic_system":"Imbrico tardio","absolute_age":{"value_ga":3.3,"applies_to":"basaltos de Mare Imbrium muestreados en el sitio Apollo 15, no una datacion directa de toda la rima","evidence":"measured","method":"datacion de muestras Apollo 15 resumida por LPI","sources":["lpi_hadley"]},"materials":[{"value":"capas de coladas basalticas expuestas en las paredes","evidence":"measured","method":"observacion de campo Apollo 15 y muestras","sources":["lpi_hadley"]}],"usgs_map_unit":{"unit_symbol":null,"reason":"una linea sinuosa cruza distintas superficies"}},
+      "topography":{"length_km":{"value":135,"evidence":"measured","sources":["lpi_hadley"]},"local_width_km":{"value":1.5,"location":"cerca del sitio Apollo 15","evidence":"measured","sources":["lpi_hadley"]},"local_depth_m":{"value":300,"location":"cerca del sitio Apollo 15","evidence":"measured","sources":["lpi_hadley"]}},
+      "morphology":{"features":["meandros","paredes con basaltos estratificados","tramos posiblemente techados y colapsados"]},
+      "limitations":["Ancho y profundidad son locales, no valores constantes para toda la rima.","La edad de basaltos vecinos no equivale necesariamente a la edad exacta de incision o colapso."]
+    },
+    {
+      "local_id":"pilot:apollo-11","name":"Apollo 11","entity_scope":"landing_site",
+      "identity":{"iau_feature_id":null,"type":"human_landing_site","latitude_deg":0.67408,"longitude_deg_east":23.47297,"dimension_km":null,"mission":"Apollo 11","landing_date":"1969-07-20","site_name":"Tranquility Base","evidence":"official_metadata","sources":["apollo_sites_coords","apollo11_map"]},
+      "geology":{"formation_process":"sitio sobre sucesivas coladas basalticas de mare cubiertas por regolito y ejecta de impactos","classification":"llanura de mare en Mare Tranquillitatis","geologic_system":"Imbrico tardio","absolute_age":{"range_ga":[3.60,3.90],"applies_to":"cinco grupos petrologicos de basaltos Apollo 11 identificados en la publicacion","evidence":"measured","method":"geocronologia y petrologia de muestras","sources":["apollo11_geology"]},"materials":[{"value":"basaltos de mare de al menos cinco unidades igneas; regolito; brechas y materiales eyectados","evidence":"measured","sources":["apollo11_geology"]}],"site_units":{"value":"tres unidades fotogeologicas de mare; el modulo descendio sobre la mas antigua de las tres","evidence":"interpretation","sources":["apollo11_geology"]},"usgs_map_unit":{"unit_symbol":null,"reason":"falta verificar la equivalencia entre el mapa global y el mapa local I-619"}},
+      "topography":{"elevation_m":null,"local_relief_m":null,"recommended_derivation":"LOLA/SLDEM para contexto regional; DEM LROC estereo para escala del sitio","sources":["nasa_lola"]},
+      "mission_findings":[{"value":"Las muestras muestran varias unidades de enfriamiento basaltico, no una unica colada homogénea.","sources":["apollo11_geology"]}],
+      "limitations":["Un sitio puntual requiere mapas locales; el mapa global 1:5M es demasiado general."]
+    },
+    {
+      "local_id":"pilot:apollo-17","name":"Apollo 17","entity_scope":"landing_site",
+      "identity":{"iau_feature_id":null,"type":"human_landing_site","latitude_deg":20.1908,"longitude_deg_east":30.77168,"dimension_km":null,"mission":"Apollo 17","landing_date":"1972-12-11","site_name":"Taurus-Littrow Valley","evidence":"official_metadata","sources":["apollo_sites_coords","apollo17_nasa"]},
+      "geology":{"formation_process":"valle estructural entre bloques montañosos del borde de Serenitatis, rellenado por basaltos y cubierto localmente por manto piroclastico oscuro y depositos de impacto","classification":"sitio de valle/mare junto a macizos de tierras altas","geologic_system":null,"absolute_age":null,"materials":[{"value":"basaltos del fondo del valle","evidence":"measured","sources":["apollo17_map"]},{"value":"brechas antiguas de los macizos, relacionadas principalmente con Serenitatis y posiblemente modificadas por ejecta posteriores","evidence":"interpretation","sources":["apollo17_map"]},{"value":"manto oscuro piroclastico volcanico","evidence":"interpretation","sources":["apollo17_map"]}],"relation_to_major_event":"Los macizos forman parte del borde de la cuenca Serenitatis; uno de los objetivos fue muestrearlos para acotar su edad.","usgs_map_unit":{"unit_symbol":null,"reason":"el sitio contiene varias unidades a escala de recorrido; no debe reducirse a una unidad global"}},
+      "topography":{"elevation_m":null,"local_relief_m":null,"recommended_derivation":"combinar LOLA regional con DEM LROC y recorridos de mision","sources":["nasa_lola"]},
+      "mission_findings":[{"value":"Se muestrearon materiales volcanicos relativamente jovenes del valle y materiales antiguos de los macizos.","evidence":"measured","sources":["apollo17_science","apollo17_map"]},{"value":"Las muestras atribuidas a rayos de Tycho ofrecen una edad indirecta para ese impacto, no para todo el sitio.","evidence":"interpretation","sources":["nasa_tycho"]}],
+      "limitations":["La edad de Serenitatis sigue discutida incluso con muestras; no se fija aqui una edad unica.","La ficha del sitio debe admitir multiples unidades y estaciones de muestreo."]
+    }
+  ]
+}

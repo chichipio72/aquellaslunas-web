@@ -303,7 +303,7 @@ function astronomyDataAltitudeProfile(array $location, string $date, string $tar
 }
 
 /** @return array<string,mixed> */
-function astronomyDataTonight(array $location, string $date, string $detail, string $label, int $timeout = 12): array
+function astronomyDataTonight(array $location, string $date, string $detail, string $label, int $timeout = 12, ?DateTimeImmutable $now = null): array
 {
     $parameters = ['date' => $date, 'detail' => $detail] + astronomyDataLocationParameters($location);
     $calculator = new TonightCalculator();
@@ -312,7 +312,8 @@ function astronomyDataTonight(array $location, string $date, string $detail, str
         static fn(): array => $calculator->calculate(
             new DateTimeImmutable($date, new DateTimeZone((string) $location['timezone'])),
             astronomyDataObserver($location),
-            $detail
+            $detail,
+            $now
         ),
         '/v1/astronomy/tonight', $parameters, $label, $timeout,
         static function (array $result) use ($detail): void {
@@ -324,13 +325,15 @@ function astronomyDataTonight(array $location, string $date, string $detail, str
             }
         }
     );
-    if (!is_array($result['moon_encounters'] ?? null)) {
+    if (!is_array($result['moon_encounters'] ?? null) || !is_array($result['moon_scenes'] ?? null) || $now !== null) {
         $portable = $calculator->calculate(
             new DateTimeImmutable($date, new DateTimeZone((string) $location['timezone'])),
             astronomyDataObserver($location),
-            $detail
+            $detail,
+            $now
         );
-        $result['moon_encounters'] = $portable['moon_encounters'] ?? [];
+        if (!is_array($result['moon_encounters'] ?? null)) $result['moon_encounters'] = $portable['moon_encounters'] ?? [];
+        if (!is_array($result['moon_scenes'] ?? null) || $now !== null) $result['moon_scenes'] = $portable['moon_scenes'] ?? [];
     }
     return $result;
 }

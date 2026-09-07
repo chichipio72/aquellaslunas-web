@@ -1,0 +1,205 @@
+html:has(.lunar-widget),
+body.lunar-widget { min-height: 100%; margin: 0; background: #02050c; color: #eef2ff; }
+.lunar-widget { overflow: hidden; }
+.lunar-widget__frame { position: relative; width: 100vw; height: 100vh; min-height: 18rem; overflow: hidden; background: radial-gradient(circle at 50% 48%, #0b1325 0, #030711 56%, #000 100%); }
+.lunar-widget__moon,
+.libration-widget { width: 100%; height: 100%; min-height: 18rem; border: 0; border-radius: 0; background: transparent; }
+.lunar-widget__moon.is-rotation-locked { pointer-events: none; cursor: default; }
+.lunar-widget__toolbar { position: absolute; z-index: 10; top: .55rem; left: 50%; display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; width: min(calc(100% - 1rem), 52rem); transform: translateX(-50%); }
+.lunar-widget__toolbar label,
+.lunar-widget__toolbar button,
+.lunar-widget__toolbar select { min-height: 2rem; border: 1px solid rgba(143, 163, 207, .4); border-radius: .4rem; background: rgba(6, 12, 26, .86); color: #eef2ff; font-family: inherit; font-size: .72rem; font-weight: 650; line-height: 1.1; backdrop-filter: blur(5px); }
+.lunar-widget__toolbar label { display: inline-flex; align-items: center; gap: .3rem; padding: .28rem .45rem; }
+.lunar-widget__toolbar input { accent-color: #e7c96e; }
+.lunar-widget__toolbar select { padding-inline: .45rem; }
+.lunar-widget__toolbar button { padding-inline: .58rem; cursor: pointer; }
+.lunar-widget__toolbar button:hover { border-color: #8aa8e9; background: rgba(25, 36, 67, .94); }
+.lunar-widget__error,
+.lunar-widget__loading { position: absolute; z-index: 4; top: 50%; left: 50%; margin: 0; color: #aab3c9; transform: translate(-50%, -50%); }
+.libration-widget { position: relative; }
+.libration-widget__background,
+.libration-widget__canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.libration-widget__background { z-index: 0; }
+.libration-widget__canvas { z-index: 1; }
+.libration-widget.is-ready .lunar-widget__loading { display: none; }
+.libration-widget__readout { position: absolute; z-index: 3; right: .7rem; bottom: .65rem; display: grid; justify-items: end; gap: .15rem; padding: .38rem .5rem; border-radius: .4rem; background: rgba(0, 0, 0, .55); color: #dce4f8; font-size: .68rem; pointer-events: none; backdrop-filter: blur(4px); }
+.libration-widget__readout strong { color: #f4d985; font-size: .76rem; }
+.libration-widget__controls { position: absolute; z-index: 4; left: .65rem; right: .65rem; bottom: .65rem; display: flex; align-items: center; gap: .55rem; max-width: min(36rem, calc(100% - 1.3rem)); }
+.libration-widget__controls button { min-height: 2rem; padding: .35rem .65rem; border: 1px solid rgba(143, 163, 207, .45); border-radius: .4rem; background: rgba(7, 14, 30, .9); color: #edf2ff; font-family: inherit; font-size: .74rem; font-weight: 700; line-height: 1; cursor: pointer; }
+.libration-widget__controls label { display: grid; flex: 1; gap: .15rem; color: #c4cce0; font-size: .65rem; font-weight: 700; }
+.libration-widget__controls input { width: 100%; accent-color: #e7c96e; }
+.libration-widget:has(.libration-widget__controls) .libration-widget__readout { bottom: 3.7rem; }
+.libration-widget.is-exporting .libration-widget__controls,
+.libration-widget.is-exporting .libration-widget__readout { display: none; }
+
+.lunar-eclipse-widget { position: relative; width: 100%; height: 100%; min-height: 22rem; overflow: hidden; }
+.lunar-eclipse-widget.is-ready .lunar-widget__loading { display: none; }
+.lunar-eclipse-widget__moon { position: absolute; inset: 0 0 7.4rem; }
+.lunar-eclipse-widget__canvas { display: block; width: 100%; height: 100%; }
+.lunar-eclipse-widget__readout { position: absolute; z-index: 3; top: .65rem; left: 50%; display: grid; justify-items: center; gap: .12rem; padding: .38rem .6rem; border-radius: .4rem; background: rgba(0, 0, 0, .55); color: #c7d0e4; font-size: .68rem; transform: translateX(-50%); backdrop-filter: blur(4px); }
+.lunar-eclipse-widget__readout strong { color: #efcc91; font-size: .8rem; }
+.lunar-eclipse-widget__geometry { position: absolute; z-index: 3; right: .6rem; bottom: 3.45rem; left: .6rem; height: 3.7rem; margin: 0; padding: .18rem .35rem; border: 1px solid rgba(145, 160, 193, .18); border-radius: .45rem; background: rgba(3, 7, 16, .76); }
+.lunar-eclipse-widget__geometry svg { display: block; width: 100%; height: 2.75rem; overflow: visible; }
+.lunar-eclipse-widget__geometry text { fill: #aeb9cf; font-size: 13px; }
+.lunar-eclipse-widget__geometry figcaption { color: #7f899e; font-size: .54rem; text-align: right; }
+.lunar-eclipse-widget__controls { position: absolute; z-index: 4; right: .65rem; bottom: .55rem; left: .65rem; display: flex; align-items: center; gap: .55rem; }
+.lunar-eclipse-widget__controls button { min-height: 2rem; padding: .35rem .65rem; border: 1px solid rgba(143, 163, 207, .45); border-radius: .4rem; background: rgba(7, 14, 30, .9); color: #edf2ff; font-family: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; }
+.lunar-eclipse-widget__controls label { display: grid; flex: 1; gap: .1rem; color: #c4cce0; font-size: .62rem; font-weight: 700; }
+.lunar-eclipse-widget__controls input { width: 100%; accent-color: #c87855; }
+
+.real-eclipse-widget { position: relative; width: 100%; height: 100%; min-height: 24rem; overflow: hidden; background: radial-gradient(circle at center, #0a1328, #01030a 72%); }
+.real-eclipse-widget.is-ready .lunar-widget__loading { display: none; }
+.real-eclipse-widget__stage,.real-solar-eclipse__canvas { display: block; width: 100%; height: 100%; }
+.real-eclipse-widget__canvas { display: block; width: 100%; height: 100%; }
+.real-eclipse-widget__readout { position: absolute; z-index: 4; top: .6rem; left: 50%; display: grid; justify-items: center; gap: .1rem; width: min(92%,34rem); padding: .4rem .65rem; border-radius: .45rem; background: rgba(0,0,0,.6); color: #c5cee1; font-size: .68rem; text-align: center; transform: translateX(-50%); backdrop-filter: blur(5px); }
+.real-eclipse-widget__readout strong { color: #f0d294; font-size: .82rem; }
+.real-eclipse-widget__readout small { color: #9ea9c0; }
+.real-eclipse-widget__controls { position: absolute; z-index: 5; right: .6rem; bottom: 1.65rem; left: .6rem; display: flex; align-items: end; gap: .4rem; }
+.real-eclipse-widget__controls button,.real-eclipse-widget__controls select { min-height: 2rem; padding: .35rem .55rem; border: 1px solid rgba(143,163,207,.45); border-radius: .4rem; background: rgba(7,14,30,.92); color: #edf2ff; font: 700 .68rem inherit; cursor: pointer; }
+.real-eclipse-widget__controls label { display: grid; flex: 0 1 26rem; gap: .12rem; color: #c4cce0; font-size: .62rem; font-weight: 700; }
+.real-eclipse-widget__controls label:last-child { flex-basis: 5rem; }
+.real-eclipse-widget__controls input { width: 100%; accent-color: #e3b765; }
+.real-eclipse-widget__contacts { position: absolute; z-index: 5; right: .65rem; bottom: 1.25rem; left: .65rem; height: .2rem; background: rgba(159,174,207,.25); pointer-events: none; }
+.real-eclipse-widget__contacts span { position: absolute; top: -.15rem; color: #cad4e8; font-size: .5rem; transform: translate(-50%,-100%); }
+.real-eclipse-widget__contacts span::after { display: block; width: 1px; height: .32rem; margin: .08rem auto 0; background: #e3b765; content: ''; }
+.real-solar-eclipse__safety { position: absolute; z-index: 4; right: .5rem; bottom: .15rem; left: .5rem; margin: 0; color: #d7b57a; font-size: .55rem; text-align: center; }
+.solar-space-eclipse__stage,
+.solar-space-eclipse__canvas { display: block; width: 100%; height: 100%; }
+.solar-space-eclipse__canvas { touch-action: none; cursor: grab; }
+.solar-space-eclipse__canvas:active { cursor: grabbing; }
+.solar-space-eclipse__scale-note { position: absolute; z-index: 4; right: .65rem; bottom: .18rem; margin: 0; color: #8f9ab1; font-size: .56rem; letter-spacing: .04em; }
+.solar-space-eclipse__controls button[aria-pressed="true"] { border-color: #d9bd71; color: #f4d985; }
+
+.earth-moon-widget { position: relative; width: 100%; height: 100%; min-height: 18rem; overflow: hidden; }
+.earth-moon-widget.is-ready .lunar-widget__loading { display: none; }
+.earth-moon-widget__comparison { --moon-diameter: clamp(4.2rem, 14vw, 7.2rem); display: flex; align-items: center; justify-content: center; gap: clamp(1rem, 4vw, 3rem); width: 100%; height: calc(100% - 5.4rem); padding: 1rem; }
+.earth-moon-widget__body { display: grid; flex: 0 0 auto; justify-items: center; gap: .35rem; margin: 0; }
+.earth-moon-widget__body--moon { width: var(--moon-diameter); }
+.earth-moon-widget__body--earth { width: calc(var(--moon-diameter) * 3.67); }
+.earth-moon-widget__canvas { width: 100%; aspect-ratio: 1; }
+.earth-moon-widget__canvas canvas { display: block; width: 100%; height: 100%; }
+.earth-moon-widget figcaption { display: grid; justify-items: center; gap: .1rem; width: max-content; max-width: 100%; color: #b8c2d8; font-size: clamp(.58rem, 1.2vw, .72rem); text-align: center; }
+.earth-moon-widget figcaption strong { color: #eef2ff; }
+.earth-moon-widget__readout { position: absolute; top: .55rem; left: 50%; z-index: 3; display: grid; justify-items: center; gap: .1rem; width: min(94%, 34rem); color: #aeb9cf; font-size: .65rem; text-align: center; transform: translateX(-50%); }
+.earth-moon-widget__readout strong { color: #f4d985; font-size: .76rem; }
+.earth-moon-widget__controls { position: absolute; z-index: 4; right: .65rem; bottom: .55rem; left: .65rem; display: flex; align-items: center; justify-content: center; gap: .45rem; }
+.earth-moon-widget__controls button { min-height: 2rem; padding: .35rem .6rem; border: 1px solid rgba(143, 163, 207, .45); border-radius: .4rem; background: rgba(7, 14, 30, .9); color: #edf2ff; font-family: inherit; font-size: .7rem; font-weight: 700; line-height: 1; cursor: pointer; }
+.earth-moon-widget__controls label { display: grid; flex: 0 1 28rem; gap: .1rem; color: #c4cce0; font-size: .62rem; font-weight: 700; }
+.earth-moon-widget__controls input { width: 100%; accent-color: #e7c96e; }
+
+.full-moon-sizes { --full-moon-reference-diameter: min(13vw, 26vh); display: grid; grid-template-rows: auto 1fr; min-height: 25rem; padding: clamp(.55rem, 1.4vw, 1rem); overflow: hidden; }
+.full-moon-sizes__header { display: flex; align-items: center; justify-content: space-between; gap: .8rem; min-width: 0; color: #eef2ff; }
+.full-moon-sizes__header > div { display: grid; gap: .12rem; }
+.full-moon-sizes__header strong { font-size: clamp(.78rem, 1.4vw, 1rem); }
+.full-moon-sizes__header span { color: #9eabc3; font-size: clamp(.58rem, 1vw, .68rem); }
+.full-moon-sizes__controls { display: flex; align-items: end; gap: .35rem; }
+.full-moon-sizes__controls label { display: grid; gap: .12rem; }
+.full-moon-sizes__controls input,
+.full-moon-sizes__controls button { min-height: 2rem; padding: .3rem .48rem; border: 1px solid rgba(143, 163, 207, .45); border-radius: .4rem; background: rgba(7, 14, 30, .9); color: #edf2ff; font: inherit; font-size: .68rem; }
+.full-moon-sizes__controls button { cursor: pointer; }
+.full-moon-sizes__controls button:hover,
+.full-moon-sizes__controls button:focus-visible { border-color: #d9bd71; outline: 2px solid transparent; color: #f4d985; }
+.full-moon-sizes__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: clamp(.3rem, 1vw, .75rem); min-height: 0; margin: .55rem 0 0; padding: 0; list-style: none; }
+.full-moon-sizes__item { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; place-items: center; min-width: 0; gap: .05rem; color: #c6d0e5; font-size: clamp(.62rem, 1.1vw, .76rem); }
+.full-moon-sizes__item time { white-space: nowrap; }
+.full-moon-sizes__item > strong { color: #f4d985; font-size: .92em; }
+.full-moon-sizes__reference { position: relative; isolation: isolate; align-self: center; width: var(--full-moon-reference-diameter); height: var(--full-moon-reference-diameter); overflow: visible; }
+.full-moon-sizes__reference::before,
+.full-moon-sizes__reference::after { position: absolute; z-index: 0; top: -14%; bottom: -14%; width: 0; border-left: 1px dashed rgba(190, 207, 239, .48); content: ""; }
+.full-moon-sizes__reference::before { left: 0; }
+.full-moon-sizes__reference::after { right: 0; }
+.full-moon-sizes__disk { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; transform: scale(var(--size-scale)); }
+.full-moon-sizes__disk img { display: block; width: 100%; height: 100%; border-radius: 50%; filter: drop-shadow(0 0 .5rem rgba(132, 157, 211, .2)); }
+
+.lunar-scene { display: grid; place-items: center; overflow: hidden; background-color: var(--lunar-scene-edge); background-image: radial-gradient(circle at 50% 68%, var(--lunar-scene-center) 0, var(--lunar-scene-center) 12%, var(--lunar-scene-edge) var(--lunar-scene-radius), var(--lunar-scene-edge) 100%); }
+.lunar-scene__moon { position: relative; isolation: isolate; width: min(78vmin, 34rem); aspect-ratio: 1; }
+.lunar-scene__moon::before { position: absolute; z-index: -1; inset: 8%; border-radius: 50%; background: var(--lunar-scene-center); box-shadow: 0 0 calc(3.8rem * var(--lunar-scene-halo)) calc(1.5rem * var(--lunar-scene-halo)) var(--lunar-scene-center); opacity: var(--lunar-scene-halo); content: ""; }
+.lunar-scene__moon .moon-three-render__canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transform: scale(var(--moon-render-scale, 1)); transform-origin: center; }
+.lunar-scene__moon.is-rendered .lunar-widget__loading { display: none; }
+.lunar-scene__context { position: absolute; right: .8rem; bottom: .65rem; display: grid; justify-items: end; gap: .1rem; margin: 0; color: rgba(239, 244, 255, .76); font-size: clamp(.62rem, 1.3vw, .74rem); text-shadow: 0 1px 4px rgba(0, 0, 0, .7); }
+.lunar-scene__context time { color: #fff; font-weight: 700; }
+
+@media (max-width: 600px) {
+  .full-moon-sizes { --full-moon-reference-diameter: min(25vw, 18vh); min-height: 38rem; overflow-y: auto; }
+  .full-moon-sizes__header { align-items: start; flex-direction: column; }
+  .full-moon-sizes__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); }
+  .lunar-widget__toolbar { top: .35rem; gap: .25rem; }
+  .lunar-widget__toolbar label { padding-inline: .36rem; }
+  .libration-widget__readout { left: .45rem; right: .45rem; justify-items: start; }
+  .libration-widget__controls { left: .45rem; right: .45rem; max-width: none; }
+  .earth-moon-widget__comparison { --moon-diameter: clamp(3.3rem, 16vw, 5rem); flex-direction: column; gap: .35rem; height: calc(100% - 7.2rem); padding-top: 2.4rem; }
+  .earth-moon-widget__controls { flex-wrap: wrap; }
+  .earth-moon-widget__controls label { flex-basis: 100%; }
+  .lunar-eclipse-widget__moon { inset-bottom: 7.8rem; }
+  .lunar-eclipse-widget__geometry { right: .4rem; left: .4rem; }
+  .real-eclipse-widget__controls { flex-wrap: wrap; bottom: 1.8rem; }
+  .real-eclipse-widget__controls label { flex-basis: calc(100% - 6rem); }
+  .real-eclipse-widget__controls label:last-child { flex-basis: 5rem; }
+}
+
+.lunar-widget-admin { display: grid; grid-template-columns: minmax(18rem, 25rem) minmax(0, 1fr); align-items: start; gap: 1rem; }
+.lunar-widget-admin__settings { grid-column: 1; }
+.lunar-widget-admin__settings > h2,
+.lunar-widget-admin__preview h2 { margin-top: 0; }
+.lunar-widget-admin__settings > p,
+.lunar-widget-admin__preview p { color: var(--muted); font-size: .82rem; }
+.lunar-widget-admin__grid,
+.lunar-widget-admin__grid fieldset { display: grid; gap: .55rem; }
+.lunar-widget-admin__grid fieldset[hidden] { display: none; }
+.lunar-widget-admin__grid > label,
+.lunar-widget-admin__grid fieldset label,
+.lunar-widget-admin__output label { display: grid; gap: .25rem; color: #e5eaf8; font-size: .78rem; font-weight: 750; }
+.lunar-widget-admin__grid fieldset { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: .3rem 0 0; padding: .7rem; border: 1px solid rgba(170, 178, 197, .18); border-radius: .65rem; }
+.lunar-widget-admin__grid legend { padding-inline: .3rem; color: var(--lunar); font-size: .78rem; font-weight: 800; }
+.lunar-widget-admin__appearance-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .75rem; }
+.lunar-widget-admin__appearance-note a { color: var(--lunar); text-underline-offset: .18em; }
+.lunar-widget-admin__body-settings { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; padding-top: .45rem; border-top: 1px solid rgba(170, 178, 197, .13); }
+.lunar-widget-admin__body-settings h3 { grid-column: 1 / -1; margin: 0; color: var(--lunar); font-size: .76rem; }
+.lunar-widget-admin__grid fieldset label.lunar-widget-admin__range { grid-template-columns: 1fr auto; align-items: center; }
+.lunar-widget-admin__range span { grid-column: 1 / -1; }
+.lunar-widget-admin__range output { min-width: 3.2rem; color: var(--lunar); text-align: right; font-size: .72rem; }
+.lunar-widget-admin :is(input, select, textarea) { width: 100%; min-height: 2.25rem; padding: .42rem .5rem; border: 1px solid #405079; border-radius: .42rem; background: #0d1428; color: #fff; font: inherit; color-scheme: dark; }
+.lunar-widget-admin :is(input, select, textarea):focus-visible { border-color: #9ab4ff; outline: 2px solid rgba(154, 180, 255, .22); outline-offset: 1px; }
+.lunar-widget-admin__preview { min-width: 0; }
+.lunar-widget-admin__presets { display: grid; grid-column: 1; gap: .55rem; }
+.lunar-widget-admin__presets[hidden] { display: none; }
+.lunar-widget-admin__presets h2,
+.lunar-widget-admin__presets p { margin-top: 0; }
+.lunar-widget-admin__presets > label { display: grid; gap: .25rem; color: #e5eaf8; font-size: .78rem; font-weight: 750; }
+.lunar-widget-admin__presets input,
+.lunar-widget-admin__presets select { width: 100%; min-height: 2.25rem; padding: .42rem .5rem; border: 1px solid #405079; border-radius: .42rem; background: #0d1428; color: #fff; font: inherit; color-scheme: dark; }
+.lunar-widget-admin__preset-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.lunar-widget-admin__preset-actions button { margin: 0; }
+.lunar-widget-admin__presets [data-preset-status] { min-height: 1.3em; margin-bottom: 0; color: var(--muted); font-size: .76rem; }
+.lunar-widget-admin__preview { grid-column: 2; grid-row: 1; }
+.lunar-widget-admin__preview > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.lunar-widget-admin__video-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; margin-bottom: .65rem; }
+.lunar-widget-admin__video-actions[hidden] { display: none; }
+.lunar-widget-admin__video-actions span { color: var(--muted); font-size: .75rem; }
+.lunar-widget-admin__preview-frame { width: 100%; margin-inline: auto; }
+.lunar-widget-admin__preview-frame[data-aspect="16:9"] { aspect-ratio: 16 / 9; }
+.lunar-widget-admin__preview-frame[data-aspect="9:16"] { width: min(100%, 27rem); aspect-ratio: 9 / 16; }
+.lunar-widget-admin__preview-frame[data-aspect="default"] { height: min(58vw, 38rem); min-height: 24rem; }
+.lunar-widget-admin__preview iframe { display: block; width: 100%; height: 100%; border: 1px solid rgba(170, 178, 197, .22); border-radius: .65rem; background: #02050c; }
+.lunar-widget-admin__output { display: grid; grid-column: 2; grid-row: 2; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .6rem; }
+.lunar-widget-admin__output label:nth-of-type(2) { grid-column: 1; }
+.lunar-widget-admin__output textarea { resize: vertical; }
+.lunar-widget-admin__url-help { grid-column: 1 / -1; margin: -.2rem 0 0; color: var(--muted); font-size: .72rem; }
+.lunar-widget-admin__output [data-widget-copy-status] { grid-column: 1 / -1; min-height: 1rem; margin: 0; color: var(--muted); font-size: .75rem; }
+
+@media (max-width: 900px) {
+  .lunar-widget-admin { grid-template-columns: 1fr; }
+  .lunar-widget-admin__settings,
+  .lunar-widget-admin__presets,
+  .lunar-widget-admin__preview,
+  .lunar-widget-admin__output { grid-column: 1; grid-row: auto; }
+  .lunar-widget-admin__preview-frame[data-aspect="default"] { height: 32rem; }
+}
+
+@media (max-width: 520px) {
+  .lunar-widget-admin__grid fieldset { grid-template-columns: 1fr; }
+  .lunar-widget-admin__body-settings { grid-template-columns: 1fr; }
+  .lunar-widget-admin__output { grid-template-columns: 1fr; }
+  .lunar-widget-admin__output label:nth-of-type(2) { grid-column: auto; }
+  .lunar-widget-admin__output .button { width: 100%; }
+}

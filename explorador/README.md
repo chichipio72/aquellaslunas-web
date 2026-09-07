@@ -323,13 +323,33 @@ todavía podría agrupar la salida, limitación que debe comprobarse al desplega
 
 - Luna instantánea: iluminación, ángulo de fase, elongación geocéntrica Sol–Luna,
   diámetro aparente geocéntrico, distancias geocéntrica y topocéntrica, latitud
-  eclíptica, ascensión recta, declinación, altura y azimut.
+  y longitud eclípticas, argumento medio de latitud (`Ángulo Luna–nodo`),
+  longitud del nodo ascendente medio, ascensión recta, declinación, altura y azimut.
 - Sol instantáneo: altura, azimut, distancia Tierra–Sol geocéntrica y ecuación
-  del tiempo (tiempo solar aparente menos tiempo solar medio).
+  del tiempo (tiempo solar aparente menos tiempo solar medio), y Ángulo Sol–nodo.
 - Eventos lunares: salida, puesta, sus azimutes y tiempo sobre el horizonte.
 - Eventos solares: salida, puesta, sus azimutes, duración del día y de la noche.
 - Derivadas: amplitudes de salida y puesta y diferencias diarias de los cuatro
   eventos.
+
+### Ciclos lunares y nodos
+
+La longitud eclíptica lunar es geocéntrica aparente y está referida al
+equinoccio verdadero de fecha. Su vuelta de 360° permite observar el mes sidéreo.
+El `Ángulo Luna–nodo` usa directamente el argumento medio de latitud `F` del
+modelo Meeus: 0° corresponde al nodo ascendente medio y 180° al descendente.
+Su vuelta representa el mes dracónico. Por eso ambas series tienen períodos
+ligeramente distintos.
+
+El nodo publicado es el nodo ascendente **medio**, referido al equinoccio medio
+de fecha; no es un nodo verdadero. `Ángulo Sol–nodo` resta ese nodo medio de la
+longitud eclíptica aparente del Sol. Las proximidades a 0° y 180° muestran las
+temporadas aproximadas de eclipses, pero no marcan eclipses concretos.
+
+Las cuatro magnitudes son circulares (0°–360°). El gráfico corta la línea en
+cada envoltura sin alterar valores ni tooltips. Pueden usarse con filtros de fase
+y Análisis de relación, cuya normalización lineal requiere cautela con datos
+circulares. No están habilitadas para Extremos locales.
 
 ## Pruebas
 
@@ -359,6 +379,39 @@ El rango vertical se conserva por grupo de escala durante redibujos locales del
 frontend (leyenda y configuración del análisis), y se reinicia con una nueva
 consulta o con la herramienta Restaurar. En un arrastre, mover el puntero hacia
 abajo desplaza la ventana hacia valores mayores.
+
+## Vista embebible
+
+La superficie compacta se carga con una configuración compartida válida:
+
+```html
+<iframe
+  src="/astro/explorador/embed.php?v=1&amp;modo=diario&amp;desde=2026-01-01&amp;hasta=2026-12-31&amp;lat=-34.6037&amp;lon=-58.3816&amp;tz=America%2FArgentina%2FBuenos_Aires&amp;campos=moon_ecliptic_longitude%2Cmoon_node_angle&amp;dias=todos"
+  title="Comparación de ciclos lunares"
+  loading="lazy">
+</iframe>
+```
+
+El embed usa exactamente el parser v=1, el catálogo, los endpoints de series,
+el progreso NDJSON y el render ECharts del Explorador completo. Variables,
+ubicación, fases, modo, relación A/B y configuración de extremos quedan fijos.
+El usuario sólo puede cambiar fechas, años y rangos temporales rápidos.
+
+`Abrir en el Explorador` reconstruye `/explorador/?v=1&...` con la configuración
+efectiva y el último intervalo calculado. `alto` es una opción exclusivamente
+visual, limitada a 320–900 px y excluida del estado v=1. `titulo` permite cambiar
+el encabezado breve del embed y tampoco forma parte del estado astronómico.
+
+Una URL ausente o inválida muestra un error y no calcula valores predeterminados.
+La respuesta declara `X-Frame-Options: SAMEORIGIN` y
+`Content-Security-Policy: frame-ancestors 'self'`: por ahora sólo se permite
+incluirla en páginas del mismo origen de Aquellas Lunas.
+
+Los administradores autenticados disponen además de **Código para insertar**
+junto a la acción pública de compartir. Esta herramienta editorial reutiliza
+la configuración v=1 visible, permite elegir altura y título, y entrega el
+`iframe` completo con la URL pública de producción. El botón, la modal y el
+código no se renderizan para visitantes públicos.
 
 ## Decisiones pendientes
 

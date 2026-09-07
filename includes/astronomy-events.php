@@ -9,6 +9,10 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use AstronomyEngine\Facade\AstronomyEventsFacade;
 use AstronomyEngine\Facade\AstronomyObserver;
+use AstronomyEngine\ConjunctionCatalog;
+use AstronomyEngine\LunarEventCalculator;
+use AstronomyEngine\MeeusLunarCalculator;
+use AstronomyEngine\MoonApparentSize;
 
 const ASTRONOMY_EVENT_DATABASE_START = '1900-01-01T00:00:00+00:00';
 const ASTRONOMY_EVENT_DATABASE_END = '2051-01-01T00:00:00+00:00';
@@ -321,6 +325,19 @@ function astronomyEventsUntraced(array $request, string $context = 'events', int
             (string) ($request['timezone'] ?? 'UTC')
         );
         if ($upcomingProfile) homeUpcomingProfileAdd('normalización y enriquecimiento local de eclipses', (hrtime(true) - $normalizationStarted) / 1_000_000);
+    }
+
+    if (in_array('conjunction', $requestedTypes, true)) {
+        $normalizationStarted = hrtime(true);
+        $items = astronomyNormalizeConjunctionItems(
+            $items,
+            $startUtc,
+            $endUtc,
+            (float) ($request['latitude'] ?? 0.0),
+            (float) ($request['longitude'] ?? 0.0),
+            (string) ($request['timezone'] ?? 'UTC')
+        );
+        if ($upcomingProfile) homeUpcomingProfileAdd('enriquecimiento local de conjunciones', (hrtime(true) - $normalizationStarted) / 1_000_000);
     }
 
     $sortStarted = hrtime(true);
@@ -649,6 +666,89 @@ function astronomyEventsFromPhp(
 }
 
 /** @return list<array<string,mixed>> */
+function astronomyNormalizeConjunctionItems(
+    array $items,
+    DateTimeImmutable $startUtc,
+    DateTimeImmutable $endUtc,
+    float $latitude,
+    float $longitude,
+    string $timezone
+): array {
+    $needsPortableLocal = false;
+    foreach ($items as $item) {
+        if (!is_array($item) || ($item['type'] ?? null) !== 'conjunction') continue;
+        $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+        if (!is_string($details['visibility_classification'] ?? null)) {
+            $needsPortableLocal = true;
+            break;
+        }
+    }
+    if ($needsPortableLocal) {
+        try {
+            $portableItems = astronomyEventsFromPhp('lunar_conjunction', $startUtc, $endUtc, $latitude, $longitude, $timezone);
+            $items = astronomyEnrichConjunctionItems($items, $portableItems);
+        } catch (Throwable $exception) {
+            error_log('Aquellas Lunas conjunction local enrichment error: ' . $exception->getMessage());
+        }
+    }
+    return astronomyEnrichConjunctionVisualGeometry($items, $latitude, $longitude);
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyEnrichConjunctionVisualGeometry(array $items,float $latitude,float $longitude):array
+{
+    $calculator=new LunarEventCalculator(new MeeusLunarCalculator());
+    foreach($items as $index=>$item){if(!is_array($item)||($item['type']??null)!=='conjunction')continue;$details=is_array($item['details']??null)?$item['details']:[];$classification=(string)($details['visibility_classification']??'');$instantValue=$classification==='visible_nearby'?($details['best_visible_time']??null):($item['datetime']??null);$target=is_string($details['planet']??null)?strtolower(trim($details['planet'])):strtolower(trim((string)($item['subtype']??'')));if(!is_string($instantValue)||$instantValue===''||$target==='')continue;try{$geometry=$calculator->conjunctionVisualGeometry(new DateTimeImmutable($instantValue),$target,$latitude,$longitude);}catch(Throwable $exception){error_log('Aquellas Lunas conjunction visual geometry error: '.$exception->getMessage());continue;}if($geometry===null)continue;$details['visual_geometry_time']=(new DateTimeImmutable($instantValue))->format(DateTimeInterface::ATOM);foreach($geometry as $key=>$value)$details['visual_'.$key]=$value;$item['details']=$details;$items[$index]=$item;}
+    return $items;
+}
+
+/** @return list<array<string,mixed>> */
+function astronomyEnrichConjunctionItems(array $items, array $portableItems): array
+{
+    $localKeys = [
+        'object_kind', 'both_above_horizon', 'moon_altitude_degrees',
+        'target_altitude_degrees', 'sun_altitude_degrees', 'solar_elongation_degrees',
+        'visibility_classification', 'visible_window_start', 'visible_window_end',
+        'best_visible_time', 'not_observable_reason',
+    ];
+    foreach ($items as $index => $item) {
+        if (!is_array($item) || ($item['type'] ?? null) !== 'conjunction') continue;
+        $details = is_array($item['details'] ?? null) ? $item['details'] : [];
+        if (is_string($details['visibility_classification'] ?? null)) continue;
+        $portable = astronomyClosestConjunctionItem($item, $portableItems);
+        if ($portable === null) continue;
+        $portableDetails = is_array($portable['details'] ?? null) ? $portable['details'] : [];
+        foreach ($localKeys as $key) {
+            if (array_key_exists($key, $portableDetails)) $details[$key] = $portableDetails[$key];
+        }
+        $details['local_calculation_source'] = 'php';
+        $items[$index]['details'] = $details;
+    }
+    return $items;
+}
+
+function astronomyClosestConjunctionItem(array $item, array $candidates): ?array
+{
+    $timestamp = astronomyEventTimestamp($item['datetime'] ?? null);
+    $subtype = (string) ($item['subtype'] ?? '');
+    $closest = null;
+    $difference = PHP_FLOAT_MAX;
+    foreach ($candidates as $candidate) {
+        if (!is_array($candidate) || ($candidate['type'] ?? null) !== 'conjunction' || ($candidate['subtype'] ?? null) !== $subtype) continue;
+        $candidateTimestamp = astronomyEventTimestamp($candidate['datetime'] ?? null);
+        if ($timestamp === null || $candidateTimestamp === null) continue;
+        $candidateDifference = abs($timestamp - $candidateTimestamp);
+        if ($candidateDifference < $difference) {
+            $difference = $candidateDifference;
+            $closest = $candidate;
+        }
+    }
+    // Las fuentes pueden diferir algunos minutos en el mínimo, pero no deben
+    // cruzar observabilidad entre dos encuentros mensuales del mismo astro.
+    return $difference <= 21600.0 ? $closest : null;
+}
+
+/** @return list<array<string,mixed>> */
 function astronomyEclipseEventsFromPhp(
     DateTimeImmutable $startUtc,
     DateTimeImmutable $endUtc,
@@ -901,6 +1001,14 @@ function astronomyNormalizeEvent(
     array $details,
     string $source
 ): array {
+    if (in_array($eventGroup, ['moon_phase', 'lunar_apsis'], true) && is_numeric($details['distance_km'] ?? null)) {
+        $details['apparent_size_percent'] = MoonApparentSize::percentOfMean((float) $details['distance_km']);
+    }
+    if ($eventGroup === 'lunar_conjunction') {
+        $objectId = astronomyEventPublicSubtype($eventGroup, $subtype);
+        $details['object_id'] = $objectId;
+        $details['object_name'] = ConjunctionCatalog::names()[$objectId] ?? $objectId;
+    }
     $details['_source'] = $source;
     return [
         'type' => astronomyEventPublicTypeForGroup($eventGroup),

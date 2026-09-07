@@ -105,6 +105,13 @@ $created = contentEditorDbLoadArticleRaw($connection, $baseSlug);
 adminContentAssert(is_array($created), 'No se pudo recargar el artículo recién creado.');
 adminContentAssert(($created['raw']['titulo'] ?? '') === $raw['titulo'], 'El título creado no persistió.');
 adminContentAssert(($created['raw']['resumen'] ?? '') === $raw['resumen'], 'El resumen creado no persistió UTF-8.');
+$exportJson = contentEditorPackageJson($baseSlug, $created['raw']);
+$exportValidation = contentEditorValidatePackageJson($exportJson);
+adminContentAssert($exportValidation['valid'], 'El JSON exportado no es aceptado por el importador: ' . json_encode($exportValidation['errors']));
+adminContentAssert(($exportValidation['slug'] ?? '') === $baseSlug, 'La exportación no preservó el slug.');
+adminContentAssert(($exportValidation['raw']['articulo'] ?? '') === $raw['articulo'], 'La exportación no preservó el Markdown.');
+adminContentAssert(count($exportValidation['raw']['trivias'] ?? []) === 1, 'La exportación no preservó las trivias.');
+adminContentAssert(count($exportValidation['raw']['sabias_que'] ?? []) === 1, 'La exportación no preservó los bloques “Sabías que…”.');
 
 $rawUpdate = $created['raw'];
 $rawUpdate['visible'] = false;
@@ -142,6 +149,88 @@ adminContentAssert($orderWords->fetchAll(PDO::FETCH_COLUMN) === ['administració
 $orderRelations = $connection->prepare('SELECT slug_relacionado FROM contenido_articulos_relaciones r INNER JOIN contenido_articulos a ON a.id = r.articulo_id WHERE a.slug = :slug ORDER BY r.orden ASC');
 $orderRelations->execute(['slug' => $updatedSlug]);
 adminContentAssert($orderRelations->fetchAll(PDO::FETCH_COLUMN) === ['semana', 'pascua'], 'No se preservó el orden de relaciones.');
+
+$reviewExport = contentEditorDbReviewExport($connection);
+adminContentAssert(($reviewExport['version'] ?? null) === 1, 'La revisión exportada no declara la versión esperada.');
+$reviewSlugs = array_column($reviewExport['articulos'], 'slug');
+adminContentAssert(count($reviewSlugs) === count(contentEditorDbListArticles($connection)), 'La revisión no exportó todos los artículos.');
+adminContentAssert(in_array($updatedSlug, $reviewSlugs, true), 'La revisión omitió el artículo de prueba.');
+$orderedTitles = $connection->query('SELECT titulo FROM contenido_articulos ORDER BY titulo ASC, slug ASC')->fetchAll(PDO::FETCH_COLUMN);
+adminContentAssert(array_column($reviewExport['articulos'], 'titulo') === $orderedTitles, 'La revisión no está ordenada alfabéticamente por título.');
+$reviewArticle = $reviewExport['articulos'][array_search($updatedSlug, $reviewSlugs, true)];
+adminContentAssert($reviewArticle['palabras_clave'] === ['administración', 'orden-2', 'orden-3'], 'La revisión exportó palabras clave incorrectas.');
+adminContentAssert($reviewArticle['relaciones'] === ['semana', 'pascua'], 'La revisión exportó relaciones incorrectas.');
+adminContentAssert(array_diff(array_keys($reviewArticle), ['slug', 'titulo', 'visible', 'resumen', 'palabras_clave', 'relaciones']) === [], 'La revisión filtró campos no permitidos.');
+
+$reviewPayload = $reviewExport;
+$reviewIndex = array_search($updatedSlug, array_column($reviewPayload['articulos'], 'slug'), true);
+$reviewPayload['articulos'][$reviewIndex]['titulo'] = 'Este título debe ignorarse';
+$reviewPayload['articulos'][$reviewIndex]['visible'] = true;
+$reviewPayload['articulos'][$reviewIndex]['resumen'] = 'Este resumen debe ignorarse';
+$reviewPayload['articulos'][$reviewIndex]['palabras_clave'] = [' revisión ', 'revisión', '', 'nueva'];
+$reviewPayload['articulos'][$reviewIndex]['relaciones'] = ['pascua', '', 'fases-de-la-luna'];
+$reviewJson = json_encode($reviewPayload, JSON_UNESCAPED_UNICODE);
+$preview = contentEditorDbPreviewReview($connection, $reviewJson);
+adminContentAssert($preview['valid'], 'El preview de revisión válida falló: ' . json_encode($preview['errors']));
+adminContentAssert($preview['summary']['modificados'] === 1, 'El preview no contó el artículo modificado.');
+adminContentAssert($preview['summary']['slugs_inexistentes'] === [], 'El preview válido informó slugs de artículo inexistentes.');
+$beforeApply = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+adminContentAssert($beforeApply['raw']['palabras_clave'] === ['administración', 'orden-2', 'orden-3'], 'El preview modificó la base antes de confirmar.');
+
+$applied = contentEditorDbApplyReview($connection, $reviewJson);
+adminContentAssert($applied['applied'], 'No se pudo aplicar la revisión válida.');
+$afterReview = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+adminContentAssert($afterReview['raw']['palabras_clave'] === ['revisión', 'nueva'], 'La revisión no actualizó o deduplicó las palabras clave.');
+adminContentAssert($afterReview['raw']['relaciones'] === ['pascua', 'fases-de-la-luna'], 'La revisión no actualizó o deduplicó las relaciones.');
+adminContentAssert($afterReview['raw']['titulo'] === $rawUpdate['titulo'], 'La revisión cambió el título.');
+adminContentAssert($afterReview['raw']['resumen'] === $rawUpdate['resumen'], 'La revisión cambió el resumen.');
+adminContentAssert($afterReview['raw']['visible'] === false, 'La revisión cambió la visibilidad.');
+adminContentAssert($afterReview['raw']['articulo'] === $rawUpdate['articulo'], 'La revisión cambió el Markdown.');
+adminContentAssert(contentEditorDbLoadArticleRaw($connection, 'test-admin-contenidos-inexistente') === null, 'La revisión creó un slug inexistente.');
+
+$invalidRelationPayload = $reviewPayload;
+$invalidRelationPayload['articulos'][$reviewIndex]['relaciones'] = ['pascua', 'relacion-que-no-existe'];
+$beforeInvalidRelation = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+$invalidRelation = contentEditorDbApplyReview($connection, json_encode($invalidRelationPayload, JSON_UNESCAPED_UNICODE));
+adminContentAssert(!$invalidRelation['applied'], 'La revisión aceptó una relación hacia un slug inexistente.');
+$afterInvalidRelation = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+adminContentAssert($afterInvalidRelation['raw']['relaciones'] === $beforeInvalidRelation['raw']['relaciones'], 'La relación inexistente modificó MySQL.');
+
+$selfRelationPayload = $reviewPayload;
+$selfRelationPayload['articulos'][$reviewIndex]['relaciones'] = [$updatedSlug];
+adminContentAssert(!contentEditorDbPreviewReview($connection, json_encode($selfRelationPayload))['valid'], 'La revisión aceptó una autorrelación.');
+
+$duplicateRelationPayload = $reviewPayload;
+$duplicateRelationPayload['articulos'][$reviewIndex]['relaciones'] = ['pascua', 'pascua'];
+adminContentAssert(!contentEditorDbPreviewReview($connection, json_encode($duplicateRelationPayload))['valid'], 'La revisión aceptó una relación duplicada.');
+
+$missingArticlePayload = $reviewPayload;
+$missingArticlePayload['articulos'][] = [
+    'slug' => 'test-admin-contenidos-inexistente', 'titulo' => 'Inexistente', 'visible' => false,
+    'resumen' => '', 'palabras_clave' => ['no-crear'], 'relaciones' => [],
+];
+$missingArticlePreview = contentEditorDbPreviewReview($connection, json_encode($missingArticlePayload));
+adminContentAssert(!$missingArticlePreview['valid'], 'La revisión aceptó un artículo de origen inexistente.');
+adminContentAssert($missingArticlePreview['summary']['slugs_inexistentes'] === ['test-admin-contenidos-inexistente'], 'El preview no informó el slug de artículo inexistente.');
+
+$forbiddenPayload = $reviewPayload;
+$forbiddenPayload['articulos'][$reviewIndex]['markdown'] = '# No permitido';
+$forbidden = contentEditorDbApplyReview($connection, json_encode($forbiddenPayload));
+adminContentAssert(!$forbidden['applied'], 'La revisión aceptó un campo fuera del esquema seguro.');
+$invalid = contentEditorDbApplyReview($connection, '{json inválido');
+adminContentAssert(!$invalid['applied'], 'La revisión aceptó JSON inválido.');
+$afterInvalid = contentEditorDbLoadArticleRaw($connection, $updatedSlug);
+adminContentAssert($afterInvalid['raw']['palabras_clave'] === ['revisión', 'nueva'], 'Una importación inválida modificó la base.');
+
+$manualInvalidRelation = $rawUpdate;
+$manualInvalidRelation['relaciones'] = ['relacion-manual-inexistente'];
+adminContentAssert(!contentEditorDbSaveArticle($connection, $updatedSlug, $updatedSlug, $manualInvalidRelation, false)['saved'], 'El editor manual aceptó una relación inexistente.');
+$manualSelfRelation = $rawUpdate;
+$manualSelfRelation['relaciones'] = [$updatedSlug];
+adminContentAssert(!contentEditorDbSaveArticle($connection, $updatedSlug, $updatedSlug, $manualSelfRelation, false)['saved'], 'El editor manual aceptó una autorrelación.');
+$manualDuplicateRelation = $rawUpdate;
+$manualDuplicateRelation['relaciones'] = ['pascua', 'pascua'];
+adminContentAssert(!contentEditorDbSaveArticle($connection, $updatedSlug, $updatedSlug, $manualDuplicateRelation, false)['saved'], 'El editor manual aceptó una relación duplicada.');
 
 $duplicateSlug = contentEditorDbSaveArticle($connection, $updatedSlug, 'pascua', $rawUpdate, false);
 adminContentAssert(!$duplicateSlug['saved'], 'Se aceptó un slug duplicado.');

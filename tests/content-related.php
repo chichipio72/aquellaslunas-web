@@ -46,6 +46,11 @@ $catalog = ['articles' => [
     'invalido' => contentRelatedArticle('invalido', true, false),
 ]];
 
+contentRelatedAssert(astronomyContentShouldShowRelatedArticles($source), 'Un artículo válido y visible no habilitó sus relacionados.');
+contentRelatedAssert(!astronomyContentShouldShowRelatedArticles(contentRelatedArticle('oculto-origen', false)), 'Un artículo oculto habilitó relacionados en preview.');
+contentRelatedAssert(!astronomyContentShouldShowRelatedArticles(contentRelatedArticle('invalido-origen', true, false)), 'Un artículo inválido habilitó relacionados.');
+contentRelatedAssert(!astronomyContentShouldShowRelatedArticles(null), 'Un artículo inexistente habilitó relacionados.');
+
 $related = astronomyContentRelatedArticles($catalog, $source, 3);
 contentRelatedAssert(array_column($related, 'slug') === ['destino-uno', 'destino-dos', 'destino-tres'], 'No se preservó el orden, el límite o el filtrado editorial.');
 contentRelatedAssert(count(array_unique(array_column($related, 'slug'))) === count($related), 'Se devolvieron relaciones duplicadas.');

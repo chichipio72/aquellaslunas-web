@@ -56,6 +56,64 @@ function editorTabErrorCounts(array $errors): array
     return $counts;
 }
 
+function renderEditorRelationSelector(array $articles, array $selectedSlugs, string $sourceSlug, array $errors): void
+{
+    $catalog = [];
+    foreach ($articles as $article) {
+        $catalog[(string) $article['slug']] = $article;
+    }
+    $selected = [];
+    $unavailable = [];
+    foreach ($selectedSlugs as $selectedSlug) {
+        $selectedSlug = trim((string) $selectedSlug);
+        if ($selectedSlug === '') {
+            continue;
+        }
+        if (isset($catalog[$selectedSlug]) && $selectedSlug !== $sourceSlug) {
+            $selected[] = $selectedSlug;
+        } else {
+            $unavailable[] = $selectedSlug;
+        }
+    }
+    ?>
+    <section class="editor-relations" data-relation-selector data-source-slug="<?= editorHtml($sourceSlug) ?>" aria-labelledby="editor-relations-title">
+        <div class="editor-relations__heading">
+            <div><h3 id="editor-relations-title">Relaciones</h3><p>Elegí artículos existentes. El orden define cómo se muestran públicamente.</p></div>
+            <label>Buscar por título o slug<input type="search" autocomplete="off" spellcheck="false" data-relation-search></label>
+        </div>
+        <?php editorFieldErrors($errors, 'relaciones'); ?>
+        <?php if ($unavailable !== []): ?><div class="editor-warnings"><strong>Relaciones actuales no disponibles</strong><p>Estos valores no se guardarán hasta que elijas artículos existentes: <code><?= editorHtml(implode(', ', $unavailable)) ?></code>.</p></div><?php endif; ?>
+        <div class="editor-relations__layout">
+            <div>
+                <h4>Seleccionadas</h4>
+                <ol class="editor-relations__selected" data-relation-selected>
+                    <?php foreach ($selected as $selectedSlug): ?><?php $article = $catalog[$selectedSlug]; ?>
+                    <li data-relation-selected-item data-relation-slug="<?= editorHtml($selectedSlug) ?>">
+                        <span><strong><?= editorHtml($article['titulo']) ?></strong><code><?= editorHtml($selectedSlug) ?></code><?php if (!$article['visible']): ?><small>Oculto</small><?php endif; ?></span>
+                        <span class="editor-relations__actions"><button class="editor-button editor-button--quiet" type="button" data-relation-move="up" aria-label="Subir <?= editorHtml($article['titulo']) ?>">↑</button><button class="editor-button editor-button--quiet" type="button" data-relation-move="down" aria-label="Bajar <?= editorHtml($article['titulo']) ?>">↓</button><button class="editor-button editor-button--danger" type="button" data-relation-remove>Quitar</button></span>
+                        <input type="hidden" name="relaciones[]" value="<?= editorHtml($selectedSlug) ?>">
+                    </li>
+                    <?php endforeach; ?>
+                </ol>
+                <p class="editor-empty" data-relation-empty<?= $selected !== [] ? ' hidden' : '' ?>>No hay relaciones seleccionadas.</p>
+            </div>
+            <div>
+                <h4>Artículos disponibles</h4>
+                <div class="editor-relations__options" data-relation-options>
+                    <?php foreach ($articles as $article): ?><?php $optionSlug = (string) $article['slug']; $isCurrent = $optionSlug === $sourceSlug; $isSelected = in_array($optionSlug, $selected, true); ?>
+                    <button class="editor-relation-option" type="button" data-relation-option data-relation-slug="<?= editorHtml($optionSlug) ?>" data-relation-title="<?= editorHtml($article['titulo']) ?>"<?= $isCurrent || $isSelected ? ' disabled' : '' ?><?= $isCurrent ? ' data-relation-current' : '' ?>>
+                        <span><strong><?= editorHtml($article['titulo']) ?></strong><code><?= editorHtml($optionSlug) ?></code></span>
+                        <small><?= $isCurrent ? 'Artículo actual' : ($article['visible'] ? 'Agregar' : 'Oculto · agregar') ?></small>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+                <p class="editor-empty" data-relation-no-results hidden>No hay artículos que coincidan con la búsqueda.</p>
+            </div>
+        </div>
+    </section>
+    <?php
+}
+
 function renderEditorImageSelector(string $name, ?string $selected, string $label, array $gallery): void
 {
     $available = [];
@@ -154,6 +212,8 @@ $raw = contentEditorEmptyArticle();
 $articleMetadata = null;
 $importJson = '';
 $importValidation = null;
+$reviewJson = '';
+$reviewPreview = null;
 
 $dbArticles = [];
 $dbArticleDiagnostics = [];
@@ -182,8 +242,77 @@ try {
     );
 }
 
+if ($action === 'export') {
+    if ($dbConnection === null) {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'No hay conexión disponible para exportar el artículo.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $loadedExport = contentEditorDbLoadArticleRaw($dbConnection, $slug);
+    if ($loadedExport === null) {
+        http_response_code(404);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'No existe el artículo solicitado.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Content-Disposition: inline; filename="contenido-' . $slug . '.json"');
+    echo contentEditorPackageJson($slug, $loadedExport['raw']);
+    exit;
+}
+
+if ($action === 'review_export') {
+    if ($dbConnection === null) {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'No hay conexión disponible para exportar la revisión.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="revision-editorial-' . gmdate('Y-m-d') . '.json"');
+    echo contentEditorReviewJson($dbConnection);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mode = (string) ($_POST['mode'] ?? 'edit');
+    if ($mode === 'review_import') {
+        $action = 'review_import';
+        $reviewJson = (string) ($_POST['review_json'] ?? '');
+        $uploaded = $_FILES['review_file'] ?? null;
+        if (is_array($uploaded) && (int) ($uploaded['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            if ((int) ($uploaded['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                $errors[] = astronomyContentError('archivo', 'No se pudo cargar el archivo JSON.');
+            } elseif ((int) ($uploaded['size'] ?? 0) > 5 * 1024 * 1024) {
+                $errors[] = astronomyContentError('archivo', 'El archivo supera el límite de 5 MB.');
+            } else {
+                $fileContents = file_get_contents((string) ($uploaded['tmp_name'] ?? ''));
+                if (!is_string($fileContents)) {
+                    $errors[] = astronomyContentError('archivo', 'No se pudo leer el archivo cargado.');
+                } else {
+                    $reviewJson = $fileContents;
+                }
+            }
+        }
+        if (!contentEditorCsrfValid($_POST['csrf_token'] ?? null)) {
+            $errors[] = astronomyContentError('csrf', 'El token CSRF no es válido.');
+        } elseif ($dbConnection === null) {
+            $errors[] = astronomyContentError('mysql', 'No hay conexión disponible para revisar la importación.');
+        } elseif ($errors === []) {
+            $reviewPreview = contentEditorDbPreviewReview($dbConnection, $reviewJson);
+            if (!$reviewPreview['valid']) {
+                $errors = array_merge($errors, $reviewPreview['errors']);
+            } elseif (($_POST['review_action'] ?? '') === 'apply') {
+                $result = contentEditorDbApplyReview($dbConnection, $reviewJson);
+                if ($result['applied']) {
+                    header('Location: index.php?review_applied=' . (int) ($result['summary']['modificados'] ?? 0), true, 303);
+                    exit;
+                }
+                $errors = array_merge($errors, $result['errors']);
+            }
+        }
+    }
     if ($mode === 'visibility_toggle') {
         $targetSlug = trim((string) ($_POST['slug'] ?? ''));
         $targetVisible = ($_POST['visible'] ?? '') === '1';
@@ -283,10 +412,13 @@ if (($_GET['saved'] ?? '') === '1') {
     $message = 'El artículo ahora es visible públicamente.';
 } elseif (($_GET['visibility'] ?? '') === 'hidden') {
     $message = 'El artículo ahora está oculto públicamente.';
+} elseif (isset($_GET['review_applied'])) {
+    $message = 'Revisión editorial aplicada: ' . (int) $_GET['review_applied'] . ' artículo(s) modificado(s).';
 }
 
 $editing = ($action === 'edit' && $slug !== '') || $action === 'new';
 $importing = $action === 'import';
+$reviewing = $action === 'review_import';
 $isNewArticle = $action === 'new';
 $editorImageGallery = contentEditorImageGallery();
 $saveFailed = $_SERVER['REQUEST_METHOD'] === 'POST' && $errors !== [];
@@ -328,17 +460,28 @@ $tabErrorCounts = editorTabErrorCounts($errors);
         <ul class="editor-photo-results" data-photo-results aria-label="Resultado de la carga"></ul>
     </section>
 <?php endif; ?>
-<?php if (!$editing && !$importing): ?>
+<?php if (!$editing && !$importing && !$reviewing): ?>
     <div class="editor-heading">
         <div><p class="eyebrow">GESTIÓN EDITORIAL</p><h2>Contenidos desde MySQL</h2></div>
         <div class="editor-heading__actions"><a class="editor-button editor-button--quiet" href="index.php?action=import">Importar contenido completo</a><a class="editor-button editor-button--primary" href="index.php?action=new">Nuevo artículo</a></div>
     </div>
+    <section class="editor-panel editor-review-tools" aria-labelledby="editor-review-title">
+        <div>
+            <p class="eyebrow">REVISIÓN EDITORIAL</p>
+            <h3 id="editor-review-title">Revisión editorial</h3>
+            <p>Exportá una instantánea editable. Al importarla sólo se actualizan palabras clave y relaciones.</p>
+        </div>
+        <div class="editor-heading__actions">
+            <a class="editor-button editor-button--quiet" href="index.php?action=review_export">Exportar revisión</a>
+            <a class="editor-button editor-button--primary" href="index.php?action=review_import">Importar revisión</a>
+        </div>
+    </section>
     <?php if ($errors !== []): ?>
         <p class="editor-title-note">No se muestra el listado porque la consulta a MySQL falló.</p>
     <?php else: ?>
     <div class="editor-table-wrap">
         <table class="editor-table">
-            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Imagen principal</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th>Actualizado</th><th></th></tr></thead>
+            <thead><tr><th>Slug</th><th>Título</th><th>Visibilidad</th><th>Imagen principal</th><th>Estado</th><th>Trivias</th><th>Sabías que</th><th>Actualizado</th><th></th><th></th></tr></thead>
             <tbody>
             <?php foreach ($dbArticles as $article): ?>
                 <?php
@@ -372,13 +515,53 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                     <td><?= (int) $article['trivias_count'] ?></td>
                     <td><?= (int) $article['sabias_que_count'] ?></td>
                     <td><?= editorHtml((string) $article['actualizado_en']) ?></td>
-                    <td><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Editar</a></td>
+                    <td class="editor-action-cell"><a class="editor-link" href="index.php?action=edit&amp;slug=<?= rawurlencode($article['slug']) ?>">Editar</a></td>
+                    <td class="editor-action-cell"><button class="editor-link editor-copy-content" type="button" data-copy-content-url="index.php?action=export&amp;slug=<?= rawurlencode($article['slug']) ?>" data-copy-content-title="<?= editorHtml($articleTitle) ?>">Copiar JSON</button></td>
                 </tr>
-                <?php if ($articleWarnings !== []): ?><tr class="editor-diagnostic-row"><td colspan="9"><ul><?php foreach ($articleWarnings as $warning): ?><li><code><?= editorHtml($warning['field']) ?></code>: <?= editorHtml($warning['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
+                <?php if ($articleWarnings !== []): ?><tr class="editor-diagnostic-row"><td colspan="10"><ul><?php foreach ($articleWarnings as $warning): ?><li><code><?= editorHtml($warning['field']) ?></code>: <?= editorHtml($warning['message']) ?></li><?php endforeach; ?></ul></td></tr><?php endif; ?>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <p class="editor-copy-status" data-copy-content-status role="status" aria-live="polite"></p>
+    <?php endif; ?>
+<?php elseif ($reviewing): ?>
+    <div class="editor-heading">
+        <div><p class="eyebrow">REVISIÓN EDITORIAL</p><h2>Importar revisión</h2></div>
+        <a class="editor-link" href="index.php">Volver al listado</a>
+    </div>
+    <section class="editor-panel editor-import-help">
+        <h3>Actualización limitada y segura</h3>
+        <p>El slug sólo identifica artículos existentes. Título, resumen y visibilidad son contexto de lectura; la importación únicamente puede reemplazar <code>palabras_clave</code> y <code>relaciones</code>. No se crearán artículos para slugs inexistentes.</p>
+    </section>
+    <form class="editor-form editor-import-form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?= editorHtml(contentEditorCsrfToken()) ?>">
+        <input type="hidden" name="mode" value="review_import">
+        <label for="review-file">Cargar archivo JSON (opcional)<input id="review-file" type="file" name="review_file" accept="application/json,.json"></label>
+        <label for="review-json">O pegar JSON</label>
+        <textarea id="review-json" name="review_json" rows="24" spellcheck="false"><?= editorHtml($reviewJson) ?></textarea>
+        <div class="editor-import-actions">
+            <button class="editor-button editor-button--quiet" type="submit" name="review_action" value="preview">Revisar cambios</button>
+            <a class="editor-button editor-button--quiet" href="index.php">Cancelar</a>
+            <button class="editor-button editor-button--primary" type="submit" name="review_action" value="apply"<?= is_array($reviewPreview) && ($reviewPreview['valid'] ?? false) ? '' : ' disabled' ?>>Confirmar y aplicar</button>
+        </div>
+    </form>
+    <?php if (is_array($reviewPreview) && ($reviewPreview['valid'] ?? false)): ?>
+        <?php $summary = $reviewPreview['summary']; ?>
+        <section class="editor-panel editor-import-summary" aria-labelledby="review-preview-title">
+            <h3 id="review-preview-title">Preview de cambios</h3>
+            <dl>
+                <div><dt>Artículos encontrados</dt><dd><?= (int) $summary['encontrados'] ?></dd></div>
+                <div><dt>Sin cambios</dt><dd><?= (int) $summary['sin_cambios'] ?></dd></div>
+                <div><dt>Modificados</dt><dd><?= (int) $summary['modificados'] ?></dd></div>
+                <div><dt>Slugs inexistentes</dt><dd><?= count($summary['slugs_inexistentes']) ?></dd></div>
+                <div><dt>Palabras clave</dt><dd>+<?= (int) $summary['palabras_agregadas'] ?> / −<?= (int) $summary['palabras_eliminadas'] ?></dd></div>
+                <div><dt>Relaciones</dt><dd>+<?= (int) $summary['relaciones_agregadas'] ?> / −<?= (int) $summary['relaciones_eliminadas'] ?></dd></div>
+            </dl>
+            <?php if ($summary['slugs_inexistentes'] !== []): ?><p><strong>No se crearán:</strong> <?= editorHtml(implode(', ', $summary['slugs_inexistentes'])) ?></p><?php endif; ?>
+            <?php if ($reviewPreview['changes'] !== []): ?><ul class="editor-review-changes"><?php foreach ($reviewPreview['changes'] as $change): ?><li><code><?= editorHtml($change['slug']) ?></code>: palabras +<?= count($change['palabras_agregadas']) ?>/−<?= count($change['palabras_eliminadas']) ?>; relaciones +<?= count($change['relaciones_agregadas']) ?>/−<?= count($change['relaciones_eliminadas']) ?></li><?php endforeach; ?></ul><?php endif; ?>
+            <p class="editor-title-note">Todavía no se modificó MySQL. Usá “Confirmar y aplicar” para guardar estos cambios.</p>
+        </section>
     <?php endif; ?>
 <?php elseif ($importing): ?>
     <div class="editor-heading">
@@ -497,8 +680,8 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                 <label>Título<input name="titulo" value="<?= editorHtml($raw['titulo'] ?? '') ?>" required><?php editorFieldErrors($errors, 'titulo'); ?></label>
                 <label>Resumen<textarea name="resumen" rows="3" required><?= editorHtml($raw['resumen'] ?? '') ?></textarea><?php editorFieldErrors($errors, 'resumen'); ?></label>
                 <label>Palabras clave <small>Una por línea</small><textarea name="palabras_clave" rows="6"><?= editorHtml(implode("\n", is_array($raw['palabras_clave'] ?? null) ? $raw['palabras_clave'] : [])) ?></textarea></label>
-                <label>Relaciones <small>Una por línea</small><textarea name="relaciones" rows="6"><?= editorHtml(implode("\n", is_array($raw['relaciones'] ?? null) ? $raw['relaciones'] : [])) ?></textarea></label>
             </div>
+            <?php renderEditorRelationSelector($dbArticles, is_array($raw['relaciones'] ?? null) ? $raw['relaciones'] : [], $slug, $errors); ?>
         </section>
         <section class="editor-panel">
             <div class="editor-section-heading"><h2>Texto del artículo</h2><div class="editor-toolbar" aria-label="Insertar formato">
@@ -507,7 +690,7 @@ $tabErrorCounts = editorTabErrorCounts($errors);
                     ['label' => 'Imagen independiente', 'snippet' => '[[imagen src="" alt=""]]'],
                     ['label' => 'Esquema', 'snippet' => '[[esquema tipo=""]]'],
                     ['label' => 'Trivia', 'snippet' => '[[trivia id=""]]'],
-                    ['label' => 'Simulador', 'snippet' => '[[embed url=""]]', 'cursor_offset' => -3],
+                    ['label' => 'Insertar embed', 'snippet' => '[[embed url=""]]', 'cursor_offset' => -3],
                     ['label' => 'Negrita', 'snippet' => '**negrita**'],
                     ['label' => 'Cursiva', 'snippet' => '*cursiva*'],
                     ['label' => 'Código', 'snippet' => '`código`'],

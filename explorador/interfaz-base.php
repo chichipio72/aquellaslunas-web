@@ -11,11 +11,15 @@ if ($directScript !== false && $directScript === __FILE__) {
 
 use Explorador\VariableCatalog;
 
+$explorerEmbedMode = ($explorerEmbedMode ?? false) === true;
 require_once __DIR__ . '/includes/VariableCatalog.php';
 require_once __DIR__ . '/includes/PhaseEventDateProvider.php';
+require_once dirname(__DIR__) . '/includes/api-client.php';
 require_once dirname(__DIR__) . '/includes/location-context.php';
-require_once dirname(__DIR__) . '/includes/site-header.php';
-require_once dirname(__DIR__) . '/includes/site-footer.php';
+if (!$explorerEmbedMode) {
+    require_once dirname(__DIR__) . '/includes/site-header.php';
+    require_once dirname(__DIR__) . '/includes/site-footer.php';
+}
 require_once dirname(__DIR__) . '/includes/asset-url.php';
 require_once dirname(__DIR__) . '/includes/favicon-links.php';
 require_once dirname(__DIR__) . '/includes/analytics.php';
@@ -24,6 +28,10 @@ require_once dirname(__DIR__) . '/includes/store-admin-auth.php';
 
 sendDynamicNoCacheHeaders();
 
+$explorerEmbedHeight = isset($explorerEmbedHeight) ? (int) $explorerEmbedHeight : 520;
+$explorerEmbedTitle = isset($explorerEmbedTitle) && is_string($explorerEmbedTitle)
+    ? $explorerEmbedTitle : 'Explorador astronómico';
+
 if (!function_exists('explorerContextHelp')) {
     function explorerContextHelp(string $id, string $text): void
     {
@@ -31,11 +39,21 @@ if (!function_exists('explorerContextHelp')) {
     }
 }
 
-$location = astronomyLocationContext();
+$location = $explorerEmbedMode ? [
+    'name' => 'Buenos Aires',
+    'latitude' => ASTRONOMY_DEFAULT_LATITUDE,
+    'longitude' => ASTRONOMY_DEFAULT_LONGITUDE,
+    'elevation_meters' => ASTRONOMY_DEFAULT_ELEVATION_METERS,
+    'timezone' => ASTRONOMY_DEFAULT_TIMEZONE,
+    'mode' => 'default',
+    'confirmed' => false,
+    'initial' => true,
+    'stored_invalid' => false,
+] : astronomyLocationContext();
 $catalog = new VariableCatalog();
 $variables = $catalog->all();
 $scaleGroups = require __DIR__ . '/catalog/scale-groups.php';
-$showTechnicalMetrics = storeAdminHasValidSessionCookie();
+$showTechnicalMetrics = !$explorerEmbedMode && storeAdminHasValidSessionCookie();
 $extremaVariables = array_filter($variables, static fn(array $definition): bool => ($definition['extrema_supported'] ?? false) === true);
 $variableSections = [
     ['title' => 'Luna', 'groups' => [
@@ -59,6 +77,8 @@ $variableSections = [
             ['moon_right_ascension', 'moon_declination'],
             ['moon_altitude', 'moon_azimuth'],
             ['moon_ecliptic_latitude'],
+            ['moon_ecliptic_longitude', 'moon_node_angle'],
+            ['moon_mean_ascending_node_longitude', 'sun_node_angle'],
             ['moon_above_horizon_hours'],
         ]],
     ]],
@@ -110,6 +130,7 @@ $pageSeo = aquellasLunasSeoPage(
     '/explorador/',
     'website'
 );
+if ($explorerEmbedMode) $pageSeo['robots'] = 'noindex, follow';
 ?>
 <!doctype html>
 <html lang="es">
@@ -117,15 +138,28 @@ $pageSeo = aquellasLunasSeoPage(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 <?php renderSeoHead($pageSeo); ?>
-<?php renderAnalyticsTracking(); ?>
+<?php if (!$explorerEmbedMode): ?><?php renderAnalyticsTracking(); ?><?php endif; ?>
 <?php renderFaviconLinks('../'); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars('../' . versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
-    <link rel="stylesheet" href="assets/explorador.css?v=20260804-1">
+    <link rel="stylesheet" href="assets/explorador.css?v=20260902-2">
+<?php if ($explorerEmbedMode): ?>
+    <link rel="stylesheet" href="assets/embed.css?v=1">
+<?php endif; ?>
+<?php if (!$explorerEmbedMode): ?>
     <script src="<?= htmlspecialchars('../' . versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
+<?php endif; ?>
 </head>
-<body class="explorer-page" data-explorer-share-path="<?= htmlspecialchars($explorerPath, ENT_QUOTES, 'UTF-8') ?>">
-<?php renderAstronomySiteHeader('explorer', $location, '../'); ?>
+<body class="explorer-page<?= $explorerEmbedMode ? ' explorer-embed-page' : '' ?>"
+    data-explorer-share-path="<?= htmlspecialchars($explorerPath, ENT_QUOTES, 'UTF-8') ?>"
+    <?= $explorerEmbedMode ? 'data-explorer-embed="true" data-explorer-full-path="' . htmlspecialchars($explorerPath, ENT_QUOTES, 'UTF-8') . '" style="--embed-chart-height:' . $explorerEmbedHeight . 'px"' : '' ?>>
+<?php if (!$explorerEmbedMode): ?><?php renderAstronomySiteHeader('explorer', $location, '../'); ?><?php endif; ?>
 <main class="explorer-shell">
+<?php if ($explorerEmbedMode): ?>
+    <header class="embed-heading">
+        <div><p class="eyebrow">Explorador astronómico</p><h1><?= htmlspecialchars($explorerEmbedTitle, ENT_QUOTES, 'UTF-8') ?></h1></div>
+        <a id="embed-open-explorer" class="embed-open-explorer" href="<?= htmlspecialchars($explorerPath, ENT_QUOTES, 'UTF-8') ?>" target="_top">Abrir en el Explorador</a>
+    </header>
+<?php endif; ?>
     <header class="explorer-heading">
         <p class="eyebrow">Explorá el cielo a lo largo del tiempo</p>
         <h1>Explorador astronómico</h1>
@@ -262,7 +296,7 @@ $pageSeo = aquellasLunasSeoPage(
                     <label>Variable B <?php explorerContextHelp('help-relation-variable-b', 'Segunda variable numérica; debe ser distinta de A.'); ?><select id="relation-variable-b"></select></label>
                 </div>
                 <p id="relation-phase-note" class="relation-phase-note" hidden>La normalización se calcula sólo sobre las fechas de fases seleccionadas.</p>
-                <p id="relation-circular-note" class="relation-circular-note">El análisis usa normalización lineal. En variables circulares, como azimutes, la interpretación puede requerir cautela.</p>
+                <p id="relation-circular-note" class="relation-circular-note">El análisis usa normalización lineal. En variables circulares, como azimutes y ángulos eclípticos de 0°–360°, la interpretación puede requerir cautela.</p>
             </fieldset>
             <fieldset id="extrema-panel" class="extrema-panel" hidden>
                 <legend>Extremos locales</legend>
@@ -303,6 +337,10 @@ $pageSeo = aquellasLunasSeoPage(
                     <span id="request-status" role="status" aria-live="polite"></span>
                 </section>
                 <button id="share-configuration" class="share-button" type="button">Compartir configuración</button>
+<?php if ($showTechnicalMetrics): ?>
+                <button id="generate-embed-code" class="embed-code-button" type="button"
+                    data-embed-base-url="<?= htmlspecialchars(aquellasLunasCanonicalUrl('/explorador/embed.php'), ENT_QUOTES, 'UTF-8') ?>"><span aria-hidden="true">&lt;/&gt;</span> Código para insertar</button>
+<?php endif; ?>
             </div>
             <p id="shared-configuration-status" class="shared-configuration-status" role="status" aria-live="polite"></p>
             <p id="shared-configuration-notice" class="shared-configuration-notice" role="status" hidden></p>
@@ -322,6 +360,31 @@ $pageSeo = aquellasLunasSeoPage(
             </div>
         </div>
     </dialog>
+    <div id="share-toast" class="share-toast" role="status" aria-live="polite" hidden></div>
+
+<?php if ($showTechnicalMetrics): ?>
+    <dialog id="embed-code-dialog" class="share-dialog embed-code-dialog" aria-labelledby="embed-code-dialog-title" aria-describedby="embed-code-dialog-note">
+        <div class="share-dialog__surface">
+            <h2 id="embed-code-dialog-title">Código para insertar</h2>
+            <p id="embed-code-dialog-note">Genera un iframe con la configuración actual. La ubicación y los parámetros astronómicos quedan incluidos en la URL.</p>
+            <div class="embed-code-options">
+                <label for="embed-code-height">Altura
+                    <input id="embed-code-height" type="number" min="320" max="900" step="1" value="560" inputmode="numeric">
+                </label>
+                <label for="embed-code-title">Título opcional
+                    <input id="embed-code-title" type="text" maxlength="100" placeholder="Explorador astronómico">
+                </label>
+            </div>
+            <label for="embed-code-output">Código HTML</label>
+            <textarea id="embed-code-output" rows="8" readonly spellcheck="false"></textarea>
+            <p id="embed-code-status" class="share-dialog__status" role="status" aria-live="polite"></p>
+            <div class="share-dialog__actions">
+                <button id="embed-code-copy" type="button">Copiar código</button>
+                <button id="embed-code-close" class="share-dialog__close" type="button">Cerrar</button>
+            </div>
+        </div>
+    </dialog>
+<?php endif; ?>
 
 <?php if ($showTechnicalMetrics): ?>
     <section class="panel metrics-panel" aria-labelledby="metrics-title">
@@ -338,14 +401,14 @@ $pageSeo = aquellasLunasSeoPage(
         <div id="chart" role="img" aria-label="Gráfico de series astronómicas"></div>
     </section>
 </main>
-<?php renderAstronomySiteFooter(); ?>
+<?php if (!$explorerEmbedMode): ?><?php renderAstronomySiteFooter(); ?><?php endif; ?>
 <script src="../vendor/frontend/echarts/5.6.0/echarts.min.js"></script>
 <script src="assets/date-controls.js"></script>
 <script src="assets/relation-analysis.js"></script>
 <script src="assets/share-config.js?v=1"></script>
-<script src="assets/time-series-segments.js?v=1"></script>
+<script src="assets/time-series-segments.js?v=2"></script>
 <script src="assets/vertical-axis-control.js?v=20260803-2"></script>
 <script>window.ExplorerScaleGroups = <?= json_encode($scaleGroups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
-<script src="assets/explorador.js?v=20260804-3"></script>
+<script src="assets/explorador.js?v=20260902-4"></script>
 </body>
 </html>

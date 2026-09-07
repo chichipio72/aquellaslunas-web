@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Smoke del embed</title></head>
+<body data-result="pending">
+<iframe id="target" src="../embed.php?v=1&amp;modo=diario&amp;desde=2026-01-01&amp;hasta=2026-01-20&amp;lat=-34.6037&amp;lon=-58.3816&amp;tz=America%2FArgentina%2FBuenos_Aires&amp;ubicacion=Ubicacion%20compartida&amp;campos=moon_ecliptic_longitude%2Cmoon_node_angle&amp;dias=todos&amp;alto=420"></iframe>
+<pre id="result">pending</pre>
+<script>
+(() => {
+    const frame = document.querySelector('#target');
+    const result = document.querySelector('#result');
+    const finish = (ok, details) => {
+        document.body.dataset.result = ok ? 'ok' : 'error';
+        result.textContent = `${ok ? 'OK' : 'ERROR'} ${details}`;
+    };
+    frame.addEventListener('load', () => {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        if (!doc || !win) { finish(false, 'iframe no accesible en mismo origen'); return; }
+        const waitFor = (test, callback, attempts = 100) => {
+            if (test()) { callback(); return; }
+            if (attempts <= 0) { finish(false, 'timeout'); return; }
+            win.setTimeout(() => waitFor(test, callback, attempts - 1), 100);
+        };
+        waitFor(() => doc.querySelector('#request-status')?.textContent.includes('filas calculadas'), () => {
+            const selectedBefore = [...doc.querySelectorAll('input[name="campos[]"]:checked')].map(item => item.value).join(',');
+            doc.querySelector('[name="fecha_desde"]').value = '2026-02-01';
+            doc.querySelector('[name="fecha_hasta"]').value = '2026-02-10';
+            doc.querySelector('#explorer-form').requestSubmit();
+            waitFor(() => doc.querySelector('#request-status')?.textContent.includes('10 filas calculadas'), () => {
+                const selectedAfter = [...doc.querySelectorAll('input[name="campos[]"]:checked')].map(item => item.value).join(',');
+                const href = doc.querySelector('#embed-open-explorer')?.href || '';
+                const location = doc.querySelector('#calculation-location-value')?.textContent || '';
+                const noOverflow = doc.documentElement.scrollWidth <= doc.documentElement.clientWidth;
+                const ok = selectedBefore === selectedAfter
+                    && selectedAfter === 'moon_ecliptic_longitude,moon_node_angle'
+                    && href.includes('desde=2026-02-01') && href.includes('hasta=2026-02-10')
+                    && href.includes('campos=moon_ecliptic_longitude%2Cmoon_node_angle')
+                    && location.includes('Ubicacion compartida') && noOverflow;
+                finish(ok, `${selectedAfter} ${href} overflow=${noOverflow}`);
+            });
+        });
+    });
+})();
+</script>
+</body>
+</html>

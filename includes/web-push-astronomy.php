@@ -373,6 +373,18 @@ function astronomyPushMoonriseEvents(array $device, DateTimeImmutable $nowUtc): 
     return $events;
 }
 
+/** @return array{TTL:int,urgency:string} */
+function astronomyPushTransportOptions(string $notificationType, DateTimeImmutable $eventTimeUtc,
+    DateTimeImmutable $attemptedAtUtc): array
+{
+    if ($notificationType !== ASTRONOMY_PUSH_MOONRISE_TYPE) {
+        return ['TTL' => 300, 'urgency' => 'normal'];
+    }
+    $secondsUntilEvent = astronomyPushUtc($eventTimeUtc)->getTimestamp()
+        - astronomyPushUtc($attemptedAtUtc)->getTimestamp();
+    return ['TTL' => max(60, min(1800, $secondsUntilEvent)), 'urgency' => 'high'];
+}
+
 /** @return list<array<string,mixed>> */
 function astronomyPushConfiguredDevices(PDO $connection, ?int $subscriptionId = null): array
 {
@@ -654,9 +666,9 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
     ?callable $eventResolver = null, ?callable $sender = null, ?callable $output = null): array
 {
     $eventResolver ??= static fn(array $device, DateTimeImmutable $now): array => astronomyPushProviderEvents($device, $now);
-    $sender ??= static function (array $device, array $message) use ($connection): array {
+    $sender ??= static function (array $device, array $message, array $transportOptions) use ($connection): array {
         return astronomyWebPushSend($connection, loadWebPushServerConfig(), (int) $device['subscription_id'],
-            $message['title'], $message['body'], $message['url']);
+            $message['title'], $message['body'], $message['url'], $transportOptions);
     };
     $output ??= static function (string $message): void {};
     $counts = ['devices' => count($devices), 'evaluated' => 0, 'due' => 0, 'sent' => 0, 'failed' => 0,
@@ -768,7 +780,10 @@ function astronomyPushProcess(PDO $connection, array $devices, DateTimeImmutable
                 continue;
             }
             try {
-                $result = $sender($device, $content);
+                $transportOptions = astronomyPushTransportOptions(
+                    $notificationType, $event['event_time_utc'], $nowUtc
+                );
+                $result = $sender($device, $content, $transportOptions);
                 $success = (int) ($result['success'] ?? 0) === 1 && (int) ($result['failed'] ?? 0) === 0;
                 $error = $success ? null : (string) ($result['errors'][0]['message'] ?? 'Error de envío Web Push');
             } catch (Throwable $exception) {

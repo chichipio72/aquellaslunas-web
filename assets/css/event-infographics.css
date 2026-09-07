@@ -1,0 +1,47 @@
+.event-infographic-container { display: grid; gap: 1.2rem; }
+.event-infographic-hero { margin-bottom: 0; }
+.event-infographic-workspace { display: grid; grid-template-columns: minmax(17rem, .72fr) minmax(22rem, 1.28fr); gap: 1.2rem; align-items: start; }
+.event-infographic-controls, .event-infographic-preview-card, .event-infographic-message { padding: clamp(1.2rem, 3vw, 2rem); }
+.event-infographic-controls { display: grid; gap: 1.2rem; position: sticky; top: 1rem; }
+.event-infographic-controls h2, .event-infographic-message h2 { margin: .2rem 0 .55rem; }
+.event-infographic-controls p, .event-infographic-message p { color: var(--muted); }
+.event-infographic-format { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: 0; padding: 0; border: 0; }
+.event-infographic-format legend { grid-column: 1 / -1; margin-bottom: .15rem; color: #c8d1e3; font-size: .84rem; font-weight: 650; }
+.event-infographic-format label { position: relative; cursor: pointer; }
+.event-infographic-format input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.event-infographic-format span { display: grid; place-items: center; min-height: 4rem; padding: .7rem; border: 1px solid rgba(151, 168, 207, .24); border-radius: .85rem; background: rgba(12, 20, 38, .72); color: #dce5f6; text-align: center; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.event-infographic-format small { color: #8f9db8; font-size: .72rem; }
+.event-infographic-format input:checked + span { border-color: rgba(218, 190, 127, .72); background: rgba(141, 116, 63, .16); color: #fff5dc; }
+.event-infographic-format input:focus-visible + span { outline: 2px solid var(--interactive); outline-offset: 3px; }
+.event-infographic-format label:hover span { transform: translateY(-1px); border-color: rgba(189, 204, 235, .48); }
+.event-infographic-actions { display: grid; grid-template-columns: 1fr; gap: .65rem; }
+.event-infographic-actions--share { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.event-infographic-actions .button { width: 100%; }
+.event-infographic-share[hidden] { display: none; }
+.event-infographic-download:disabled, .event-infographic-share:disabled { cursor: wait; opacity: .68; }
+.event-infographic-status { min-height: 1.35em; margin: -.55rem 0 0; font-size: .82rem; }
+.event-infographic-preview-card { min-width: 0; }
+.event-infographic-preview { display: flex; justify-content: center; min-height: 28rem; padding: clamp(.7rem, 2.2vw, 1.25rem); overflow: hidden; border: 1px solid rgba(143, 159, 196, .16); border-radius: 1rem; background: #02050c; }
+.event-infographic-preview canvas { display: block; width: auto; max-width: 100%; height: min(68vh, 48rem); border-radius: .45rem; box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, .48); }
+.event-infographic-message .button { margin-top: .5rem; }
+.event-infographic-moon-source { position: fixed; left: -10000px; top: 0; width: 640px; height: 640px; pointer-events: none; visibility: hidden; }
+.event-infographic-eclipse-sources { position: fixed; left: 0; top: 0; z-index: 9999; width: 720px; height: 720px; opacity: .001; pointer-events: none; }
+.event-infographic-eclipse-source { position: relative; width: 720px; height: 720px; }
+.event-infographic-eclipse-source .real-eclipse-widget,
+.event-infographic-eclipse-source [data-eclipse-stage] { display: block; width: 100%; height: 100%; }
+.event-infographic-link { display: inline-flex; align-items: center; width: fit-content; color: #d8c494; font-size: .78rem; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.event-infographic-link:hover, .event-infographic-link:focus-visible { color: #fff0c7; text-decoration: underline; text-underline-offset: .2rem; }
+.event-infographic-link:visited { color: #d8c494; }
+
+@media (max-width: 760px) {
+  .event-infographic-workspace { grid-template-columns: 1fr; }
+  .event-infographic-controls { position: static; }
+  .event-infographic-preview { min-height: 22rem; }
+  .event-infographic-preview canvas { height: min(64vh, 38rem); }
+}
+
+@media (max-width: 430px) {
+  .event-infographic-format { grid-template-columns: 1fr; }
+  .event-infographic-actions--share { grid-template-columns: 1fr; }
+  .event-infographic-preview { padding: .45rem; }
+}

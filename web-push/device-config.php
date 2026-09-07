@@ -49,6 +49,10 @@ try {
         $config = $payload['config'] ?? null;
         if (!is_array($config)) throw new InvalidArgumentException('La configuración enviada no es válida.');
         $state = astronomyPushSaveCurrentDevice($connection, $subscription, $config);
+    } elseif ($action === 'update_location') {
+        $location = $payload['location'] ?? null;
+        if (!is_array($location)) throw new InvalidArgumentException('La ubicación enviada no es válida.');
+        $state = astronomyPushUpdateCurrentDeviceLocation($connection, $subscription, $location);
     } else {
         throw new InvalidArgumentException('La acción solicitada no es válida.');
     }

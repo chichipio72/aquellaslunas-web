@@ -8,7 +8,7 @@ function renderFaviconLinks(string $pathPrefix = ''): void
     $faviconIco = htmlspecialchars($pathPrefix . versionedAssetUrl('assets/images/favicon/favicon.ico'), ENT_QUOTES, 'UTF-8');
     $faviconPng = htmlspecialchars($pathPrefix . versionedAssetUrl('assets/images/favicon/favicon-32x32.png'), ENT_QUOTES, 'UTF-8');
     $appleTouchIcon = htmlspecialchars($pathPrefix . versionedAssetUrl('assets/images/favicon/apple-touch-icon.png'), ENT_QUOTES, 'UTF-8');
-    $manifestUrl = htmlspecialchars($pathPrefix . versionedAssetUrl('manifest.webmanifest'), ENT_QUOTES, 'UTF-8');
+    $manifestUrl = '/astro/manifest.webmanifest';
 
     echo '    <link rel="icon" href="' . $faviconSvg . '" type="image/svg+xml">' . "\n";
     echo '    <link rel="icon" href="' . $faviconIco . '" sizes="any">' . "\n";

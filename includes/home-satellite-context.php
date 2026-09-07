@@ -7,6 +7,7 @@ require_once __DIR__ . '/home-notification-links.php';
 
 use AstronomyEngine\Facade\AstronomyObserver;
 use AstronomyEngine\Satellite\CachedCelesTrakTleProvider;
+use AstronomyEngine\Satellite\CelesTrakTleDownloader;
 use AstronomyEngine\Satellite\ResolvedTle;
 use AstronomyEngine\Satellite\SatelliteTransitEvent;
 use AstronomyEngine\Satellite\SatelliteTransitService;
@@ -58,7 +59,7 @@ function homeSatelliteDisplayEvents(array $events): array
     return $nearPasses === [] ? [] : [$nearPasses[0]];
 }
 
-/** @return array{title:string,time:string,duration:?string,edge_distance:?string,solar_warning:?string} */
+/** @return array{title:string,time:string,duration:?string,edge_distance:?string,target_altitude:?string,solar_warning:?string} */
 function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $timezoneName,
     DateTimeImmutable $now): array
 {
@@ -84,10 +85,23 @@ function homeSatelliteEventPresentation(SatelliteTransitEvent $event, string $ti
         'edge_distance' => $event->classification === 'near_pass'
             ? number_format(max(0.0, $event->minimumSeparationDegrees - $event->targetApparentRadiusDegrees), 1, ',', '.') . '°'
             : null,
+        'target_altitude' => $event->targetBody === 'moon'
+            ? 'Luna a ' . number_format(abs($event->targetAltitudeDegrees), 1, ',', '.') . '° '
+                . ($event->targetAltitudeDegrees >= 0.0 ? 'sobre' : 'bajo') . ' el horizonte.'
+            : null,
         'solar_warning' => $event->targetBody === 'sun'
             ? 'No observes el Sol directamente ni con instrumentos sin un filtro solar certificado.'
             : null,
     ];
+}
+
+function homeSatelliteViewerUrl(SatelliteTransitEvent $event): string
+{
+    $parameters = [
+        'station' => in_array($event->satellite, ['iss', 'tiangong'], true) ? $event->satellite : 'iss',
+        'time' => $event->maximum->format(DateTimeInterface::ATOM),
+    ];
+    return astronomyInternalUrl('iss-y-tiangong.php?' . http_build_query($parameters, '', '&', PHP_QUERY_RFC3986));
 }
 
 /** @param list<SatelliteTransitEvent> $events */
@@ -105,7 +119,9 @@ function renderHomeSatelliteEventItems(array $events, string $timezoneName, Date
             <h3><?= htmlspecialchars($presentation['title'], ENT_QUOTES, 'UTF-8') ?></h3>
             <?php if ($presentation['duration'] !== null): ?><p>Duración <?= htmlspecialchars($presentation['duration'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
             <?php if ($presentation['edge_distance'] !== null): ?><p>A unos <?= htmlspecialchars($presentation['edge_distance'], ENT_QUOTES, 'UTF-8') ?> del borde.</p><?php endif; ?>
+            <?php if ($presentation['target_altitude'] !== null): ?><p><?= htmlspecialchars($presentation['target_altitude'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
             <?php if ($presentation['solar_warning'] !== null): ?><p class="home-v2-satellite-event__safety"><?= htmlspecialchars($presentation['solar_warning'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+            <a class="button compact-secondary-button home-v2-satellite-event__viewer-link" href="<?= htmlspecialchars(homeSatelliteViewerUrl($event), ENT_QUOTES, 'UTF-8') ?>">Ver ISS y Tiangong</a>
         </section>
         <?php
     }
@@ -217,7 +233,9 @@ function homeSatelliteContextUntraced(array $location, DateTimeImmutable $now, ?
                 ?: dirname(__DIR__) . '/astronomy-engine/cache/satellite/tle-cache.json');
             $ttl = (int) (getenv('ASTRONOMY_TLE_CACHE_TTL_SECONDS')
                 ?: CachedCelesTrakTleProvider::DEFAULT_TTL_SECONDS);
-            $service = new SatelliteTransitService(new CachedCelesTrakTleProvider($cachePath, $ttl));
+            $service = new SatelliteTransitService(new CachedCelesTrakTleProvider(
+                $cachePath, $ttl, new CelesTrakTleDownloader(3), null, false
+            ));
             $runner = static fn(AstronomyObserver $resolvedObserver, DateTimeImmutable $start, int $hours,
                 array $satellites, array $targets): SatelliteTransitServiceResult =>
                 $service->search($resolvedObserver, $start, $hours, $satellites, $targets);

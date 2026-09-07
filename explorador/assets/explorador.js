@@ -46,12 +46,23 @@
     const shareDialogStatus = document.querySelector('#share-dialog-status');
     const shareDialogCopy = document.querySelector('#share-dialog-copy');
     const shareDialogClose = document.querySelector('#share-dialog-close');
+    const shareToast = document.querySelector('#share-toast');
+    const embedCodeButton = document.querySelector('#generate-embed-code');
+    const embedCodeDialog = document.querySelector('#embed-code-dialog');
+    const embedCodeHeight = document.querySelector('#embed-code-height');
+    const embedCodeTitle = document.querySelector('#embed-code-title');
+    const embedCodeOutput = document.querySelector('#embed-code-output');
+    const embedCodeStatus = document.querySelector('#embed-code-status');
+    const embedCodeCopy = document.querySelector('#embed-code-copy');
+    const embedCodeClose = document.querySelector('#embed-code-close');
     const sharedNotice = document.querySelector('#shared-configuration-notice');
     const shareTools = window.ExplorerShareConfig;
     const timeSeriesSegments = window.ExplorerTimeSeriesSegments;
     const dateTools = window.ExplorerDateTools;
     const verticalAxisTools = window.ExplorerVerticalAxisControl;
     const scaleGroups = window.ExplorerScaleGroups || {};
+    const embedMode = document.body.dataset.explorerEmbed === 'true';
+    const embedOpenExplorer = document.querySelector('#embed-open-explorer');
     let chart = null;
     let verticalAxisController = null;
     let activeController = null;
@@ -62,6 +73,8 @@
     let sharedFieldOrder = null;
     let activeLocation = {...officialLocation};
     let sharedLocationActive = false;
+    let lockedEmbedConfiguration = null;
+    let shareToastTimer = 0;
     let alignRelationBands = () => {};
     const preferredRelationFields = {a: '', b: ''};
     const relationAnalysis = window.ExplorerRelationAnalysis;
@@ -72,6 +85,7 @@
         local_time: {min: 0, max: 24},
         duration: {min: 0, max: 26},
         azimuth: {min: 0, max: 360},
+        ecliptic_cycle_angle: {min: 0, max: 360},
         hours_angle: {min: 0, max: 24},
     };
     const scaleTitle = group => {
@@ -90,9 +104,9 @@
 
     const metric = (label, value) => `<div><dt>${label}</dt><dd>${value}</dd></div>`;
     const number = (value, digits = 1) => Number(value).toLocaleString('es-AR', {maximumFractionDigits: digits});
-    const roundedAxisDigits = {solar_distance: 0, equation_of_time: 0,
+    const roundedAxisDigits = {solar_distance: 0, equation_of_time: 0, ecliptic_cycle_angle: 0,
         angular_separation: 0, lunar_angular_diameter: 1};
-    const roundedAxisStep = {solar_distance: 1000, equation_of_time: 1,
+    const roundedAxisStep = {solar_distance: 1000, equation_of_time: 1, ecliptic_cycle_angle: 60,
         angular_separation: 1, lunar_angular_diameter: 0.1};
     const localTime = value => {
         if (value === null || value === undefined) return '—';
@@ -508,6 +522,7 @@
             nameRotate: index % 2 ? -90 : 90,
             scale: true,
             ...(group === 'local_time' ? {min: 0, max: 24, interval: 4} : {}),
+            ...(group === 'ecliptic_cycle_angle' ? {min: 0, max: 360, interval: 60} : {}),
             ...(roundedAxisStep[group] !== undefined ? {minInterval: roundedAxisStep[group]} : {}),
             axisLabel: {color: '#9eabc0', formatter: group === 'local_time'
                 ? localTimeAxis
@@ -521,7 +536,9 @@
             const metadata = data.field_metadata[field];
             const values = data.rows.map(row => row[field]);
             const visualSegments = metadata.scaleGroup === 'local_time'
-                ? timeSeriesSegments.splitAtMidnight(values) : [values];
+                ? timeSeriesSegments.splitAtMidnight(values)
+                : (metadata.scaleGroup === 'ecliptic_cycle_angle'
+                    ? timeSeriesSegments.splitCircular(values) : [values]);
             return visualSegments.map((segment, segmentIndex) => ({
                 id: `main-${field}-${segmentIndex}`,
                 name: metadata.shortName,
@@ -791,6 +808,44 @@
         return checked.valid ? {url, warning: ''} : {url: '', warning: checked.warnings.join(' ')};
     }
 
+    function updateEmbedExplorerLink() {
+        if (!embedMode || !embedOpenExplorer) return;
+        const fullPath = document.body.dataset.explorerFullPath || '/explorador/';
+        embedOpenExplorer.href = shareTools.build(visibleShareConfiguration(),
+            new URL(fullPath, window.location.origin).toString());
+    }
+
+    function lockEmbedConfiguration(config) {
+        lockedEmbedConfiguration = {...config, fields: [...config.fields], phases: [...config.phases],
+            methods: [...config.methods]};
+    }
+
+    function restoreLockedEmbedConfiguration() {
+        const config = lockedEmbedConfiguration;
+        if (!embedMode || !config) return;
+        modeInputs.forEach(input => { input.checked = input.value === config.mode; });
+        activeLocation = {latitude: Number(config.latitude), longitude: Number(config.longitude),
+            timezone: config.timezone, name: config.locationLabel || ''};
+        if (config.mode === 'diario') {
+            form.querySelectorAll('input[name="campos[]"]').forEach(input => {
+                input.checked = config.fields.includes(input.value);
+            });
+            phaseInputs.forEach(input => { input.checked = config.phases.includes(input.value); });
+            allDays.checked = config.phases.length === 0;
+            relationMethods.forEach(input => { input.checked = config.methods.includes(input.value); });
+            preferredRelationFields.a = config.a || ''; preferredRelationFields.b = config.b || '';
+            updateRelationControls();
+            if (config.a) relationSelectA.value = config.a;
+            if (config.b) relationSelectB.value = config.b;
+            preventDuplicateRelationVariables();
+        } else {
+            extremaVariable.value = config.extremaField;
+            [...form.querySelectorAll('input[name="tipo_extremo"]')].forEach(input => {
+                input.checked = input.value === config.extremaType;
+            });
+        }
+    }
+
     function openShareDialog(url, message = '') {
         shareUrlInput.value = url;
         shareDialogStatus.textContent = message;
@@ -808,6 +863,90 @@
         await navigator.clipboard.writeText(url);
     }
 
+    function showShareToast(message) {
+        if (!shareToast) return;
+        window.clearTimeout(shareToastTimer);
+        shareToast.textContent = message;
+        shareToast.hidden = false;
+        shareToastTimer = window.setTimeout(() => {
+            shareToast.hidden = true;
+            shareToast.textContent = '';
+        }, 2000);
+    }
+
+    const escapeEmbedAttribute = value => String(value).replace(/[&<>"']/g, character => {
+        if (character === '&') return '&amp;';
+        if (character === '<') return '&lt;';
+        if (character === '>') return '&gt;';
+        if (character === '"') return '&quot;';
+        return '&#039;';
+    });
+
+    function refreshEmbedCode() {
+        if (!embedCodeButton || !embedCodeHeight || !embedCodeTitle || !embedCodeOutput || !embedCodeStatus) return;
+        const height = Number(embedCodeHeight.value);
+        if (!Number.isInteger(height) || height < 320 || height > 900) {
+            embedCodeOutput.value = '';
+            embedCodeStatus.textContent = 'La altura debe ser un número entero entre 320 y 900 px.';
+            return;
+        }
+        const config = visibleShareConfiguration();
+        const baseUrl = embedCodeButton.dataset.embedBaseUrl || '';
+        const serialized = shareTools.build(config, baseUrl);
+        const checked = shareTools.parse(new URL(serialized).search, shareSchema, safeDefaults());
+        if (!checked.valid) {
+            embedCodeOutput.value = '';
+            embedCodeStatus.textContent = checked.warnings.join(' ') || 'La configuración actual no puede insertarse.';
+            return;
+        }
+        const title = embedCodeTitle.value.trim().slice(0, 100);
+        const embedUrl = new URL(serialized);
+        embedUrl.searchParams.set('alto', String(height));
+        if (title) embedUrl.searchParams.set('titulo', title); else embedUrl.searchParams.delete('titulo');
+        if (embedUrl.toString().length > 4000) {
+            embedCodeOutput.value = '';
+            embedCodeStatus.textContent = 'La URL del embed supera los 4.000 caracteres.';
+            return;
+        }
+        const accessibleTitle = title || 'Explorador astronómico';
+        embedCodeOutput.value = `<iframe\n  src="${escapeEmbedAttribute(embedUrl.toString())}"\n  title="${escapeEmbedAttribute(accessibleTitle)}"\n  width="100%"\n  height="${height}"\n  loading="lazy"\n  style="border:0;"\n></iframe>`;
+        embedCodeStatus.textContent = '';
+    }
+
+    if (embedCodeButton && embedCodeDialog && embedCodeHeight && embedCodeTitle
+        && embedCodeOutput && embedCodeStatus && embedCodeCopy && embedCodeClose) {
+        const closeEmbedCodeDialog = () => { if (embedCodeDialog.open) embedCodeDialog.close(); };
+        embedCodeButton.addEventListener('click', () => {
+            refreshEmbedCode();
+            if (!embedCodeDialog.open) embedCodeDialog.showModal();
+            embedCodeHeight.focus();
+        });
+        [embedCodeHeight, embedCodeTitle].forEach(control => control.addEventListener('input', refreshEmbedCode));
+        embedCodeCopy.addEventListener('click', async () => {
+            refreshEmbedCode();
+            if (!embedCodeOutput.value) return;
+            try {
+                await copyShareUrl(embedCodeOutput.value);
+                embedCodeStatus.textContent = 'Código copiado.';
+            } catch (error) {
+                embedCodeOutput.focus(); embedCodeOutput.select();
+                embedCodeStatus.textContent = 'No se pudo copiar automáticamente. El código quedó seleccionado para copia manual.';
+            }
+        });
+        embedCodeClose.addEventListener('click', closeEmbedCodeDialog);
+        embedCodeDialog.addEventListener('cancel', event => { event.preventDefault(); closeEmbedCodeDialog(); });
+        embedCodeDialog.addEventListener('close', () => embedCodeButton.focus());
+        embedCodeDialog.addEventListener('keydown', event => {
+            if (event.key !== 'Tab') return;
+            const focusable = [...embedCodeDialog.querySelectorAll('input, textarea, button')]
+                .filter(element => !element.disabled && !element.hidden);
+            if (!focusable.length) return;
+            const first = focusable[0]; const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        });
+    }
+
     shareButton.addEventListener('click', async () => {
         shareStatus.textContent = '';
         const result = canonicalShareUrl();
@@ -819,10 +958,7 @@
         window.history.replaceState(null, '', result.url);
         try {
             await copyShareUrl(result.url);
-            shareStatus.textContent = 'Enlace copiado.';
-            window.setTimeout(() => {
-                if (shareStatus.textContent === 'Enlace copiado.') shareStatus.textContent = '';
-            }, 3000);
+            showShareToast('Enlace copiado al portapapeles');
         } catch (error) {
             openShareDialog(result.url, 'No se pudo copiar automáticamente. Podés copiarlo desde este campo.');
         }
@@ -860,6 +996,18 @@
 
     function applySharedConfiguration() {
         const parsed = shareTools.parse(window.location.search, shareSchema, safeDefaults());
+        if (embedMode && (!parsed.present || !parsed.valid)) {
+            sharedNotice.hidden = false;
+            sharedNotice.textContent = parsed.present
+                ? parsed.warnings.join(' ')
+                : 'El embed necesita una configuración compartida v=1 válida.';
+            sharedNotice.classList.add('error');
+            form.querySelectorAll('input, select, button').forEach(control => { control.disabled = true; });
+            chartElement.hidden = true;
+            chartMessage.style.display = 'block';
+            chartMessage.textContent = 'No se pudo cargar la configuración del gráfico.';
+            return;
+        }
         if (!parsed.present) return;
         sharedNotice.hidden = false;
         if (!parsed.valid) {
@@ -894,11 +1042,16 @@
             [...form.querySelectorAll('input[name="tipo_extremo"]')].forEach(input => { input.checked = input.value === config.extremaType; });
             updateExtremaGuidance();
         }
+        if (embedMode) {
+            lockEmbedConfiguration(config);
+            updateEmbedExplorerLink();
+        }
         if (parsed.valid) window.setTimeout(() => form.requestSubmit(), 0);
     }
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        restoreLockedEmbedConfiguration();
         if (!validateDateOrder()) return;
         const mode = currentMode();
         const fields = orderedSelectedFieldInputs().map(input => input.value);
@@ -943,6 +1096,7 @@
                 status.textContent = `${number(data.rows.length, 0)} filas calculadas.`;
             }
             showMetrics(data);
+            updateEmbedExplorerLink();
             stopElapsedTimer();
             cancelButton.disabled = true;
             cancelButton.hidden = true;
@@ -968,21 +1122,63 @@
         }
     });
     const contextHelpButtons = [...document.querySelectorAll('.context-help')];
+    const contextHelpEntries = new Map();
+    const positionContextHelp = button => {
+        const tooltip = contextHelpEntries.get(button);
+        if (!tooltip || tooltip.hidden) return;
+        const margin = 8;
+        const gap = 7;
+        const anchor = button.getBoundingClientRect();
+        tooltip.style.width = `${Math.min(280, Math.max(160, window.innerWidth - margin * 2))}px`;
+        tooltip.style.left = '0px'; tooltip.style.top = '0px';
+        const box = tooltip.getBoundingClientRect();
+        const left = Math.min(window.innerWidth - box.width - margin,
+            Math.max(margin, anchor.left + anchor.width / 2 - box.width / 2));
+        const fitsAbove = anchor.top >= box.height + gap + margin;
+        const top = fitsAbove
+            ? anchor.top - box.height - gap
+            : Math.min(window.innerHeight - box.height - margin, anchor.bottom + gap);
+        tooltip.style.left = `${Math.max(margin, left)}px`;
+        tooltip.style.top = `${Math.max(margin, top)}px`;
+        tooltip.dataset.side = fitsAbove ? 'top' : 'bottom';
+    };
+    const setContextHelpOpen = (button, open) => {
+        const tooltip = contextHelpEntries.get(button);
+        if (!tooltip) return;
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        tooltip.hidden = !open;
+        if (open) positionContextHelp(button);
+    };
     const closeContextHelp = except => contextHelpButtons.forEach(button => {
-        if (button !== except) button.setAttribute('aria-expanded', 'false');
+        if (button !== except) setContextHelpOpen(button, false);
     });
     contextHelpButtons.forEach(button => {
+        const tooltip = button.nextElementSibling;
+        if (!(tooltip instanceof HTMLElement) || !tooltip.classList.contains('context-help__content')) return;
+        contextHelpEntries.set(button, tooltip);
+        tooltip.hidden = true;
+        (button.closest('dialog') || document.body).append(tooltip);
         button.addEventListener('click', event => {
             event.preventDefault(); event.stopPropagation();
             const opening = button.getAttribute('aria-expanded') !== 'true';
             closeContextHelp(button);
-            button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            setContextHelpOpen(button, opening);
         });
+        button.addEventListener('mouseenter', () => { closeContextHelp(button); setContextHelpOpen(button, true); });
+        button.addEventListener('mouseleave', () => {
+            if (document.activeElement !== button) setContextHelpOpen(button, false);
+        });
+        button.addEventListener('focus', () => {
+            if (button.matches(':focus-visible')) { closeContextHelp(button); setContextHelpOpen(button, true); }
+        });
+        button.addEventListener('blur', () => setContextHelpOpen(button, false));
         button.addEventListener('keydown', event => {
-            if (event.key === 'Escape') { button.setAttribute('aria-expanded', 'false'); button.focus(); }
+            if (event.key === 'Escape') { setContextHelpOpen(button, false); button.focus(); }
         });
     });
     document.addEventListener('click', () => closeContextHelp());
+    window.addEventListener('resize', () => contextHelpButtons.forEach(positionContextHelp));
+    document.addEventListener('scroll', () => contextHelpButtons.forEach(positionContextHelp), true);
     cancelButton.addEventListener('click', () => cancelActiveRequest('Cálculo cancelado.'));
     window.addEventListener('resize', () => { chart?.resize(); alignRelationBands(); });
     applySharedConfiguration();

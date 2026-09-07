@@ -20,7 +20,20 @@ contentEmbedAssert(str_contains($html, '<iframe '), 'La URL válida no generó i
 contentEmbedAssert(str_contains($html, 'src="https://chichipiosblog.com.ar/astronomia/sol-tierra-luna/?embed=1&amp;view=eclipse&amp;datetime=2026-08-12T15:07:21.756Z"'), 'No se conservó y escapó la query completa.');
 contentEmbedAssert(str_contains($html, 'title="Simulador astronómico interactivo"'), 'El iframe no tiene título accesible.');
 contentEmbedAssert(str_contains($html, 'loading="lazy"'), 'El iframe no usa carga diferida.');
-contentEmbedAssert(str_contains($html, 'sandbox="allow-scripts allow-same-origin"'), 'El sandbox no está controlado por el renderer.');
+contentEmbedAssert(str_contains($html, 'sandbox="allow-scripts allow-same-origin allow-top-navigation-by-user-activation"'), 'El sandbox no está controlado por el renderer.');
+
+$lunarWidgetUrl = 'https://aquellaslunas.com.ar/astro/embeds/libracion-lunar.php?mode=full&amp;controls=0';
+$lunarWidgetHtml = astronomyContentRenderMarkdown('[[embed url="' . str_replace('&amp;', '&', $lunarWidgetUrl) . '"]]');
+contentEmbedAssert(str_contains($lunarWidgetHtml, 'src="' . $lunarWidgetUrl . '"'), 'El widget lunar propio no se puede insertar en contenidos.');
+contentEmbedAssert(str_contains($lunarWidgetHtml, 'title="Widget lunar interactivo"'), 'El widget lunar no tiene título accesible controlado.');
+$earthMoonUrl = 'https://aquellaslunas.com.ar/astro/embeds/fases-tierra-luna.php?fecha=2026-08-17&amp;hora=12%3A00';
+$earthMoonHtml = astronomyContentRenderMarkdown('[[embed url="' . str_replace('&amp;', '&', $earthMoonUrl) . '"]]');
+contentEmbedAssert(str_contains($earthMoonHtml, 'src="' . $earthMoonUrl . '"'), 'El widget Tierra–Luna no atraviesa la directiva controlada de contenidos.');
+
+$explorerUrl = 'https://aquellaslunas.com.ar/astro/explorador/embed.php?v=1&amp;modo=diario&amp;desde=2026-01-01&amp;hasta=2026-01-31&amp;lat=-34.6037&amp;lon=-58.3816&amp;tz=America%2FArgentina%2FBuenos_Aires&amp;campos=moon_illumination&amp;dias=todos';
+$explorerHtml = astronomyContentRenderMarkdown('[[embed url="' . str_replace('&amp;', '&', $explorerUrl) . '"]]');
+contentEmbedAssert(str_contains($explorerHtml, 'src="' . $explorerUrl . '"'), 'El Explorador embebible no atraviesa la directiva controlada.');
+contentEmbedAssert(str_contains($explorerHtml, 'title="Explorador astronómico"'), 'El Explorador embebible no tiene título accesible controlado.');
 
 $rejectedUrls = [
     'http://chichipiosblog.com.ar/astronomia/sol-tierra-luna/?embed=1',
@@ -31,6 +44,10 @@ $rejectedUrls = [
     'https://chichipiosblog.com.ar/astronomia/%2e%2e/admin/',
     'https://chichipiosblog.com.ar:443/astronomia/sol-tierra-luna/?embed=1',
     'https://usuario@chichipiosblog.com.ar/astronomia/sol-tierra-luna/?embed=1',
+    'https://aquellaslunas.com.ar/astro/admin/',
+    'https://aquellaslunas.com.ar/astro/embeds/../admin/',
+    'https://aquellaslunas.com.ar/astro/explorador/',
+    'https://aquellaslunas.com.ar/astro/explorador/otro.php',
     'javascript:alert(1)',
     'data:text/html,test',
     '/astronomia/sol-tierra-luna/?embed=1',

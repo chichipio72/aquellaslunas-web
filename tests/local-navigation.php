@@ -1,69 +1,31 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/../includes/site-sections.php';
-require_once __DIR__ . '/../includes/site-configuration.php';
-require_once __DIR__ . '/../includes/web-database.php';
+require_once __DIR__ . '/../scripts/migrations/create-site-menu-configuration.php';
 
 function localNavigationAssert(bool $condition, string $message): void
 {
-    if (!$condition) {
-        throw new RuntimeException($message);
-    }
+    if (!$condition) throw new RuntimeException($message);
 }
 
-putenv('APP_ENV=local');
-putenv('ASTRONOMY_SHOW_TIMINGS=false');
 $connection = getWebDatabaseConnection();
-astronomySiteConfigInitialize($connection);
+runSiteMenuConfigurationMigration($connection);
+astronomySiteMenuResetCache();
+$publicSections = astronomySiteSections(false);
+$adminSections = astronomySiteSections(true);
 
-$allEnabled = [];
-foreach (array_keys(astronomySiteConfigCatalog()) as $key) {
-    $allEnabled[$key] = true;
-}
-astronomySiteConfigUpdate($connection, $allEnabled);
+localNavigationAssert(($publicSections['home']['menu_enabled'] ?? false) === true, 'Inicio no permanece visible para público.');
+localNavigationAssert(array_key_first($publicSections) === 'home', 'Inicio no permanece primero.');
+localNavigationAssert(($adminSections['gallery']['menu_enabled'] ?? false) === true, 'Galería no aparece para administración.');
+localNavigationAssert(($adminSections['visual_tests']['menu_enabled'] ?? false) === true, 'Pruebas visuales no aparece para administración.');
+localNavigationAssert(($publicSections['visual_tests']['menu_enabled'] ?? true) === false, 'Pruebas visuales aparece para público.');
+localNavigationAssert(($adminSections['gallery']['swipe_enabled'] ?? true) === false, 'Galería entró en navegación por deslizamiento.');
+localNavigationAssert(($adminSections['visual_tests']['swipe_enabled'] ?? true) === false, 'Pruebas visuales entró en navegación por deslizamiento.');
 
-$localSections = astronomySiteSections();
-localNavigationAssert(($localSections['gallery']['menu_enabled'] ?? false) === true, 'Galería no aparece en el menú local.');
-localNavigationAssert(($localSections['visual_tests']['menu_enabled'] ?? false) === true, 'Pruebas visuales no aparece en el menú local.');
-localNavigationAssert(($localSections['content']['menu_enabled'] ?? false) === true, 'Contenidos no aparece en el menú local.');
-localNavigationAssert(($localSections['gallery']['swipe_enabled'] ?? true) === false, 'Galería entró en la navegación por deslizamiento.');
-localNavigationAssert(($localSections['visual_tests']['swipe_enabled'] ?? true) === false, 'Pruebas visuales entró en la navegación por deslizamiento.');
-
-$orderedIds = array_keys($localSections);
-$galleryIndex = array_search('gallery', $orderedIds, true);
-$testsIndex = array_search('visual_tests', $orderedIds, true);
-$locationIndex = array_search('location', $orderedIds, true);
-localNavigationAssert(
-    is_int($galleryIndex) && is_int($testsIndex) && is_int($locationIndex)
-    && $galleryIndex < $testsIndex && $testsIndex < $locationIndex,
-    'Las herramientas locales no quedaron antes de Ubicación.'
-);
-
-putenv('APP_ENV=production');
-putenv('ASTRONOMY_SHOW_TIMINGS=true');
-$productionSections = astronomySiteSections();
-localNavigationAssert(($productionSections['gallery']['menu_enabled'] ?? false) === true, 'Galería dependió del entorno en vez de su configuración pública.');
-localNavigationAssert(($productionSections['visual_tests']['menu_enabled'] ?? true) === false, 'Pruebas visuales aparece en el menú de producción.');
-localNavigationAssert(($productionSections['content']['menu_enabled'] ?? false) === true, 'Contenidos no permanece visible por defecto en producción.');
-
-astronomySiteConfigUpdate($connection, array_merge($allEnabled, [
-    'menu.today.enabled' => false,
-    'menu.content.enabled' => false,
-]));
-$restrictedSections = astronomySiteSections();
-localNavigationAssert(($restrictedSections['today']['menu_enabled'] ?? true) === false, 'El menú no ocultó El cielo hoy al deshabilitar su clave.');
-localNavigationAssert(($restrictedSections['content']['menu_enabled'] ?? true) === false, 'El menú no ocultó Contenidos al deshabilitar su clave.');
-localNavigationAssert(($restrictedSections['visual_tests']['menu_enabled'] ?? true) === false, 'La configuración pública habilitó herramientas locales.');
-
-astronomySiteConfigUpdate($connection, array_merge($allEnabled, [
-    'menu.gallery.enabled' => false,
-]));
-$galleryRestrictedSections = astronomySiteSections();
-localNavigationAssert(($galleryRestrictedSections['gallery']['menu_enabled'] ?? true) === false, 'Galería no respetó su clave de configuración pública.');
-
-astronomySiteConfigUpdate($connection, $allEnabled);
-
-putenv('APP_ENV');
-putenv('ASTRONOMY_SHOW_TIMINGS');
+$swipeSections = array_values(array_filter($publicSections, static fn(array $section): bool => $section['swipe_enabled'] === true));
+usort($swipeSections, static fn(array $first, array $second): int => ($first['swipe_order'] ?? 0) <=> ($second['swipe_order'] ?? 0));
+localNavigationAssert(array_column($swipeSections, 'id') === ['home', 'today', 'tonight', 'sun_moon', 'events', 'eclipses', 'planner'], 'La configuración del menú alteró el contrato independiente de swipe.');
 
 echo "local-navigation: ok\n";

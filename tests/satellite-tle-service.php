@@ -61,6 +61,52 @@ try {
     $fallback = $provider->resolve('iss');
     tleServiceAssert($fallback->cacheStatus === 'fallback' && $downloader->calls === 3 && $fallback->warnings !== [], 'Download failure did not use valid fallback.');
 
+    $localDownloader = new TestTleDownloader([new RuntimeException('web must not download stale cache')]);
+    $localFirst = new CachedCelesTrakTleProvider($cachePath, 60, $localDownloader, $clock, false);
+    $staleLocal = $localFirst->resolve('iss');
+    tleServiceAssert($staleLocal->cacheStatus === 'cache_hit' && $localDownloader->calls === 0,
+        'Local-first resolution downloaded merely because a valid cache entry was stale.');
+
+    $cacheBeforeFailedRefresh = file_get_contents($cachePath);
+    try {
+        $localFirst->refresh('iss');
+        throw new RuntimeException('Failed forced refresh was reported as successful.');
+    } catch (RuntimeException $exception) {
+        tleServiceAssert(str_contains($exception->getMessage(), 'Could not refresh a valid TLE'),
+            'Forced refresh returned an unclear download error.');
+    }
+    tleServiceAssert(file_get_contents($cachePath) === $cacheBeforeFailedRefresh,
+        'Failed forced refresh modified the last valid cache.');
+
+    $invalidRefresh = tleFixture('iss');
+    $invalidRefresh[68] = $invalidRefresh[68] === '0' ? '1' : '0';
+    $invalidRefreshProvider = new CachedCelesTrakTleProvider(
+        $cachePath, 60, new TestTleDownloader([$invalidRefresh]), $clock, false
+    );
+    try {
+        $invalidRefreshProvider->refresh('iss');
+        throw new RuntimeException('Invalid forced refresh was reported as successful.');
+    } catch (RuntimeException $exception) {
+        tleServiceAssert(str_contains($exception->getMessage(), 'Could not refresh a valid TLE'),
+            'Invalid forced refresh returned an unclear validation error.');
+    }
+    tleServiceAssert(file_get_contents($cachePath) === $cacheBeforeFailedRefresh,
+        'Invalid forced refresh replaced the last valid cache.');
+
+    $forcedDownloader = new TestTleDownloader([tleFixture('iss')]);
+    $forcedProvider = new CachedCelesTrakTleProvider($cachePath, 60, $forcedDownloader, $clock, false);
+    $forced = $forcedProvider->refresh('iss');
+    tleServiceAssert($forced->cacheStatus === 'refreshed' && $forcedDownloader->calls === 1,
+        'Forced refresh did not download and persist a valid TLE.');
+
+    $emptyCacheDownloader = new TestTleDownloader([tleFixture('tiangong')]);
+    $emptyCacheProvider = new CachedCelesTrakTleProvider(
+        $temporary . '/empty-local-first.json', 60, $emptyCacheDownloader, $clock, false
+    );
+    $lastResort = $emptyCacheProvider->resolve('tiangong');
+    tleServiceAssert($lastResort->cacheStatus === 'refreshed' && $emptyCacheDownloader->calls === 1,
+        'Local-first resolution did not download as a last resort when no valid cache existed.');
+
     $invalid = tleFixture('tiangong');
     $invalid[68] = $invalid[68] === '0' ? '1' : '0';
     $invalidProvider = new CachedCelesTrakTleProvider($temporary . '/invalid.json', 60, new TestTleDownloader([$invalid]), $clock);
@@ -84,6 +130,7 @@ try {
     echo json_encode([
         'status' => 'OK',
         'cache' => ['hot' => $hot->cacheStatus, 'expired' => $updated->cacheStatus, 'fallback' => $fallback->cacheStatus,
+            'local_first' => $staleLocal->cacheStatus, 'forced' => $forced->cacheStatus,
             'download_calls' => $downloader->calls],
         'offline_48h' => ['events' => count($alertEvents), 'event' => $alertEvents[0]->data(),
             'metrics' => $search->metrics],

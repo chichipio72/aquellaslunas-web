@@ -25,6 +25,7 @@
 .today-summary__body { display: grid; grid-template-columns: minmax(220px,320px) minmax(0,1fr); gap: clamp(1rem,4vw,3rem); align-items: center; }
 .today-moon-image-frame { width: 100%; aspect-ratio: 1; display: grid; place-items: center; overflow: visible; }
 .today-moon-image { display: block; width: 100%; height: 100%; object-fit: contain; transform: rotate(var(--moon-apparent-rotation, 0deg)); transform-origin: 50% 50%; }
+.today-moon-image-frame .moon-three-render__fallback { transform: rotate(var(--moon-apparent-rotation, 0deg)) scale(var(--moon-render-scale, 1)); }
 .today-summary__copy h2 { margin: 0; color: var(--lunar); font-size: clamp(1.5rem,3vw,2.25rem); font-weight: 500; }
 .today-lead { max-width: 46rem; font-size: clamp(1rem,2vw,1.2rem); line-height: 1.55; text-wrap: pretty; }
 .today-highlights,.today-sun-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .65rem; }
@@ -50,6 +51,10 @@
 .today-time-rows > div { display: grid; grid-template-columns: minmax(13rem,1fr) auto; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid rgba(170,178,197,.1); }
 .today-time-rows strong { font-size: .88rem; font-weight: 500; }
 .today-time-rows span { color: var(--muted); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.today-events-layout { display: grid; grid-template-columns: minmax(0,.9fr) minmax(20rem,1.1fr); gap: 1rem; align-items: center; }
+.today-events-layout--scene-only { grid-template-columns: minmax(0,1fr); }
+.today-events__moon-scene { min-width: 0; }
+.today-events__moon-scene .home-tonight-scene svg { max-height: 18rem; }
 .today-events section { display: grid; grid-template-columns: 1.7rem 4rem minmax(0,1fr); gap: .7rem; padding: .8rem 0; border-bottom: 1px solid rgba(170,178,197,.1); }
 .today-event-icon { margin-top: -.08rem; }
 .today-events time { color: var(--lunar); }
@@ -80,5 +85,7 @@
   .today-tabs { max-width: 100%; }
   .today-tabs button { padding-inline: .6rem; font-size: .78rem; }
   .today-time-rows > div { grid-template-columns: 1fr; gap: .2rem; }
+  .today-events-layout { grid-template-columns: minmax(0,1fr); }
+  .today-events__moon-scene { width: 100%; overflow: hidden; }
   .today-moon-dialog { width: 100%; max-width: none; margin: auto 0 0; border-radius: 1rem 1rem 0 0; }
 }

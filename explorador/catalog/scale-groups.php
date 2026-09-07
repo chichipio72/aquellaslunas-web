@@ -8,6 +8,7 @@ return [
     'azimuth' => ['label' => 'Azimut', 'unit' => '°'],
     'angle' => ['label' => 'Ángulo', 'unit' => '°'],
     'angle_signed' => ['label' => 'Ángulo con signo', 'unit' => '°'],
+    'ecliptic_cycle_angle' => ['label' => 'Ángulo eclíptico circular', 'unit' => '°'],
     'amplitude' => ['label' => 'Ángulo con signo', 'unit' => '°'],
     'altitude' => ['label' => 'Altura', 'unit' => '°'],
     'distance' => ['label' => 'Distancia lunar', 'unit' => 'km'],

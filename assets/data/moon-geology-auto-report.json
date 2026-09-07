@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-08-18",
+  "geologic_map": {
+    "matched": 9085,
+    "unmatched": 1,
+    "ambiguous": 0
+  },
+  "crater_matches": {
+    "safe": 1538,
+    "probable": 3,
+    "ambiguous": 7,
+    "unmatched": 67,
+    "probable_examples": [
+      {
+        "id": "iau:15006",
+        "name": "Igor",
+        "lpi_row": 3809,
+        "separation_degrees": 0.050613,
+        "diameter_difference_percent": 0.0
+      },
+      {
+        "id": "iau:15011",
+        "name": "Slava",
+        "lpi_row": 7471,
+        "separation_degrees": 0.07,
+        "diameter_difference_percent": 0.0
+      },
+      {
+        "id": "iau:15013",
+        "name": "Vasya",
+        "lpi_row": 8173,
+        "separation_degrees": 0.101226,
+        "diameter_difference_percent": 0.0
+      }
+    ],
+    "ambiguous_examples": [
+      {
+        "id": "iau:2252",
+        "name": "Grimaldi",
+        "candidate_rows": [
+          3117
+        ]
+      },
+      {
+        "id": "iau:15007",
+        "name": "Kolya",
+        "candidate_rows": [
+          4149
+        ]
+      },
+      {
+        "id": "iau:15008",
+        "name": "Kostya",
+        "candidate_rows": [
+          4184
+        ]
+      },
+      {
+        "id": "iau:15009",
+        "name": "Leonid",
+        "candidate_rows": [
+          4599
+        ]
+      },
+      {
+        "id": "iau:15010",
+        "name": "Nikolya",
+        "candidate_rows": [
+          5686
+        ]
+      },
+      {
+        "id": "iau:15012",
+        "name": "Valera",
+        "candidate_rows": [
+          8067
+        ]
+      },
+      {
+        "id": "iau:15014",
+        "name": "Vitya",
+        "candidate_rows": [
+          8472
+        ]
+      }
+    ]
+  },
+  "enriched_objects": 9086
+}

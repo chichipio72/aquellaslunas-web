@@ -138,7 +138,8 @@ function astronomyWebPushSend(
     ?int $subscriptionId,
     string $title,
     string $body,
-    string $url
+    string $url,
+    array $transportOptions = []
 ): array {
     $autoload = dirname(__DIR__) . '/vendor/autoload.php';
     if (!is_file($autoload)) {
@@ -163,6 +164,12 @@ function astronomyWebPushSend(
         throw new InvalidArgumentException('No hay suscripciones activas para el destino elegido.');
     }
 
+    $ttl = filter_var($transportOptions['TTL'] ?? 300, FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 0, 'max_range' => 2419200]]);
+    $urgency = (string) ($transportOptions['urgency'] ?? 'normal');
+    if ($ttl === false || !in_array($urgency, ['very-low', 'low', 'normal', 'high'], true)) {
+        throw new InvalidArgumentException('Las opciones de transporte Web Push no son válidas.');
+    }
     $payload = json_encode(['title' => $title, 'body' => $body, 'url' => $url], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     $sender = new \Minishlink\WebPush\WebPush([
         'VAPID' => [
@@ -170,7 +177,7 @@ function astronomyWebPushSend(
             'publicKey' => $config['public_key'],
             'privateKey' => $config['private_key'],
         ],
-    ], ['TTL' => 300, 'urgency' => 'normal', 'batchSize' => 50, 'contentType' => 'application/json'], 20, [
+    ], ['TTL' => $ttl, 'urgency' => $urgency, 'batchSize' => 50, 'contentType' => 'application/json'], 20, [
         \GuzzleHttp\RequestOptions::ALLOW_REDIRECTS => false,
     ]);
     $sender->setReuseVAPIDHeaders(true);

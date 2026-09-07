@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prueba técnica — Luna 3D con relieve</title>
+    <link rel="stylesheet" href="./moon.css">
+</head>
+<body>
+    <main class="experiment">
+        <div id="moon-stage" class="stage" aria-label="Render 3D interactivo de la Luna">
+            <p id="loading-message" class="status">Cargando texturas lunares…</p>
+        </div>
+
+        <section class="controls" aria-labelledby="controls-title">
+            <div class="controls__heading">
+                <div>
+                    <p class="eyebrow">Prueba técnica local</p>
+                    <h1 id="controls-title">Luna 3D con relieve aparente</h1>
+                </div>
+                <output id="phase-output" class="phase-output" for="sun-angle">Iluminación: 67 %</output>
+            </div>
+
+            <div class="presets" aria-label="Configuraciones rápidas">
+                <button type="button" data-preset="terminator">Terminador / cráteres</button>
+                <button type="button" data-preset="full">Luna llena</button>
+                <button type="button" data-preset="realistic">Luna más realista</button>
+                <button type="button" data-preset="reset" class="button--secondary">Restablecer</button>
+            </div>
+
+            <label class="control control--mode" for="render-mode">
+                <span>Modo</span>
+                <select id="render-mode">
+                    <option value="astronomical" selected>Astronómico hoy / Buenos Aires</option>
+                    <option value="custom">Fecha y ubicación personalizadas</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </label>
+
+            <fieldset id="custom-observer" class="custom-observer" disabled>
+                <legend>Caso fotográfico reproducible</legend>
+                <div class="custom-observer__grid">
+                    <label class="control" for="custom-datetime"><span>Fecha y hora local</span><input id="custom-datetime" type="datetime-local" value="2026-08-16T19:01"></label>
+                    <label class="control" for="custom-latitude"><span>Latitud</span><input id="custom-latitude" type="number" min="-90" max="90" step="any" value="-34.532989356165835"></label>
+                    <label class="control" for="custom-longitude"><span>Longitud</span><input id="custom-longitude" type="number" min="-180" max="180" step="any" value="-58.537805002828605"></label>
+                </div>
+                <button id="load-carapachay" type="button">Cargar caso Carapachay · 16/08/2026 19:01</button>
+                <button id="load-custom" type="button" class="button--secondary">Calcular estos valores</button>
+            </fieldset>
+
+            <label class="control control--date" for="astronomy-day-offset">
+                <span>Fecha astronómica <output id="astronomy-day-output">Hoy · calculando…</output></span>
+                <input id="astronomy-day-offset" type="range" min="-15" max="15" value="0" step="1">
+                <small>−15 días <span>0 = hoy</span> +15 días</small>
+            </label>
+
+            <dl id="astronomy-summary" class="astronomy-summary">
+                <div><dt>Fecha y hora</dt><dd id="astro-datetime">Calculando…</dd></div>
+                <div><dt>Ubicación</dt><dd id="astro-location">Buenos Aires / CABA</dd></div>
+                <div><dt>Fase</dt><dd id="astro-phase">—</dd></div>
+                <div><dt>Iluminación</dt><dd id="astro-illumination">—</dd></div>
+                <div><dt>Libración</dt><dd id="astro-libration">—</dd></div>
+                <div><dt>Subobservador</dt><dd id="astro-subobserver">—</dd></div>
+                <div><dt>Subsolar</dt><dd id="astro-subsolar">—</dd></div>
+                <div><dt>Norte lunar</dt><dd id="astro-orientation">—</dd></div>
+                <div><dt>Limbo brillante</dt><dd id="astro-bright-limb">—</dd></div>
+                <div><dt>Altura / azimut</dt><dd id="astro-horizontal">—</dd></div>
+            </dl>
+
+            <div id="feature-audit" class="feature-audit" hidden>
+                <h2>Accidentes de control y terminador</h2>
+                <div id="feature-audit-list"></div>
+                <p class="hint hint--compact">Distancia positiva: lado iluminado. Negativa: lado nocturno. Es una distancia angular sobre la esfera de referencia, no una medición de sombras del relieve.</p>
+            </div>
+
+            <details class="diagnostics" open>
+                <summary>Trazabilidad astronómica de esta carga</summary>
+                <dl class="astronomy-summary diagnostics__summary">
+                    <div><dt>Reloj efectivo</dt><dd id="debug-clock">—</dd></div>
+                    <div><dt>Fracción de ciclo cruda</dt><dd id="debug-cycle">—</dd></div>
+                    <div><dt>Fracción iluminada cruda</dt><dd id="debug-illumination">—</dd></div>
+                    <div><dt>Fase calculada</dt><dd id="debug-phase">—</dd></div>
+                </dl>
+                <p class="hint hint--compact">JSON exacto enviado por astronomy.php</p>
+                <pre id="debug-json">Esperando respuesta…</pre>
+                <p class="hint hint--compact">Valores recibidos y finalmente usados por Three.js</p>
+                <pre id="debug-client">Esperando render…</pre>
+            </details>
+
+            <div class="controls__grid">
+                <label class="control" for="sun-angle">
+                    <span>Ángulo horizontal / fase <output id="sun-angle-output">70°</output></span>
+                    <input id="sun-angle" type="range" min="-180" max="180" value="70" step="1">
+                </label>
+
+                <label class="control" for="sun-elevation">
+                    <span>Altura del Sol <output id="sun-elevation-output">12°</output></span>
+                    <input id="sun-elevation" type="range" min="-60" max="60" value="12" step="1">
+                </label>
+
+                <label class="control" for="sun-intensity">
+                    <span>Intensidad de luz principal <output id="sun-intensity-output">4.2</output></span>
+                    <input id="sun-intensity" type="range" min="0" max="8" value="4.2" step="0.1">
+                </label>
+
+                <label class="control" for="fill-intensity">
+                    <span>Intensidad de luz ambiente <output id="fill-intensity-output">0.00</output></span>
+                    <input id="fill-intensity" type="range" min="0" max="1" value="0" step="0.01">
+                </label>
+
+                <label class="control" for="bump-scale">
+                    <span>bumpScale <output id="bump-scale-output">0.045</output></span>
+                    <input id="bump-scale" type="range" min="0" max="0.2" value="0.045" step="0.005">
+                </label>
+
+                <label class="control" for="normal-scale-x">
+                    <span>normalScale X <output id="normal-scale-x-output">1.00</output></span>
+                    <input id="normal-scale-x" type="range" min="-4" max="4" value="1" step="0.1">
+                </label>
+
+                <label class="control" for="normal-scale-y">
+                    <span>normalScale Y <output id="normal-scale-y-output">1.00</output></span>
+                    <input id="normal-scale-y" type="range" min="-4" max="4" value="1" step="0.1">
+                </label>
+
+                <label class="control control--select" for="relief-mode">
+                    <span>Relieve</span>
+                    <select id="relief-mode">
+                        <option value="none">Ninguno</option>
+                        <option value="bump" selected>Bump map</option>
+                        <option value="normal">Normal map</option>
+                    </select>
+                </label>
+
+                <label class="control control--select" for="dem-resolution">
+                    <span>DEM / resolución</span>
+                    <select id="dem-resolution">
+                        <option value="low">LOLA 1K · 1024 × 512</option>
+                        <option value="medium" selected>LOLA 4 ppd · 1440 × 720</option>
+                        <option value="high">LOLA alta · 2880 × 1440</option>
+                    </select>
+                </label>
+
+                <label class="control" for="texture-contrast">
+                    <span>Contraste de textura <output id="texture-contrast-output">1.15</output></span>
+                    <input id="texture-contrast" type="range" min="0.5" max="2" value="1.15" step="0.05">
+                </label>
+
+                <label class="control" for="texture-brightness">
+                    <span>Brillo de textura <output id="texture-brightness-output">0.95</output></span>
+                    <input id="texture-brightness" type="range" min="0.5" max="1.5" value="0.95" step="0.05">
+                </label>
+
+                <label class="control" for="texture-gamma">
+                    <span>Gamma de textura <output id="texture-gamma-output">0.95</output></span>
+                    <input id="texture-gamma" type="range" min="0.5" max="2" value="0.95" step="0.05">
+                </label>
+
+                <label class="control" for="texture-saturation">
+                    <span>Saturación <output id="texture-saturation-output">0.80</output></span>
+                    <input id="texture-saturation" type="range" min="0" max="2" value="0.8" step="0.05">
+                </label>
+
+                <label class="control" for="render-exposure">
+                    <span>Exposición del render <output id="render-exposure-output">1.15</output></span>
+                    <input id="render-exposure" type="range" min="0.5" max="2" value="1.15" step="0.05">
+                </label>
+            </div>
+
+            <p id="relief-description" class="hint" aria-live="polite">bumpMap activo: el DEM modifica la iluminación; la geometría sigue siendo esférica.</p>
+            <p id="dem-status" class="hint hint--compact" aria-live="polite">DEM medio listo para comparar.</p>
+        </section>
+    </main>
+
+    <script type="module" src="./moon.js"></script>
+</body>
+</html>

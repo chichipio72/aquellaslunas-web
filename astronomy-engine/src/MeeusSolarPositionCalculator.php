@@ -130,6 +130,9 @@ final class MeeusSolarPositionCalculator implements SolarPositionCalculator
                 / (SolarPosition::ASTRONOMICAL_UNIT_KILOMETERS * $earthSunDistanceAu)
             )),
             equationOfTimeMinutes: $equationOfTimeMinutes,
+            rightAscensionDegrees: $this->normalizeDegrees(rad2deg($rightAscension)),
+            declinationDegrees: rad2deg($declination),
+            apparentEclipticLongitudeDegrees: $this->normalizeDegrees($apparentLongitude),
         );
     }
 

@@ -4,29 +4,32 @@ require_once __DIR__ . '/api-config.php';
 require_once __DIR__ . '/current-datetime.php';
 require_once __DIR__ . '/asset-url.php';
 require_once __DIR__ . '/site-configuration.php';
+require_once __DIR__ . '/site-menu.php';
 
-function astronomySiteSections(): array
+function astronomySiteSections(?bool $adminContext = null): array
 {
-    $sections = [
-        'home' => ['id' => 'home', 'label' => 'Inicio', 'url' => 'index.php', 'order' => 10, 'menu_enabled' => astronomySiteMenuEntryEnabled('home'), 'swipe_enabled' => true, 'swipe_order' => 10],
-        'today' => ['id' => 'today', 'label' => 'El cielo hoy', 'url' => 'cielo-de-hoy.php', 'order' => 15, 'menu_enabled' => astronomySiteMenuEntryEnabled('today'), 'swipe_enabled' => true, 'swipe_order' => 20],
-        'tonight' => ['id' => 'tonight', 'label' => 'El cielo esta noche', 'url' => 'cielo-de-esta-noche.php', 'order' => 18, 'menu_enabled' => astronomySiteMenuEntryEnabled('tonight'), 'swipe_enabled' => true, 'swipe_order' => 30],
-        'sun_moon' => ['id' => 'sun_moon', 'label' => 'Calendario solar y lunar', 'url' => 'sol-y-luna.php', 'order' => 20, 'menu_enabled' => astronomySiteMenuEntryEnabled('sun_moon'), 'swipe_enabled' => true, 'swipe_order' => 40],
-        'events' => ['id' => 'events', 'label' => 'Eventos lunares', 'url' => 'eventos.php', 'order' => 30, 'menu_enabled' => astronomySiteMenuEntryEnabled('events'), 'swipe_enabled' => true, 'swipe_order' => 50],
-        'eclipses' => ['id' => 'eclipses', 'label' => 'Eclipses', 'url' => 'eclipses.php', 'order' => 40, 'menu_enabled' => astronomySiteMenuEntryEnabled('eclipses'), 'swipe_enabled' => true, 'swipe_order' => 60],
-        'planner' => ['id' => 'planner', 'label' => 'Planificador', 'url' => 'planificador.php', 'order' => 50, 'menu_enabled' => astronomySiteMenuEntryEnabled('planner'), 'swipe_enabled' => true, 'swipe_order' => 70],
-        'explorer' => ['id' => 'explorer', 'label' => 'Explorador astronómico', 'url' => 'explorador/', 'order' => 55, 'menu_enabled' => astronomySiteMenuEntryEnabled('explorer'), 'swipe_enabled' => false],
-        'gallery' => ['id' => 'gallery', 'label' => 'Galería', 'url' => 'galeria.php', 'order' => 60, 'menu_enabled' => astronomySiteMenuEntryEnabled('gallery'), 'swipe_enabled' => false],
-        'visual_tests' => ['id' => 'visual_tests', 'label' => 'Pruebas visuales', 'url' => 'pruebas-visuales.php', 'order' => 65, 'menu_enabled' => canUseSiteDebugTools(), 'swipe_enabled' => false],
-        'content' => ['id' => 'content', 'label' => 'Contenidos', 'url' => 'contenidos.php', 'order' => 67, 'menu_enabled' => astronomySiteMenuEntryEnabled('content') && isContentEnabled(), 'swipe_enabled' => false],
-        'location' => ['id' => 'location', 'label' => 'Ubicación', 'url' => 'ubicacion.php', 'order' => 70, 'menu_enabled' => astronomySiteMenuEntryEnabled('location'), 'swipe_enabled' => false],
-        'notifications' => ['id' => 'notifications', 'label' => 'Configurar notificaciones', 'url' => 'notificaciones.php', 'order' => 72, 'menu_enabled' => astronomySiteMenuEntryEnabled('notifications'), 'swipe_enabled' => false],
-        'moon_songs' => ['id' => 'moon_songs', 'label' => 'Canciones a la Luna', 'url' => 'canciones-a-la-luna.php', 'order' => 73, 'menu_enabled' => astronomySiteMenuEntryEnabled('moon_songs'), 'swipe_enabled' => false],
-        'capabilities' => ['id' => 'capabilities', 'label' => 'Qué ofrece Aquellas Lunas', 'url' => 'que-podes-hacer.php', 'order' => 75, 'menu_enabled' => astronomySiteMenuEntryEnabled('capabilities'), 'swipe_enabled' => false],
-        'about' => ['id' => 'about', 'label' => 'Acerca del sitio', 'url' => 'acerca-del-sitio.php', 'order' => 80, 'menu_enabled' => astronomySiteMenuEntryEnabled('about'), 'swipe_enabled' => false],
-        'administration' => ['id' => 'administration', 'label' => 'Administración', 'url' => 'admin/', 'order' => 90, 'menu_enabled' => astronomySiteMenuEntryEnabled('administration'), 'swipe_enabled' => false],
-    ];
-    uasort($sections, static fn(array $first, array $second): int => $first['order'] <=> $second['order']);
+    $adminContext ??= storeAdminHasValidSessionCookie();
+    $menu = astronomySiteMenuLoad();
+    $sections = [];
+    foreach (astronomySiteSectionCatalog() as $sectionId => $definition) {
+        if ($sectionId === 'home') {
+            $sections[$sectionId] = $definition + ['order' => PHP_INT_MIN, 'group_id' => null, 'group_label' => null, 'group_order' => PHP_INT_MIN, 'menu_enabled' => true];
+            continue;
+        }
+        $settings = $menu['sections'][$sectionId] ?? null;
+        $group = is_array($settings) ? ($menu['groups'][$settings['group_id']] ?? null) : null;
+        $visible = is_array($settings) && is_array($group)
+            ? (($adminContext ? $settings['admin_visible'] : $settings['public_visible']) === true)
+            : false;
+        $sections[$sectionId] = $definition + [
+            'order' => (int) ($settings['sort_order'] ?? PHP_INT_MAX),
+            'group_id' => $settings['group_id'] ?? null,
+            'group_label' => $group['label'] ?? null,
+            'group_order' => (int) ($group['sort_order'] ?? PHP_INT_MAX),
+            'menu_enabled' => $visible,
+        ];
+    }
+    uasort($sections, static fn(array $first, array $second): int => [$first['group_order'], $first['order'], $first['id']] <=> [$second['group_order'], $second['order'], $second['id']]);
     return $sections;
 }
 
@@ -47,25 +50,26 @@ function astronomySiteSectionUrl(string $sectionId, string $rootPrefix = ''): st
     return $section !== null ? astronomyInternalUrl($rootPrefix . $section['url']) : astronomyInternalUrl($rootPrefix . 'index.php');
 }
 
-function renderAstronomySiteNavigation(string $currentSectionId, string $rootPrefix = ''): void
+function renderAstronomySiteNavigation(string $currentSectionId, string $rootPrefix = '', ?bool $adminContext = null): void
 {
     ?><nav class="site-nav" aria-label="Navegación principal"><?php
-    $installRendered = false;
-    foreach (astronomySiteSections() as $section) {
-        if ($section['id'] === 'about') {
-            if (!$installRendered) {
-                ?><button class="site-nav__action" type="button" data-install-trigger data-install-source="menu" aria-label="Instalar Aquellas Lunas">Instalar Aquellas Lunas</button><?php
-                $installRendered = true;
-            }
-        }
+    $currentGroup = null;
+    foreach (astronomySiteSections($adminContext) as $section) {
         if ($section['menu_enabled'] !== true) {
             continue;
         }
+        if ($section['id'] !== 'home' && $section['group_id'] !== $currentGroup) {
+            $currentGroup = $section['group_id'];
+            ?><span class="site-nav__group-title"><?= htmlspecialchars((string) $section['group_label'], ENT_QUOTES, 'UTF-8') ?></span><?php
+        }
+        if (($section['type'] ?? '') === 'install') {
+            ?><button class="site-nav__action site-nav__group-item" type="button" data-install-trigger data-install-source="menu" aria-label="Instalar Aquellas Lunas" hidden>Instalar Aquellas Lunas</button><?php
+            continue;
+        }
         $isCurrent = $section['id'] === $currentSectionId;
-        ?><a href="<?= htmlspecialchars(astronomyInternalUrl($rootPrefix . $section['url']), ENT_QUOTES, 'UTF-8') ?>"<?= $isCurrent ? ' class="is-active" aria-current="page"' : '' ?>><?= htmlspecialchars($section['label']) ?></a><?php
-    }
-    if (!$installRendered) {
-        ?><button class="site-nav__action" type="button" data-install-trigger data-install-source="menu" aria-label="Instalar Aquellas Lunas">Instalar Aquellas Lunas</button><?php
+        $linkClass = trim(($section['id'] === 'home' ? '' : 'site-nav__group-item ') . ($isCurrent ? 'is-active' : ''));
+        ?>
+        <a href="<?= htmlspecialchars(astronomyInternalUrl($rootPrefix . $section['url']), ENT_QUOTES, 'UTF-8') ?>"<?= $linkClass !== '' ? ' class="' . htmlspecialchars($linkClass, ENT_QUOTES, 'UTF-8') . '"' : '' ?><?= $isCurrent ? ' aria-current="page"' : '' ?>><?= htmlspecialchars($section['label']) ?></a><?php
     }
     ?></nav><?php
 }

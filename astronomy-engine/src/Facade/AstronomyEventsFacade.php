@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace AstronomyEngine\Facade;
 
 use AstronomyEngine\EclipseObserver;
+use AstronomyEngine\ConjunctionCatalog;
 use AstronomyEngine\LunarEclipse;
 use AstronomyEngine\LunarEclipseCalculator;
 use AstronomyEngine\LunarEclipseLocalCalculator;
 use AstronomyEngine\LunarEvent;
 use AstronomyEngine\LunarEventCalculator;
 use AstronomyEngine\MeeusLunarCalculator;
+use AstronomyEngine\MoonApparentSize;
 use AstronomyEngine\SolarEclipse;
 use AstronomyEngine\SolarEclipseCalculator;
 use AstronomyEngine\SolarEclipseLocalCalculator;
@@ -97,13 +99,14 @@ final class AstronomyEventsFacade
         if (in_array('earthshine', $selected, true)) {
             $earthshine = (new EarthshineFacade())->between($start, $end, $observer);
             foreach ($earthshine['opportunities'] as $opportunity) {
+                $details = $this->earthshinePublicDetails($opportunity);
                 $items[] = [
                     'type' => 'earthshine',
                     'subtype' => $opportunity['period'],
                     'datetime' => $opportunity['start'],
                     'end_datetime' => $opportunity['end'],
                     'title' => $opportunity['period'] === 'morning' ? 'Oportunidad matutina de Luna fina' : 'Oportunidad vespertina de Luna fina',
-                    'details' => $opportunity,
+                    'details' => $details,
                 ];
             }
         }
@@ -132,6 +135,49 @@ final class AstronomyEventsFacade
             'observer' => $observer->data(),
             'items' => $items,
         ];
+    }
+
+    /**
+     * Adapta el contrato interno de EarthshineFacade al contrato público histórico.
+     *
+     * @param array<string,mixed> $opportunity
+     * @return array<string,mixed>
+     */
+    private function earthshinePublicDetails(array $opportunity): array
+    {
+        $details = $opportunity;
+        $details['start_time'] = $opportunity['start'] ?? null;
+        $details['end_time'] = $opportunity['end'] ?? null;
+        $details['best_visible_time'] = $opportunity['representative_time'] ?? null;
+
+        $moonTime = $this->dateTime($opportunity['moon_event_time'] ?? null);
+        $solarTime = $this->dateTime($opportunity['solar_event_time'] ?? null);
+        if ($moonTime !== null && $solarTime !== null) {
+            $details['difference_minutes'] = (int) round(
+                ((float) $moonTime->format('U.u') - (float) $solarTime->format('U.u')) / 60
+            );
+        }
+
+        $earthshineWindow = is_array($opportunity['earthshine_window'] ?? null)
+            ? $opportunity['earthshine_window']
+            : [];
+        if (is_numeric($earthshineWindow['moon_altitude_degrees'] ?? null)) {
+            $details['moon_altitude_degrees'] = (float) $earthshineWindow['moon_altitude_degrees'];
+        }
+
+        return $details;
+    }
+
+    private function dateTime(mixed $value): ?DateTimeImmutable
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+        try {
+            return new DateTimeImmutable($value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @param string|list<string>|null $types @return list<string> */
@@ -180,11 +226,7 @@ final class AstronomyEventsFacade
             return null;
         }
 
-        $subtype = match ($event->type) {
-            'ascending_node' => 'ascending',
-            'descending_node' => 'descending',
-            default => $event->type,
-        };
+        $subtype = $event->type;
         $title = match ($type) {
             'moon_phase' => match ($subtype) {
                 'new_moon' => 'Luna nueva',
@@ -194,11 +236,18 @@ final class AstronomyEventsFacade
                 default => $subtype,
             },
             'apsis' => $subtype === 'perigee' ? 'Perigeo lunar' : 'Apogeo lunar',
-            'lunar_nodes' => $subtype === 'ascending' ? 'Nodo lunar ascendente' : 'Nodo lunar descendente',
+            'lunar_nodes' => $subtype === 'ascending_node' ? 'Nodo lunar ascendente' : 'Nodo lunar descendente',
             'libration' => 'Extremo de libración lunar',
             'conjunction' => 'Conjunción de la Luna con '.$subtype,
         };
         $details = $event->data + ['calculation_group' => $event->group, 'precision_profile' => $event->precisionProfile->value];
+        if (in_array($type, ['moon_phase', 'apsis'], true) && is_numeric($details['distance_km'] ?? null)) {
+            $details['apparent_size_percent'] = MoonApparentSize::percentOfMean((float) $details['distance_km']);
+        }
+        if ($type === 'conjunction') {
+            $details['object_id'] = $subtype;
+            $details['object_name'] = ConjunctionCatalog::names()[$subtype] ?? $subtype;
+        }
 
         return [
             'type' => $type,

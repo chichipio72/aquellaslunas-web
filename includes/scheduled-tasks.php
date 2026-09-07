@@ -66,8 +66,13 @@ function scheduledTaskMigrationChecksum(array $entry): ?string
 {
     $file = $entry['checksum_file'] ?? null;
     if (!is_string($file) || $file === '') return null;
-    $checksum = hash_file('sha256', $file);
-    if (!is_string($checksum)) throw new RuntimeException('No se pudo calcular la firma de una migración.');
+    $checksum = is_readable($file) ? @hash_file('sha256', $file) : false;
+    if (!is_string($checksum)) {
+        $id = (string) ($entry['id'] ?? 'desconocida');
+        $displayPath = 'scripts/migrations/' . basename($file);
+        throw new RuntimeException('No se pudo calcular la firma de la migración ' . $id
+            . ' (' . $displayPath . ').');
+    }
     return $checksum;
 }
 

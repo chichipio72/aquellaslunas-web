@@ -1,0 +1,2 @@
+-- Idempotent V1 seed expansion for moon_with_horizon, eclipse and additional variants.
+-- Executed by create-photography-editorial-v1-seeds.php through the shared initializer.

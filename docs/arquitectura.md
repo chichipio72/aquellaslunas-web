@@ -11,6 +11,7 @@ Las páginas públicas son:
 - `eventos.php`: efemérides filtrables;
 - `eclipses.php`: búsqueda y detalle de eclipses;
 - `planificador.php`: planificación cartográfica del Sol y la Luna;
+- `fotografia.php`: planificación de encuadres fotográficos lunares a escala angular;
 - `ubicacion.php`: configuración de la ubicación global;
 - `galeria.php`: fotografías disponibles de la tienda;
 - `acerca-del-sitio.php`: contenido institucional;
@@ -18,12 +19,37 @@ Las páginas públicas son:
 
 ## Ubicación, encabezado y registro de secciones
 
+La herramienta de Fotografía separa cuatro contratos. `includes/photography-scene.php`
+construye el estado astronómico continuo y su clasificación descriptiva;
+`includes/photography-geometry.php` calcula sensor, campo visual y encuadre;
+`includes/photography-editorial.php` persiste escenas y variantes; y
+`assets/js/photography-planner.js` renderiza exclusivamente el modo Esquema. El estado
+serializado es la entrada prevista para un futuro renderer Simulado, que no debe
+recalcular astronomía en el navegador.
+
+Los objetos brillantes del esquema son una selección de `ConjunctionCatalog` y
+conservan las coordenadas calculadas por el motor. Los eclipses se consultan mediante
+`astronomyEvents()` y Fotografía sólo clasifica el contrato local normalizado. Las
+escenas y variantes activas se relacionan por `primary_scene` sin reemplazar el
+estado continuo; `includes/photography-links.php` prepara URLs desde Lo próximo y
+Eventos Lunares sin trasladar una focal artística.
+Las imágenes editoriales de escena y variante son referencias fotográficas reales
+opcionales: su ausencia no altera ningún contrato ni genera una superficie vacía en
+administración o en la página pública. Cuando ambas existen, la variante seleccionada
+tiene precedencia visual sobre la imagen general de su escena.
+
 `includes/location-context.php` valida y entrega la única ubicación activa. Las páginas
 locales no leen cookies ni procesan geolocalización por separado. La estructura incluye
 nombre, latitud, longitud, zona IANA y origen. `includes/site-header.php` muestra la
 localidad enlazada a `ubicacion.php`; `site-footer.php` centraliza la atribución.
 
 `ubicacion.php` es el único punto de escritura. PHP valida antes de emitir cookies.
+Cuando el navegador ya posee una suscripción Web Push activa y una configuración de
+avisos asociada, la página puede copiar allí, por decisión explícita del usuario, la
+ubicación general recién validada. La identidad se vuelve a comprobar con la
+`PushSubscription` completa y el endpoint público actualiza exclusivamente nombre,
+coordenadas y zona horaria; no crea configuración ni modifica preferencias o material
+criptográfico de la suscripción.
 `assets/js/location.js` pide permisos y maneja errores; `assets/js/astro-map.js` crea el
 mapa Leaflet, busca con Nominatim y mantiene el marcador del observador. Las futuras
 capas o líneas de azimut deben permanecer separadas de ese marcador.
@@ -33,11 +59,30 @@ sin guardar y, después de confirmar, redirige al mismo destino. Se admiten cons
 internas, pero se rechazan esquemas, hosts, rutas fuera de la instalación, fragmentos
 y caracteres de control.
 
-`includes/site-sections.php` es la fuente única para el orden, etiqueta, URL, presencia en menú y presencia en swipe de cada sección. `renderAstronomySiteNavigation()` genera el menú y aplica `class="is-active"` y `aria-current="page"` a la página actual. `astronomyMobileSwipeContext()` filtra el mismo registro por `swipe_enabled`.
+`includes/site-menu.php` conserva el catálogo estable de secciones —identificador,
+etiqueta y URL— y carga desde `site_menu_groups` y `site_menu_sections` la agrupación,
+orden y visibilidades `public_visible`/`admin_visible`. `Inicio` queda fuera de esas
+tablas de asignación, siempre primero y visible. `includes/site-sections.php` compone
+ese estado con el contrato de swipe; `renderAstronomySiteNavigation()` omite grupos
+vacíos y aplica `class="is-active"` y `aria-current="page"` a la página actual.
+La sesión administrativa se detecta sin abrir ni alterar la sesión pública.
 
-El recorrido táctil actual es Inicio → Esta noche → Sol y Luna → Planificador → Eventos. Eclipses, Ubicación y Acerca tienen `swipe_enabled=false`. Galería también queda fuera y tiene `menu_enabled=false` mientras continúa en pruebas, aunque conserva acceso directo.
+El recorrido táctil continúa definido por `swipe_enabled` y no se reordena desde el
+menú administrativo. Ocultar una entrada afecta sólo la navegación: su URL y sus
+restricciones de acceso propias no cambian.
 
 Las vistas públicas invocan el encabezado común con la marca **Aquellas Lunas** y el subtítulo **Una Luna diferente cada noche**. El menú está centralizado en el registro de secciones.
+
+### Contenido de “Qué ofrece Aquellas Lunas”
+
+`que-podes-hacer.php` no contiene texto editorial: carga
+`content-data/que-podes-hacer.json` mediante `includes/capabilities-content.php`.
+El esquema versión 1 separa hero, tarjetas principales, tarjetas especiales y cierre;
+los cuerpos aceptan exclusivamente bloques `paragraph` y `list`. Iconos, estilos y
+acciones se validan contra contratos controlados, los enlaces son internos y todo
+texto se escapa. Un archivo ausente o inválido produce un estado público controlado
+y registra el diagnóstico. La carpeta se transfiere en despliegues pero `.htaccess`
+y la configuración Apache local impiden descargarla directamente.
 
 ## Includes compartidos
 
@@ -45,7 +90,8 @@ Las vistas públicas invocan el encabezado común con la marca **Aquellas Lunas*
 - `api-client.php`: cURL, reintento controlado, métricas y cabeceras dinámicas sin caché.
 - `current-datetime.php`: reloj editorial real/simulado. En el entorno local habilitado persiste una fecha y hora de pared en sesión; producción usa siempre el reloj real.
 - `astronomy-icon.php`: mapeo visual compartido para fases y eventos secundarios. Traduce `moon_phase/new_moon|first_quarter|full_moon|last_quarter`, `earthshine`, `conjunction`, `libration_*`, `apsis/perigee|apogee` y cualquier `eclipse` a clases `astro-icon--*`; los tipos desconocidos usan `astro-icon--generic`. Recibe la latitud para orientar los cuartos y la luz cenicienta según hemisferio.
-- `site-sections.php`: registro, menú y contexto de swipe resuelto por PHP.
+- `site-menu.php`: catálogo, grupos, orden y doble visibilidad del menú.
+- `site-sections.php`: composición del menú y contexto de swipe resuelto por PHP.
 - `tonight.php`: contrato tolerante y presentación compartida de visibilidad nocturna.
 - `location-context.php`: lectura, validación, fallback y guardado de ubicación.
 - `site-header.php`, `site-footer.php` y `location-map.php`: interfaz compartida.
@@ -73,10 +119,19 @@ un subconjunto deliberadamente pequeño y escapa primero todo texto. Los compone
 futuros se emiten como marcadores visibles, sin ejecutar contenido arbitrario.
 
 `[[embed url="..."]]` es una directiva controlada, no HTML libre. La política
-central de proveedores admite inicialmente sólo HTTPS, host exacto
-`chichipiosblog.com.ar` y rutas bajo `/astronomia/`. El renderer es el único que
+central de proveedores admite HTTPS con host exacto `chichipiosblog.com.ar` y
+rutas bajo `/astronomia/`, además de los widgets propios con host exacto
+`aquellaslunas.com.ar` y rutas bajo `/astro/embeds/`. El renderer es el único que
 define iframe, sandbox, carga diferida y presentación responsive. Una directiva
 inválida se omite de la vista pública y queda como advertencia editorial.
+
+El iframe se emite con `sandbox="allow-scripts allow-same-origin"`,
+`referrerpolicy="strict-origin-when-cross-origin"` y `loading="lazy"`; no admite
+usuario, contraseña, puerto, esquemas distintos de HTTPS, traversal, barras
+codificadas ni rutas fuera del prefijo autorizado. `.content-embed` ocupa el 100 %
+de su columna, usa altura acotada en escritorio y una altura mayor bajo 700 px para
+conservar la utilidad de herramientas verticales. Lleva
+`data-swipe-navigation-ignore` para no competir con la navegación táctil global.
 
 Las imágenes reutilizables se resuelven exclusivamente desde
 `assets/images/tienda/previews/contenido/`. Un único resolver filtra archivos JPG/JPEG, PNG y
@@ -102,6 +157,35 @@ de sus artículos para construir los enlaces. No arma el catálogo editorial com
 Las opciones de trivia se mezclan sobre una copia. En modo usuario sólo participan
 entidades válidas y visibles. Las pantallas que necesitan índice o detalle conservan
 la carga del catálogo completo.
+
+### SEO, navegación y relaciones de contenidos
+
+El SEO de contenidos parte del catálogo MySQL ya validado. Un artículo sólo se
+considera público cuando existe, es válido, está visible y no se abrió mediante la
+preview administrativa. En ese caso `contenido.php` publica `index, follow`, canonical
+individual estable por slug, Open Graph de tipo `article` y JSON-LD `Article`; si hay
+fecha de actualización o imagen principal válidas se incorporan como `dateModified`
+e `image`. La misma respuesta incluye un `BreadcrumbList` Inicio → Contenidos →
+artículo y renderiza esa ruta como `<nav>` visible y accesible. Artículos inexistentes,
+inválidos, ocultos o en preview usan `noindex, nofollow`.
+
+`contenidos.php` es una `CollectionPage`: sin búsqueda usa `index, follow`; con una
+consulta `q` mantiene la canonical limpia del índice y cambia a `noindex, follow` para
+evitar indexar combinaciones internas sin impedir el seguimiento de sus artículos.
+`sitemap.php`, servido públicamente como `/astro/sitemap.xml`, agrega dinámicamente
+únicamente artículos válidos y visibles con esa misma canonical y `lastmod` cuando
+`actualizado_en` contiene una fecha válida.
+
+El bloque **Contenidos relacionados** consume exclusivamente la lista dirigida y
+ordenada de `contenido_articulos_relaciones` del artículo origen. El helper elimina
+duplicados y autorrelaciones, descarta slugs inválidos y destinos ocultos o inválidos,
+y conserva como máximo los tres primeros. No infiere reciprocidad ni usa palabras
+clave como sustituto editorial.
+
+El slug publicado es parte de la URL pública estable. El editor permite modificarlo
+porque sigue siendo una herramienta técnica, pero muestra una advertencia explícita
+sobre enlaces externos e indexación. No existe historial, alias ni redirección desde
+el slug anterior.
 
 `includes/content-debug.php` administra ese modo mediante la sesión local y un POST
 con CSRF. Requiere `canUseSiteDebugTools()`. Tanto enlaces como páginas directas y loader comprueban
@@ -133,7 +217,19 @@ El piloto Web Push permite configurar cada dispositivo desde `/notificaciones.ph
 
 `web-push/subscribe.php` registra o reactiva la suscripción y `web-push/unsubscribe.php` marca la fila inactiva antes de retirarla del navegador. `web-push/device-config.php` atiende únicamente solicitudes JSON de origen propio con CSRF de sesión y guarda configuración y preferencias en una transacción mediante la capa común. El service worker sólo atiende `push` y `notificationclick`: no contiene caché, precache ni comportamiento offline.
 
-Mientras dure el piloto, el menú público puede incluir **Administración** → `admin/` para permitir el ingreso desde una PWA standalone. Su visibilidad se controla, como la de las demás entradas del menú principal, desde **Visibilidad de secciones**; el valor predeterminado es visible. Ocultarla no deshabilita la ruta, que sigue reutilizando el login, la sesión y el CSRF administrativos existentes y no concede acceso por sí misma.
+Mientras dure el piloto, el menú puede incluir **Administración** → `admin/` para
+permitir el ingreso desde una PWA standalone. Sus visibilidades pública y administrativa
+se controlan desde **Menú y secciones**. Ocultarla no deshabilita la ruta, que sigue
+reutilizando el login, la sesión y el CSRF existentes y no concede acceso por sí misma.
+
+La migración automática `20260817_site_menu_configuration` crea las dos tablas y
+conserva cada valor público previo de `menu.*.enabled`. La visibilidad administrativa
+inicial es verdadera para todas las secciones; `Pruebas visuales` queda explícitamente
+sólo para administración, y Galería también queda sólo administrativa cuando su valor
+público previo estaba apagado. Los grupos iniciales son Eventos, Explorar,
+Configuración y Sobre Aquellas Lunas. El panel permite crear, renombrar y ordenar
+grupos, mover y ordenar secciones y editar ambas visibilidades. Una clave foránea
+`ON DELETE RESTRICT` y la validación de aplicación impiden eliminar grupos ocupados.
 
 El endpoint valida método, tipo y tamaño de cuerpo, origen cuando el navegador lo informa, endpoint HTTPS y claves Base64 URL. `includes/web-push.php` persiste mediante una sentencia preparada en `WEB_DB`; el endpoint es único y un alta repetida reactiva y actualiza la misma fila. No almacena ubicación, preferencias ni identidad personal; `user_agent` es diagnóstico opcional.
 
@@ -142,6 +238,23 @@ El panel envía desde PHP en el hosting mediante `minishlink/web-push` 10.1 y el
 Las tareas automáticas del hosting entran únicamente por `scripts/run-scheduled-tasks.php`. El orquestador usa un lock no bloqueante, aplica las migraciones compatibles registradas explícitamente y luego procesa pruebas programadas y avisos astronómicos mediante funciones compartidas. Los wrappers anteriores permanecen disponibles sólo para diagnóstico manual. El estado operativo y las migraciones aplicadas se persisten en MySQL para su consulta administrativa.
 
 El catálogo `web_push_notification_types` separa la disponibilidad global de cada tipo de la preferencia del dispositivo y de su estado técnico. Conserva nombre, plantillas, destino y programación predeterminada. Los procesadores sólo sustituyen marcadores permitidos explícitamente por tipo y guardan en el historial el título, cuerpo y URL usados en cada intento real. Los tipos administrativos, como `test`, no aparecen entre las preferencias normales del dispositivo.
+
+Los cuatro avisos astronómicos públicos —salida lunar, eclipses, conjunciones
+lunares y tránsitos satelitales— poseen título, cuerpo y URL configurables en ese
+catálogo; los procesadores no fijan copias alternativas. Al activar notificaciones,
+la página muestra el ID público `AL-XXXXXXXX` únicamente como referencia de soporte
+y explica que, ante un problema, el usuario puede contactar por Instagram y
+mencionarlo. El ID no se presenta como identificador de seguimiento ni concede
+acceso a la configuración.
+
+La portada expone accesos contextuales con campana junto a la próxima salida lunar,
+los eclipses, las conjunciones y los tránsitos ISS/Tiangong que corresponda mostrar.
+El enlace sólo abre `/notificaciones.php?notification_type=...#tipos-de-aviso`; nunca
+cambia una preferencia desde la tarjeta ni crea un recordatorio para ese evento
+concreto. El significado es siempre “configurar todos los avisos de esta clase”.
+`assets/js/home-notification-links.js` consulta, cuando existe permiso y suscripción,
+el estado vigente del tipo para mejorar `aria-label` y `title`; una falla conserva el
+enlace neutral y no bloquea la portada.
 
 El editor administrativo valida y guarda el contenido persistido en tablas
 editoriales. Su núcleo se mantiene separado de la vista para probar normalización,
@@ -168,7 +281,7 @@ a 50. El índice muestra una miniatura apaisada 16:9 en una columna editorial de
 separa el H1 del cuerpo Markdown y ordena título, resumen, cabecera y desarrollo.
 Las páginas editoriales usan una columna de lectura propia: el artículo completo
 admite hasta 1050 px y los bloques de texto se limitan a una línea de lectura más
-estrecha (aprox. 800–850 px). Es la única excepción a la regla general de márgenes
+estrecha de 60 rem (960 px con la raíz predeterminada). Es la única excepción a la regla general de márgenes
 uniformes del sitio. Dentro de ese ancho, la imagen principal se muestra centrada en
 un contenedor ajustado al tamaño real de la fotografía, con un margen interno breve.
 Como excepción editorial, cuando sobra espacio horizontal la imagen principal puede
@@ -178,14 +291,12 @@ conserva el original como referencia y muestra aparte una preview 16:9 fiel al
 resultado público; habilita el selector de foco cuando hay recorte. Una relación fuera
 del rango tolerante 1.70–1.85 produce una advertencia no bloqueante.
 
-Ninguna presentación amplía un archivo por encima de sus dimensiones naturales.
-El resolver expone ancho y alto reales como límites CSS; hero, índice, componentes
-internos y previews pueden reducir la fotografía con `contain`, pero nunca aplican
-zoom. Si el marco disponible es mayor, la imagen queda centrada y el espacio
-restante permanece libre.
-
-La única excepción es la imagen principal de la página editorial individual: allí puede
-escalar hasta 1.3x de su ancho natural cuando el ancho disponible lo permita.
+Fuera de la imagen principal del artículo individual, ninguna presentación amplía un
+archivo por encima de sus dimensiones naturales. El resolver expone ancho y alto
+reales como límites CSS; índice, componentes internos y previews pueden reducir la
+fotografía con `contain`, pero no aplican zoom. Si el marco disponible es mayor, la
+imagen queda centrada y el espacio restante permanece libre. La única excepción es
+el hero editorial ya descrito, que puede escalar hasta 1,3×.
 
 Esta política no se propaga a otras clases de recurso. Una fotografía independiente
 usa `[[imagen src="archivo.jpg" alt="Descripción"]]` y siempre queda centrada. Para
@@ -258,7 +369,213 @@ registra manualmente el namespace PSR-4 `AstronomyEngine\` desde
 `moon/instant`, `altitude-profile` y `tonight` con la fuente `api` o `php`
 seleccionada en administración. La otra fuente actúa como fallback técnico.
 `moon/image` permite `static` o `api`, con la alternativa como fallback y el PNG
-pequeño como último recurso.
+pequeño como último recurso. Las excepciones son la Luna grande de “El cielo
+hoy” en portada y `luna-fecha-favorita.php`: usan el componente estático Three.js de
+`assets/js/moon-three-render.js`, geometría PHP embebida y configuración
+`home.moon_three.*` en portada y `favorite.moon_three.*` en la sección de fecha
+favorita. La portada conserva `moon-image.php` como fallback y la sección nueva
+compone sus descargas en el navegador.
+
+`luna-fecha-favorita.php` ofrece composición vertical 1440 × 2560 y apaisada
+2560 × 1440, con el bloque editorial opcional en ambas. Usa
+`favorite.moon_three.*`, independiente de la portada y con controles adicionales
+para color, brillo y degradado horizontal del fondo. La vista inicial conserva el
+normal configurado; recién al exportar intenta cargar el normal map 8K y mantiene el
+estándar como fallback cuando el dispositivo no admite texturas de 8192 píxeles o la
+carga falla.
+
+`luna-interactiva.php` reutiliza `MoonDiskAppearanceCalculator`, albedo y normal
+map, pero monta `assets/js/interactive-moon.js`: una escena explorable que parte
+de la orientación/libración real y proyecta etiquetas HTML desde coordenadas 3D.
+Su apariencia usa el namespace persistente `interactive.moon_three.*`, separado
+de portada y fecha favorita. Conserva los mismos trece controles básicos del
+render; `size_percent` define la escala inicial y el zoom del visitante se aplica
+sobre ella. La página pública y `embeds/luna-interactiva.php` consumen el mismo
+conjunto.
+El normal map global 8K derivado offline del DEM LOLA 64 ppd se conserva como
+segunda capa progresiva de este visor. En modo automático se solicita al alcanzar
+el zoom configurado (1,3 por defecto), nunca durante la carga inicial; los modos
+estándar y 8K permiten forzar el recurso. Si `MAX_TEXTURE_SIZE` es menor que 8192
+se mantiene silenciosamente el mapa estándar. Una vez activado, el 8K permanece
+en la sesión para evitar cambios repetidos de textura. El visor ampliado de portada
+reutiliza esta misma política al abrirse o hacer zoom, y el exportador de fecha
+favorita reutiliza el recurso y la comprobación técnica sólo al iniciar una descarga.
+El catálogo curado `assets/data/moon-features.json` separa cráteres, mares, otros
+accidentes y alunizajes, con importancia 1–2. Los nombres geográficos provienen
+del Gazetteer IAU/USGS (planetocéntrico, este positivo); los alunizajes usan
+referencias NASA/NSSDC. La visibilidad se decide con la normal transformada de
+cada punto, las colisiones se resuelven en pantalla y el detalle adicional exige
+zoom. Capas, detalle, giro y zoom son reproducibles mediante query string; con
+`embed=1` se omiten navegación y pie. `illumination=realistic|full` alterna entre
+el punto subsolar calculado y una luz frontal fija respecto de la cámara; el modo
+completo no altera orientación, libración ni coordenadas de superficie.
+
+La búsqueda pública mantiene otro conjunto de datos: `assets/data/moon-gazetteer.json`
+es una instantánea local de los accidentes lunares aprobados por IAU/USGS y se
+regenera offline con `tools/update-moon-gazetteer.py`; nunca genera etiquetas por
+sí mismo ni consulta USGS durante la navegación. Se combina en cliente con los
+alunizajes curados. El objeto elegido se materializa como un marcador temporal y
+orienta el globo hacia sus coordenadas. `assets/data/moon-geology-experiment.json`
+aporta bloques científicos opcionales para las diez fichas piloto, siempre
+conservando tipo de evidencia, fuentes y limitaciones; el resto recibe sólo la
+ficha básica del Gazetteer.
+
+`assets/data/moon-geology-auto.json` mantiene separado el enriquecimiento
+reproducible. `tools/build-moon-geology-auto.py` une el punto central del
+Gazetteer con los polígonos del mapa geológico USGS 1:5M y sólo incorpora cruces
+de cráteres LPI clasificados como seguros por nombre, coordenadas y diámetro.
+Los matches probables o ambiguos quedan en `moon-geology-auto-report.json`, no en
+las fichas. Las métricas conservan si son medidas, modeladas o estimaciones
+publicadas. Esta capa es contexto científico opcional y nunca controla etiquetas.
+
+Las recomendaciones de cráteres de “Esta noche” se calculan en
+`includes/moon-crater-recommendations.php` para portada y página detallada. El
+índice compacto `moon-crater-observation.json`, regenerable con
+`tools/build-moon-crater-observation-catalog.py`, contiene sólo cráteres nominales
+de al menos 20 km y referencias a los indicadores científicos ya importados. La
+puntuación combina iluminación rasante del lado iluminado, distancia al limbo,
+diámetro, topografía, morfología, ficha científica y catálogo curado. Si la Luna
+no alcanza 10° durante el tramo restante de oscuridad civil o ningún candidato
+supera el umbral, el bloque no se presenta.
+
+La presentación en español se resuelve sin alterar esos catálogos mediante
+`assets/data/moon-geology-es.json`. El recurso reúne un vocabulario controlado,
+nombres públicos de fuentes y traducciones de las unidades USGS indexadas por su
+código. Las descripciones e interpretaciones se traducen una sola vez por unidad y
+se reutilizan en todas las fichas que caen en ella. Las etimologías individuales
+del Gazetteer permanecen en el dato original, pero no se muestran mientras no haya
+una estrategia de localización trazable.
+
+Los widgets de contenidos no reutilizan la página pública como iframe genérico:
+`embeds/luna-interactiva.php` ofrece un wrapper dedicado sobre el mismo módulo,
+con estado inicial, capas, bloqueo de rotación y controles parametrizados por URL.
+`embeds/libracion-lunar.php` genera 121 muestras compactas entre la Luna nueva
+anterior al instante vigente y la siguiente, calculadas con
+`PrincipalPhaseCalculator`. Ambos modos recorren exactamente esos mismos límites;
+`assets/js/lunar-libration-widget.js` interpola libración, orientación, fase y Sol
+en cada frame. La orientación inicial usa `lunar_north_screen_angle_degrees`,
+calculado topocéntricamente con la ubicación central del sitio; durante el ciclo
+se congela esa referencia de pantalla y varía sólo el ángulo del eje lunar para
+no comprimir la rotación diaria del campo en una oscilación rápida. El tiempo avanza siempre
+hacia adelante y el cierre aplica un blend visual suave sólo sobre el último 2 %
+del ciclo. La administración puede capturar un ciclo como
+WebM 1280 × 720 o 720 × 1280 en el navegador mediante `captureStream` y
+`MediaRecorder`; el video compone sólo fondo y canvas, sin controles ni readout.
+El payload de este widget carga `favorite.moon_three.*`: luz principal y ambiente,
+tratamiento de textura, relieve, exposición, tamaño y composición del fondo se
+comparten sin parámetros visuales adicionales entre la previsualización del
+administrador, la URL embebida y el WebM exportado.
+La cámara compensa el campo horizontal de los marcos verticales antes de aplicar
+el `zoom` configurable, por lo que el disco completo entra también en 9:16.
+`embeds/fases-tierra-luna.php` agrega la comparación recíproca: toma el mismo
+instante y vector solar de `MoonDiskAppearanceCalculator`, ilumina la Tierra con
+el vector opuesto y conserva `iluminación Tierra = 1 - iluminación Luna`. El
+punto terrestre central se obtiene de la ascensión recta geocéntrica lunar y el
+tiempo sidéreo de Greenwich; el diámetro visible terrestre se representa 3,67
+veces mayor. La fecha y hora iniciales, autoplay, velocidad y controles forman
+parte de la URL, y el ciclo cliente usa las mismas 121 muestras de una lunación.
+La referencia de norte celeste queda fijada para el observador en el instante
+seleccionado: la Luna varía sólo por libración y el eje terrestre conserva su
+inclinación en pantalla, sin comprimir la rotación diaria del campo en el ciclo.
+El generador codifica además parámetros Three.js independientes por cuerpo. Luna
+y Tierra separan luz principal, ambiente, exposición y rugosidad; la Luna expone
+también los dos componentes de `normalScale`. Son estado reproducible de la URL,
+no configuración persistente ni valores compartidos con los otros widgets.
+`admin/widgets-lunares/` genera preview, URL pública e iframe. Conserva en
+`localStorage` la última configuración de cada widget y la selección activa para
+sobrevivir una recarga del navegador. Esta preferencia local no modifica widgets
+ya insertados ni constituye configuración global. El campo “URL del embed” también
+funciona como entrada: reconoce cualquiera de las nueve rutas del generador,
+selecciona el widget y aplica sus parámetros a los
+controles y a la preview; parámetros futuros sin control visible se conservan al
+regenerar la URL durante esa sesión. Estas superficies no forman parte del menú ni
+del sitemap.
+
+Las dos rutas adicionales son `embeds/escena-lunar.php`, una composición lunar
+observacional configurable, y `embeds/lunas-llenas-tamano.php`, que compara las
+próximas doce lunas llenas contra el diámetro a 384.400 km. La escena mantiene su
+estado técnico en la URL, pero el generador puede guardar presets con nombre y
+descripción en `lunar_scene_presets`. El endpoint autenticado
+`admin/api/lunar-scene-presets.php` valida una lista cerrada de parámetros y permite
+crear, actualizar, duplicar o eliminar esos presets con CSRF. Guardarlos no publica
+el embed, no cambia la ubicación activa y no los convierte en configuración global.
+
+Los eclipses reales se publican sólo como widgets en
+`embeds/eclipse-lunar-real.php` y `embeds/eclipse-solar-real.php`. Sus series,
+contactos, discos aparentes y orientación se preparan en PHP desde el motor; el
+cliente únicamente interpola y renderiza. En el solar, la fotosfera se representa
+como un disco cálido casi uniforme y la corona se compone mediante halo continuo
+y filamentos Bézier irregulares. Prominencias, perlas y diamante se anclan al limbo
+solar y sólo se revelan en totalidad o alrededor de C2/C3. Son capas visuales
+graduables con `corona_level`, `prominence_level` y `baily_level` entre 0 y 10;
+no modifican muestras, tamaños ni contactos. Las claves booleanas anteriores se
+normalizan únicamente para conservar URLs existentes.
+`totality_effects_before_seconds` y `totality_effects_after_seconds` limitan su
+aparición fuera de la totalidad a márgenes visuales configurables alrededor de
+C2 y C3. La entrada y salida son suaves; los tiempos se comparan contra los
+contactos locales ya calculados y no los desplazan ni recalculan.
+La cámara del eclipse lunar real mantiene un margen vertical para readout y
+controles y aumenta su distancia en formatos angostos según el aspect ratio; el
+disco completo debe permanecer dentro del canvas tanto en la preview como en los
+modales públicos.
+El eclipse lunar real conserva sin cambios el sombreado parcial y suma una
+adaptación perceptual exclusiva de la totalidad: `totality_brightness` y
+`totality_copper_intensity` se multiplican por una envolvente suave que vale cero
+en U2/U3 y alcanza uno en el máximo. Son ajustes visuales de URL y nunca alteran
+contactos ni geometría.
+Dentro de esa envolvente, el fragment shader calcula para cada punto
+`(radio_umbra - distancia_al_centro) / radio_umbra`. Esa profundidad real gobierna
+la mezcla borde naranja–zona profunda roja, la caída de brillo, saturación y
+contraste de textura. Una perturbación procedural determinista puede deformar
+sutilmente la profundidad; con `totality_atmospheric_irregularity=0` desaparece.
+Los demás ajustes son `totality_max_darkness`, `totality_gradient_contrast`,
+`totality_edge_color`, `totality_deep_color`, `totality_saturation`,
+`totality_texture_contrast` y `totality_gradient_softness`.
+El fondo del eclipse lunar real admite además `sky_color` y `sky_brightness`.
+Son controles puramente visuales del color y luminosidad del cielo; no modifican
+la luz de la Luna, la geometría, los contactos ni las muestras astronómicas.
+La URL puede ajustar además exposición general; intensidad y color de fotosfera;
+oscurecimiento del limbo; color del disco lunar; brillo, color y oscurecimiento
+del cielo; e intensidad/color independientes de corona, prominencias y
+perlas/diamante. Todos son parámetros exclusivos de presentación consumidos por
+el canvas y no entran en los adaptadores geométricos.
+La interpolación temporal compartida trata orientación celeste, ángulo del disco,
+longitud y acimut como ángulos cíclicos: entre muestras siempre recorre el arco
+corto. Esto evita giros visuales completos al cruzar la representación 0°/360°
+sin modificar las muestras ni la orientación calculada por el motor.
+Al recargar la preview por un cambio de estos parámetros, la administración lee
+el progreso temporal vigente y lo pasa sólo a la URL interna mediante
+`_preview_progress`. Este parámetro efímero no se incorpora a la URL pública ni
+al iframe copiado; evita volver al máximo durante la calibración visual.
+
+`embeds/eclipse-solar-espacio.php` agrega la vista geocéntrica didáctica sin
+integrarla a superficies públicas. `SolarEclipseShadowGeometry` reutiliza las
+efemérides de `MeeusEclipsePositionCalculator` y entrega simultáneamente vectores
+geocéntricos ecuatoriales inerciales y su transformación al marco terrestre
+rotante, además de eje, radios de penumbra y núcleo, tipo umbra/antumbra y su
+intersección con la esfera terrestre. Los contactos globales de esta escena
+se refinan desde la tangencia de esos conos con la Tierra. El shader de la Tierra
+calcula por fragmento la separación y radios aparentes de Sol y Luna desde cada
+punto superficial, aplica el solapamiento de discos sólo en el hemisferio diurno
+y conserva el terminador mediante iluminación paralela. La trayectoria del mesh
+lunar interpola el vector inercial por timestamp y después normaliza una sola vez
+para aplicar la distancia visual constante configurada. La rotación sidérea se
+aplica exclusivamente a la Tierra y a la localización superficial de la sombra.
+No hay autoencuadre ni normalización por frame dependiente del eclipse; la escena
+comprime sólo la distancia visual Luna–Tierra y lo declara. Radios relativos y
+geometría de sombra permanecen en unidades físicas del motor.
+
+La integración pública de eclipses comparte `includes/eclipse-widget-embed.php`
+entre portada, Eventos lunares y Eclipses. Las URLs guardadas en Configuración
+del sitio son plantillas completas: se valida host, HTTPS y ruta del widget, se
+preserva cualquier parámetro presente y se sustituyen exclusivamente `date`,
+`lat`, `lon` y `elevation`. El host de la plantilla nunca se usa para renderizar:
+el iframe apunta a la ruta del mismo entorno que sirve la página, para que preview
+y detalle público ejecuten la misma versión del widget. Si una plantilla no corresponde al widget esperado,
+se intenta el valor predeterminado seguro; si tampoco puede construirse, el
+detalle conserva su imagen representativa. El aviso de portada consulta el grupo
+`eclipse` por separado del ranking de “Lo próximo” y sólo admite circunstancias
+locales cuya `visibility_classification` no sea `not_visible`.
 
 `includes/astronomy-events.php` es el punto único para eventos. Fases, ápsides,
 nodos, libraciones, conjunciones y eclipses admiten `api`, `database`, `php`,
@@ -328,6 +645,42 @@ relevante: Luna llena en alguno de los días civiles atravesados por la noche, o
 conjunción, eclipse, luz cenicienta, oportunidad de Luna llena, ápside o libración
 dentro de la ventana nocturna. La consulta de eventos sólo decide protagonismo; las
 posiciones y ventanas observables continúan perteneciendo al contrato `tonight`.
+
+La portada puede acompañar el resumen con una escena angular Luna–planetas/estrellas.
+`TonightCalculator` entrega `moon_scenes` a partir del mismo catálogo y las mismas
+muestras de cinco minutos usadas para las cercanías de hasta 10°; la capa de datos
+completa este campo con el motor PHP cuando una respuesta API anterior todavía no lo
+incluye. La selección descarta muestras anteriores al reloj vigente (también en modo
+simulado), de modo que el esquema siempre representa una oportunidad futura.
+
+La redacción de cercanías aplica una única prioridad editorial: si hay planetas
+dentro de 10°, se omiten estrellas del resumen; se menciona un planeta o, si hay dos,
+se usa la plantilla administrativa especial para ambos. Sólo cuando no hay planetas
+se menciona la estrella cercana con menor separación. Los títulos, el texto de un
+encuentro y la variante de dos planetas pertenecen a la configuración editorial del
+administrador. Esta prioridad afecta el texto y el ancla de la escena, pero la escena
+incluye todos los planetas y estrellas calculados dentro de 10° para su instante.
+
+`includes/home-tonight-scene.php` selecciona el mismo encuentro priorizado
+que el texto (incluidas las conjunciones formales), calcula únicamente encuadre y
+presentación, y reutiliza la imagen lunar por fase y su rotación aparente. Sin objetos
+válidos cercanos no se renderiza figura ni se reserva espacio.
+El componente identifica directamente a la Luna y a cada astro, y usa un marco con
+fondo completamente opaco para que la geometría calculada no se confunda con el
+fondo estelar decorativo de las páginas. Los planetas usan un disco, Saturno añade
+un anillo y las estrellas una cruz con núcleo; todos llevan nombre, la Luna su propia
+etiqueta y el pie informa hora y escala angular.
+La página detallada reutiliza ese mismo modelo junto a las tarjetas de encuentros:
+las tarjetas se apilan a la izquierda y la escena ocupa la derecha en escritorio;
+en móvil forman una sola columna. La escena puede ampliarse mediante un `dialog`
+nativo, a ancho completo en móvil, sin recalcular posiciones ni duplicar el SVG en
+el HTML inicial. El disparador admite clic y teclado; el diálogo se cierra mediante
+su botón, el fondo o Escape y devuelve el foco al esquema.
+`cielo-de-hoy.php` reutiliza también el modelo dentro de “Qué sucede hoy”, junto a
+los eventos editoriales de la fecha. Para el día actual antes del mediodía consulta
+la noche civil iniciada el día anterior; después utiliza la fecha visible. La escena
+sigue sometida al filtro común de oportunidades futuras y desaparece sin dejar
+espacio cuando no hay objetos válidos dentro de 10°.
 
 El catálogo independiente de veinte estrellas y todas las constelaciones son contrato
 de la API, no datos duplicados en PHP. La vista usa sólo `constellation.name`, omite el
@@ -655,11 +1008,13 @@ alternativa sin duplicar una aceptación ya registrada.
 
 `assets/js/content-trivia.js` reutiliza el mismo helper para medir exclusivamente
 las trivias públicas de portada. `trivia_view` se emite una vez cuando la trivia
-alcanza el viewport mediante `IntersectionObserver`; `trivia_answer`, una vez al
-elegir una opción; y `trivia_article_click`, al seguir el enlace relacionado.
-Los payloads se limitan al código editorial, slug relacionado cuando existe,
-resultado correcto/incorrecto y ordinal de opción. La falta o bloqueo de GA4 no
-interrumpe la interacción.
+alcanza 25 % visible mediante `IntersectionObserver`; un `WeakSet` deduplica esa
+vista por elemento durante la vida del documento. `trivia_answer` se emite sólo en
+la primera elección porque `data-answered` bloquea respuestas posteriores;
+`trivia_article_click` se emite al seguir el enlace sin prevenir la navegación.
+Todos incluyen `trivia_codigo`; `articulo_slug` sólo cuando existe relación,
+`correcta` y `opcion` sólo corresponden a la respuesta. La falta o bloqueo de GA4
+no interrumpe la interacción.
 
 El mismo script centraliza la detección conservadora de navegadores embebidos
 de Instagram y Facebook mediante marcadores propios de sus User-Agent. En ese
@@ -691,5 +1046,17 @@ este mecanismo y conserva sus instrucciones específicas.
 Las fronteras comunes `astronomyDataResolve()`, `astronomyEvents()`, `homeSatelliteContext()` y los endpoints de series del Explorador registran opcionalmente una sola traza por operación completa. `includes/astronomy-trace.php` nunca instrumenta muestras internas y una falla de persistencia sólo se envía a `error_log`. `request_id` es único por operación y queda indexado para que un futuro reporte pueda referenciarlo; `session_trace_id` agrupa anónimamente las operaciones de una pestaña o sesión de navegador.
 
 Las vistas dinámicas que llaman `sendDynamicNoCacheHeaders()` —Inicio, Esta noche, Sol y Luna, Planificador, Eventos, Eclipses, Ubicación y Galería— deshabilitan la caché. Los proxies JSON también usan `no-store`. Los assets estáticos conservan caché normal y cambian de URL al cambiar su `filemtime`.
+
+La portada activa la protección visual reutilizable de
+`includes/page-freshness.php` y `assets/js/page-freshness.js`. El instante de carga
+se toma del contexto temporal común `window.siteTimeContext`: usa su instante fijo
+cuando el reloj está simulado y `Date.now()` sólo en modo normal. Se conserva en el
+nodo del aviso durante la vida de ese documento; si cambia el modo del reloj, la
+base se reinicia para no comparar escalas distintas. Al cargar, en `visibilitychange` al volver a estado visible y en
+`pageshow`, se compara el reloj actual del dispositivo con ese instante. Superadas
+las tres horas definidas por `ASTRONOMY_PAGE_FRESHNESS_THRESHOLD_SECONDS`, aparece
+un único banner persistente cuyo botón ejecuta una recarga normal. No hay timer,
+consulta al servidor, actualización automática ni cambios de caché. El componente
+es opt-in: otras páginas no lo cargan hasta que se evalúen individualmente.
 
 El cliente reintenta una vez, después de 500 ms, errores de transporte y HTTP 502/503/504. Los errores se registran sin credenciales, cookies ni cuerpos completos. Las vistas mantienen navegación y muestran recuperación parcial; `page-recovery.js` limita recargas y sólo actúa si `data-api-state="error"`.

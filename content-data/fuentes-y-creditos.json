@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "page": {
+    "eyebrow": "Transparencia y procedencia",
+    "title": "Fuentes y créditos",
+    "introduction": [
+      "Aquellas Lunas combina cálculos astronómicos propios con información procedente de organismos científicos, catálogos especializados y servicios externos.",
+      "Siempre que es posible, los datos se procesan específicamente para la fecha, hora y ubicación seleccionadas. Cuando la información proviene de una fuente externa, se identifica y se ofrece un enlace a su origen."
+    ]
+  },
+  "sections": [
+    {
+      "id": "calculos-astronomicos",
+      "title": "Cálculos astronómicos propios",
+      "blocks": [
+        { "type": "paragraph", "text": "Gran parte de la información astronómica que muestra Aquellas Lunas se obtiene mediante cálculos propios realizados por el sitio, específicamente para la fecha, hora y ubicación seleccionadas." },
+        { "type": "paragraph", "text": "Esto incluye, entre otros:" },
+        { "type": "list", "items": ["posiciones del Sol y la Luna", "alturas y direcciones", "salidas y puestas", "fases e iluminación lunar", "distancias y tamaño aparente", "libraciones", "conjunciones", "perigeos y apogeos", "nodos lunares", "crepúsculos", "trayectorias", "visibilidad local de eclipses", "oportunidades de observación", "posiciones y tránsitos de ISS y Tiangong"] },
+        { "type": "paragraph", "text": "Los cálculos astronómicos se basan principalmente en métodos publicados por Jean Meeus en Astronomical Algorithms y en otros modelos astronómicos estándar." },
+        { "type": "paragraph", "text": "Para ISS y Tiangong se utilizan elementos orbitales publicados por CelesTrak y propagación mediante SGP4, basada en el modelo de Vallado. Aquellas Lunas calcula a partir de esos datos las posiciones y los posibles tránsitos frente al Sol o la Luna." }
+      ]
+    },
+    {
+      "id": "fuentes-cientificas",
+      "title": "Fuentes científicas y de datos",
+      "sources": [
+        { "name": "CelesTrak", "description": ["Elementos orbitales de ISS y Tiangong."], "links": [{ "label": "Sitio oficial de CelesTrak", "url": "https://celestrak.org/" }] },
+        { "name": "IAU / USGS — Gazetteer of Planetary Nomenclature", "description": ["Nombres oficiales, tipos, coordenadas y dimensiones de cráteres, mares y otros accidentes lunares."], "links": [{ "label": "Gazetteer of Planetary Nomenclature", "url": "https://planetarynames.wr.usgs.gov/" }] },
+        { "name": "USGS Astrogeology", "description": ["Información y cartografía geológica lunar, incluyendo el Unified Geologic Map of the Moon."], "links": [{ "label": "USGS Astrogeology", "url": "https://astrogeology.usgs.gov/" }] },
+        { "name": "Lunar and Planetary Institute", "description": ["Profundidad, topografía y otras propiedades de cráteres lunares."], "links": [{ "label": "Lunar and Planetary Institute", "url": "https://www.lpi.usra.edu/" }] },
+        { "name": "NASA / Goddard Space Flight Center", "description": ["Mapas globales de visibilidad de eclipses solares y lunares de los catálogos de Fred Espenak y Jean Meeus.", "Los mapas son recursos NASA/GSFC. La visibilidad concreta desde la ubicación seleccionada es calculada por Aquellas Lunas."], "links": [{ "label": "NASA Eclipse Web Site", "url": "https://eclipse.gsfc.nasa.gov/" }] },
+        { "name": "Misiones y sitios de alunizaje", "description": ["La información se obtiene y normaliza a partir de documentación de las agencias responsables de las distintas misiones."], "links": [{ "label": "NASA", "url": "https://www.nasa.gov/" }, { "label": "Lunar Reconnaissance Orbiter Camera / LROC", "url": "https://www.lroc.asu.edu/" }, { "label": "CNSA", "url": "https://www.cnsa.gov.cn/" }, { "label": "ISRO", "url": "https://www.isro.gov.in/" }, { "label": "JAXA", "url": "https://global.jaxa.jp/" }] },
+        { "name": "JPL / NASA", "description": ["Elementos orbitales aproximados utilizados en cálculos planetarios y conjunciones."], "links": [{ "label": "Jet Propulsion Laboratory", "url": "https://www.jpl.nasa.gov/" }] },
+        { "name": "Hipparcos / ESA", "description": ["Posiciones y movimientos propios de estrellas utilizadas en conjunciones y herramientas de observación."], "links": [{ "label": "Hipparcos", "url": "https://www.cosmos.esa.int/web/hipparcos" }] }
+      ]
+    },
+    {
+      "id": "mapas-ubicaciones",
+      "title": "Mapas, ubicaciones y zonas horarias",
+      "sources": [
+        { "name": "OpenStreetMap", "description": ["Cartografía utilizada en el Planificador.", "Las direcciones y trayectorias astronómicas superpuestas sobre el mapa son calculadas por Aquellas Lunas."], "links": [{ "label": "OpenStreetMap", "url": "https://www.openstreetmap.org/" }] },
+        { "name": "Nominatim", "description": ["Búsqueda de localidades y conversión entre coordenadas y nombres geográficos."], "links": [{ "label": "Nominatim", "url": "https://nominatim.org/" }] },
+        { "name": "timezone-boundary-builder", "description": ["Datos geográficos utilizados para determinar la zona horaria correspondiente a unas coordenadas."], "links": [{ "label": "Repositorio oficial", "url": "https://github.com/evansiroky/timezone-boundary-builder" }] }
+      ]
+    },
+    {
+      "id": "meteorologia",
+      "title": "Meteorología",
+      "sources": [
+        { "name": "Open-Meteo", "description": ["Pronóstico meteorológico, nubosidad total y nubosidad por capas.", "El pronóstico es orientativo y puede cambiar."], "links": [{ "label": "Open-Meteo", "url": "https://open-meteo.com/" }] }
+      ]
+    },
+    {
+      "id": "visualizaciones-simulaciones",
+      "title": "Visualizaciones y simulaciones",
+      "blocks": [
+        { "type": "notice", "text": "No todas las imágenes de la Luna que aparecen en Aquellas Lunas son fotografías. Las herramientas interactivas pueden generar renders y simulaciones a partir de cálculos astronómicos, texturas y modelos tridimensionales." }
+      ],
+      "sources": [
+        { "name": "Three.js", "description": ["Biblioteca utilizada para varias visualizaciones y simulaciones tridimensionales."], "links": [{ "label": "Three.js", "url": "https://threejs.org/" }] },
+        { "name": "NASA Scientific Visualization Studio / CGI Moon Kit", "description": ["Las texturas y datos de relieve utilizados en los renders 3D de la Luna proceden directa o derivadamente del CGI Moon Kit de NASA Scientific Visualization Studio, preparado por Ernie Wright (USRA) con datos de Lunar Reconnaissance Orbiter, LROC y LOLA.", "Algunos recursos fueron convertidos o redimensionados localmente para su utilización en Aquellas Lunas."], "links": [{ "label": "CGI Moon Kit", "url": "https://svs.gsfc.nasa.gov/4720/" }] },
+        { "name": "NASA Visible Earth", "description": ["Las visualizaciones terrestres utilizadas en algunas herramientas emplean recursos de NASA Visible Earth, incluyendo Blue Marble y Black Marble."], "links": [{ "label": "NASA Visible Earth", "url": "https://visibleearth.nasa.gov/" }] }
+      ]
+    },
+    {
+      "id": "fotografias",
+      "title": "Fotografías",
+      "blocks": [
+        {
+          "type": "notice",
+          "text": "Todas las fotografías publicadas en Aquellas Lunas son propias."
+        },
+        {
+          "type": "paragraph",
+          "text": "También podés encontrar más fotografías de la Luna en la cuenta de Instagram de Aquellas Lunas."
+        }
+      ],
+      "sources": [
+        {
+          "name": "Instagram",
+          "description": [
+            "Cuenta de Aquellas Lunas en Instagram."
+          ],
+          "links": [
+            {
+              "label": "Aquellas Lunas en Instagram",
+              "url": "https://www.instagram.com/aquellas_lunas/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "desarrollo-asistencia",
+      "title": "Desarrollo y asistencia",
+      "blocks": [
+        { "type": "paragraph", "text": "Aquellas Lunas es un proyecto desarrollado por Andrés Miñones." },
+        { "type": "paragraph", "text": "En distintas etapas del diseño, análisis, programación, revisión y documentación se utilizaron herramientas de inteligencia artificial de OpenAI como asistentes de desarrollo." },
+        { "type": "list", "items": ["ChatGPT: utilizado principalmente para análisis, discusión conceptual, revisión, diseño de funcionalidades y preparación de especificaciones.", "Codex: utilizado como asistente para inspección, desarrollo y modificación del código del proyecto."] },
+        { "type": "paragraph", "text": "Las decisiones finales sobre contenidos, diseño, funcionamiento, cálculos y publicación corresponden al responsable de Aquellas Lunas." }
+      ],
+      "sources": [
+        { "name": "OpenAI", "description": ["Sitio oficial de OpenAI."], "links": [{ "label": "OpenAI", "url": "https://openai.com/" }] }
+      ]
+    }
+  ]
+}

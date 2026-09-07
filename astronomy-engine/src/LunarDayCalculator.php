@@ -11,6 +11,7 @@ final class LunarDayCalculator
 {
     private const SAMPLE_SECONDS=300;
     private const MOON_RADIUS_KM=1737.4;
+    public const STANDARD_REFRACTION_DEGREES=34.0/60.0;
     public function __construct(private readonly MeeusLunarCalculator $calculator) {}
 
     public function calculate(DateTimeImmutable $localDate,float $latitude,float $longitude,float $elevation=0.0): LunarDay
@@ -42,8 +43,15 @@ final class LunarDayCalculator
     private function horizonValue(float $ts,DateTimeZone $zone,float $lat,float $lon,float $elevation): float
     {
         $p=$this->calculator->calculate($this->fromTimestamp($ts,$zone),$lat,$lon,$elevation);
-        $angularRadius=rad2deg(asin(self::MOON_RADIUS_KM/$p->topocentricDistanceKilometers));
-        return $p->altitudeDegrees-(-(34.0/60.0)-$angularRadius);
+        return $p->altitudeDegrees-self::horizonCenterAltitudeDegrees($p->topocentricDistanceKilometers);
+    }
+    public static function horizonCenterAltitudeDegrees(float $topocentricDistanceKilometers): float
+    {
+        return -self::STANDARD_REFRACTION_DEGREES-self::apparentSemidiameterDegrees($topocentricDistanceKilometers);
+    }
+    public static function apparentSemidiameterDegrees(float $topocentricDistanceKilometers): float
+    {
+        return rad2deg(asin(self::MOON_RADIUS_KM/$topocentricDistanceKilometers));
     }
     private function bisect(float $left,float $right,DateTimeZone $zone,float $lat,float $lon,float $elevation): float
     {

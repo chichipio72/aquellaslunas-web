@@ -229,6 +229,14 @@ function renderAstronomyTimings(): void
                 </div>
             </details>
         <?php endif; ?>
+        <?php $moonThreeDiagnostic = is_array($GLOBALS['home_moon_three_diagnostic'] ?? null)
+            ? $GLOBALS['home_moon_three_diagnostic'] : []; ?>
+        <?php if ($moonThreeDiagnostic !== []): ?>
+            <p class="api-diagnostics__page-time" data-moon-three-diagnostic>
+                Luna Three.js: servidor <?= htmlspecialchars(number_format((float) ($moonThreeDiagnostic['server_ms'] ?? 0.0), 1, ',', '.')) ?> ms
+                · navegador: <span data-moon-three-diagnostic-status><?= ($moonThreeDiagnostic['status'] ?? '') === 'preparada' ? 'midiendo carga y primer render…' : 'fallback' ?></span>
+            </p>
+        <?php endif; ?>
         <?php $traceDiagnostics = is_array($GLOBALS['astronomy_trace_diagnostics'] ?? null)
             ? $GLOBALS['astronomy_trace_diagnostics'] : []; ?>
         <?php if ($traceDiagnostics !== []): ?>

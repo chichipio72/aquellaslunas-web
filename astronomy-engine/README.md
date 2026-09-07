@@ -64,19 +64,20 @@ Meeus capítulo 27 y los asigna a invierno/verano según el hemisferio.
 `MoonImageRenderer` genera PNG lunares portables mediante GD, con orientación
 fija, por hemisferio o aparente local, sombreado configurable y caché de
 archivos. Reutiliza los calculadores existentes para la orientación aparente.
-El contrato está documentado en
-[`../docs/php-moon-image.md`](../docs/php-moon-image.md).
+La integración de imágenes y sus superficies vigentes está documentada en
+[`../docs/funcionalidades-y-motor.md`](../docs/funcionalidades-y-motor.md).
 
-La integración productiva no invoca este renderer en runtime: sirve una
-colección precalculada de 404 PNG y aplica la orientación aparente mediante
-`MoonBrightLimbCalculator` y rotación CSS. Por lo tanto GD no es un requisito
-del runtime de producción de la web.
+La integración pública combina superficies Three.js expresamente autorizadas,
+una colección PNG precalculada y `moon-image.php` como fallback/compatibilidad.
+`MoonImageRenderer` no es el renderer principal de esas superficies, por lo que
+GD no es un requisito del núcleo astronómico.
 
 `TonightCalculator` compone posiciones solares, lunares, planetarias y de un
 catálogo fijo para producir ventanas observables entre mediodías, con los
 modos `summary` y `full`. Los datos Hipparcos/SIMBAD están separados en
-`TonightCatalog`. El contrato y sus diferencias de modelo están en
-[`../docs/php-tonight.md`](../docs/php-tonight.md).
+`TonightCatalog`. El contrato y su integración pública están resumidos en
+[`../docs/funcionalidades-y-motor.md`](../docs/funcionalidades-y-motor.md) y
+detallados en [`../docs/arquitectura.md`](../docs/arquitectura.md).
 
 El subnamespace `AstronomyEngine\Satellite` contiene el primer bloque orbital
 portable: parseo estricto de TLE, propagación SGP4 near-earth con WGS72 y

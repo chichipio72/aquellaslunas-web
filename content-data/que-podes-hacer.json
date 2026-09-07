@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "page": {
+    "eyebrow": "Guía del sitio",
+    "title": "Qué podés hacer en Aquellas Lunas",
+    "introduction": [
+      "Aquellas Lunas es una web para observar, entender y disfrutar el cielo. Reúne herramientas astronómicas, información sobre la Luna, eventos, meteorología, contenidos, juegos y recursos interactivos.",
+      "No hace falta saber astronomía para usarla. La información intenta contar primero qué está pasando y por qué puede ser interesante, con un lenguaje claro y amigable. Cuando querés profundizar, muchas secciones permiten acceder también a datos y herramientas más detalladas."
+    ]
+  },
+  "main_label": "Explorá Aquellas Lunas",
+  "feature_label": "Además, en todo el sitio",
+  "main_cards": [
+    {
+      "id": "cielo-hoy",
+      "title": "El cielo hoy",
+      "icon": { "type": "moon_phase", "subtype": "first_quarter" },
+      "blocks": [
+        { "type": "paragraph", "text": "Una mirada rápida a cómo será el día y la noche desde tu ubicación." },
+        { "type": "paragraph", "text": "Podés saber cuándo salen y se ponen el Sol y la Luna, cómo está la Luna hoy, cuándo será visible, cómo cambia su posición a lo largo de las horas y cuáles pueden ser los mejores momentos para observar." },
+        { "type": "paragraph", "text": "La información astronómica se combina, cuando está disponible, con la previsión de nubosidad para ayudarte a decidir cuándo vale la pena mirar el cielo." }
+      ],
+      "link": { "text": "Ir a El cielo hoy →", "url": "cielo-de-hoy.php" }
+    },
+    {
+      "id": "cielo-esta-noche",
+      "title": "El cielo esta noche",
+      "icon": { "type": "conjunction" },
+      "blocks": [
+        { "type": "paragraph", "text": "Si querés salir y mirar el cielo, esta sección intenta responder una pregunta muy simple: ¿qué hay interesante para ver esta noche?" },
+        { "type": "paragraph", "text": "Destaca planetas, estrellas, conjunciones y otros objetos o fenómenos visibles, explicando hacia dónde mirar, aproximadamente cuándo hacerlo y qué ayuda óptica puede ser útil." },
+        { "type": "paragraph", "text": "No pretende mostrar todo el cielo: selecciona lo que puede resultar más interesante para una observación casual." }
+      ],
+      "link": { "text": "Ir a El cielo esta noche →", "url": "cielo-de-esta-noche.php" }
+    },
+    {
+      "id": "calendario-solar-lunar",
+      "title": "Calendario solar y lunar",
+      "icon": { "type": "moon_phase", "subtype": "full_moon" },
+      "blocks": [
+        { "type": "paragraph", "text": "Permite recorrer varios días y comparar rápidamente cómo van cambiando el Sol y la Luna." },
+        { "type": "paragraph", "text": "Es especialmente útil para planificar una observación o una fotografía: podés comparar fases, horarios, períodos de visibilidad y recorridos sobre el cielo sin tener que consultar cada fecha por separado." }
+      ],
+      "link": { "text": "Ir a Calendario solar y lunar →", "url": "sol-y-luna.php" }
+    },
+    {
+      "id": "eventos-lunares",
+      "title": "Eventos astronómicos",
+      "icon": { "type": "earthshine" },
+      "blocks": [
+        { "type": "paragraph", "text": "Aquellas Lunas busca y reúne acontecimientos que pueden hacer que una noche sea diferente." },
+        { "type": "paragraph", "text": "Incluye fases lunares, conjunciones, perigeos y apogeos, libraciones, luz cenicienta, Lunas muy finas, eclipses y otros eventos relacionados con el Sol y la Luna." },
+        { "type": "paragraph", "text": "En lugar de limitarse a mostrar números, intenta explicar qué ocurre, cuándo conviene mirar y qué podés esperar ver desde tu ubicación." }
+      ],
+      "link": { "text": "Explorar eventos →", "url": "eventos.php" }
+    },
+    {
+      "id": "eclipses",
+      "title": "Eclipses",
+      "icon": { "type": "eclipse", "subtype": "lunar_eclipse" },
+      "blocks": [
+        { "type": "paragraph", "text": "Podés consultar eclipses solares y lunares y, sobre todo, saber si realmente serán visibles desde donde estás." },
+        { "type": "paragraph", "text": "Aquellas Lunas diferencia el eclipse como fenómeno global de lo que podrá observarse desde tu ubicación y presenta sus distintas etapas de una manera fácil de seguir." }
+      ],
+      "link": { "text": "Ir a Eclipses →", "url": "eclipses.php" }
+    },
+    {
+      "id": "iss-tiangong",
+      "title": "ISS y Tiangong frente a la Luna",
+      "icon": { "type": "conjunction" },
+      "blocks": [
+        { "type": "paragraph", "text": "Aquellas Lunas puede buscar oportunidades en las que la Estación Espacial Internacional o la estación espacial china Tiangong pasen frente al disco de la Luna." },
+        { "type": "paragraph", "text": "Estos tránsitos duran apenas una fracción de segundo y sólo pueden verse desde una zona geográfica relativamente pequeña." },
+        { "type": "paragraph", "text": "La herramienta calcula el fenómeno para tu ubicación y te ayuda a saber cuándo puede ocurrir y qué tan cerca estás de la zona desde la que podrá verse." }
+      ]
+    },
+    {
+      "id": "planificador",
+      "title": "Planificador",
+      "icon": { "type": "apsis", "subtype": "perigee" },
+      "blocks": [
+        { "type": "paragraph", "text": "Una herramienta para quienes quieren preparar con más precisión una observación o una fotografía." },
+        { "type": "paragraph", "text": "Permite explorar dónde estarán el Sol y la Luna en una fecha y hora determinadas y anticipar por qué sector del horizonte aparecerán o desaparecerán." },
+        { "type": "paragraph", "text": "Puede ayudarte, por ejemplo, a preparar una composición de la Luna con un edificio, un paisaje o algún elemento del entorno." }
+      ],
+      "link": { "text": "Ir a Planificador →", "url": "planificador.php" }
+    },
+    {
+      "id": "explorador-astronomico",
+      "title": "Explorador astronómico",
+      "icon": { "type": "apsis", "subtype": "apogee" },
+      "blocks": [
+        { "type": "paragraph", "text": "Un espacio para jugar con el tiempo y explorar cómo se relacionan los distintos ciclos y movimientos del Sol y la Luna." },
+        { "type": "paragraph", "text": "Podés cambiar fechas, recorrer períodos largos, comparar magnitudes y observar relaciones que son difíciles de descubrir mirando solamente un día aislado." },
+        { "type": "paragraph", "text": "Está pensado para experimentar: mover parámetros, hacerse preguntas y ver qué sucede." }
+      ],
+      "link": { "text": "Abrir el Explorador astronómico →", "url": "explorador/" }
+    },
+    {
+      "id": "luna-interactiva",
+      "title": "Explorá la Luna",
+      "icon": { "type": "moon_phase", "subtype": "full_moon" },
+      "blocks": [
+        { "type": "paragraph", "text": "Una Luna interactiva para recorrer su superficie y descubrir los nombres de mares, cráteres y otros accidentes lunares." },
+        { "type": "paragraph", "text": "Podés explorar el disco lunar visualmente y reconocer lugares que muchas veces vemos a simple vista o en fotografías sin saber cómo se llaman." },
+        { "type": "paragraph", "text": "Es una forma de transformar una imagen familiar de la Luna en un mapa lleno de lugares por descubrir." }
+      ],
+      "link": { "text": "Explorar la Luna →", "url": "luna-interactiva.php" }
+    },
+    {
+      "id": "luna-fecha-favorita",
+      "title": "La Luna de tu fecha favorita",
+      "icon": { "type": "moon_phase", "subtype": "waxing_crescent" },
+      "blocks": [
+        { "type": "paragraph", "text": "Elegí una fecha que tenga un significado especial y descubrí cómo era la Luna ese día." },
+        { "type": "paragraph", "text": "Puede ser un cumpleaños, un aniversario, una fecha histórica o simplemente un día que quieras recordar." },
+        { "type": "paragraph", "text": "Una manera diferente de relacionar nuestros recuerdos con el cielo." }
+      ],
+      "link": { "text": "Buscar una Luna especial →", "url": "luna-fecha-favorita.php" }
+    },
+    {
+      "id": "contenidos",
+      "title": "Contenidos",
+      "icon": { "type": "earthshine" },
+      "blocks": [
+        { "type": "paragraph", "text": "Además de herramientas y cálculos, Aquellas Lunas tiene contenidos para entender mejor lo que vemos en el cielo." },
+        { "type": "paragraph", "text": "Encontrás explicaciones sobre la Luna y otros temas astronómicos escritas para público general, sin dar por sentado que conocés previamente los términos técnicos." },
+        { "type": "paragraph", "text": "La idea es que una curiosidad pueda convertirse fácilmente en una puerta de entrada para aprender algo nuevo." }
+      ],
+      "link": { "text": "Explorar contenidos →", "url": "contenidos.php" }
+    },
+    {
+      "id": "sabias-que",
+      "title": "¿Sabías que...?",
+      "icon": { "type": "earthshine" },
+      "blocks": [
+        { "type": "paragraph", "text": "Pequeñas historias, datos curiosos y detalles sorprendentes sobre la Luna y la astronomía." },
+        { "type": "paragraph", "text": "Están pensados para descubrir algo interesante en pocos segundos y, muchas veces, despertar una nueva pregunta." }
+      ]
+    },
+    {
+      "id": "trivias",
+      "title": "Trivias",
+      "icon": { "type": "conjunction" },
+      "blocks": [
+        { "type": "paragraph", "text": "También podés poner a prueba lo que sabés de la Luna y la astronomía jugando." },
+        { "type": "paragraph", "text": "Las trivias están pensadas tanto para acertar como para aprender: después de responder podés descubrir la explicación que hay detrás de cada pregunta." },
+        { "type": "paragraph", "text": "No hace falta ser experto. Equivocarse también forma parte del juego." }
+      ]
+    },
+    {
+      "id": "notificaciones",
+      "title": "Avisos astronómicos",
+      "icon": { "type": "moon_phase", "subtype": "waning_crescent" },
+      "blocks": [
+        { "type": "paragraph", "text": "No siempre hace falta acordarse de mirar Aquellas Lunas: la web también puede avisarte cuando se acerca algo interesante." },
+        { "type": "paragraph", "text": "Podés configurar notificaciones para acontecimientos como la salida de la Luna, eclipses, conjunciones cercanas o tránsitos de la ISS y Tiangong." },
+        { "type": "paragraph", "text": "Los avisos se adaptan a la ubicación que elijas y podés decidir cuáles querés recibir y cuándo preferís que no te molesten." }
+      ],
+      "link": { "text": "Configurar avisos →", "url": "notificaciones.php" }
+    }
+  ],
+  "feature_cards": [
+    {
+      "id": "ubicacion",
+      "style": "location",
+      "title": "El cielo desde tu ubicación",
+      "blocks": [
+        { "type": "paragraph", "text": "El cielo no se ve igual desde todos lados. Aquellas Lunas adapta sus cálculos a la ubicación desde la que observás." },
+        { "type": "paragraph", "text": "Horarios, posiciones, recorridos, eclipses, tránsitos de estaciones espaciales y condiciones meteorológicas pueden cambiar según dónde estés." },
+        { "type": "paragraph", "text": "También podés elegir otra ubicación y descubrir cómo se verá un fenómeno desde allí." }
+      ],
+      "action": { "kind": "link", "text": "Elegir ubicación", "url": "ubicacion.php" }
+    },
+    {
+      "id": "lenguaje-amigable",
+      "style": "technical",
+      "title": "Astronomía en lenguaje amigable",
+      "blocks": [
+        { "type": "paragraph", "text": "Detrás de Aquellas Lunas hay muchos cálculos, coordenadas, ángulos, modelos astronómicos y datos meteorológicos, pero no hace falta conocerlos para usar la web." },
+        { "type": "paragraph", "text": "Siempre que es posible, la información se expresa primero de la manera más natural: qué va a ocurrir, cuándo mirar, hacia dónde hacerlo y por qué puede ser interesante." },
+        { "type": "paragraph", "text": "Para quien quiera profundizar, los datos más precisos y el detalle técnico siguen estando disponibles." }
+      ],
+      "action": { "kind": "link", "text": "Explorar eventos", "url": "eventos.php" }
+    },
+    {
+      "id": "calculos",
+      "style": "calculation",
+      "title": "Cálculos para cada momento y lugar",
+      "blocks": [
+        { "type": "paragraph", "text": "Buena parte de la información astronómica de Aquellas Lunas se calcula específicamente para la fecha y la ubicación seleccionadas." },
+        { "type": "paragraph", "text": "Eso permite explorar el cielo de otros días, comparar lugares y trabajar con fenómenos que dependen mucho de dónde se encuentra el observador." },
+        { "type": "paragraph", "text": "Los cálculos abarcan desde los movimientos cotidianos del Sol y la Luna hasta fases, eclipses, conjunciones, libraciones y otros fenómenos astronómicos." }
+      ],
+      "action": { "kind": "link", "text": "Abrir el Explorador", "url": "explorador/" }
+    },
+    {
+      "id": "prevision",
+      "style": "forecast",
+      "title": "El cielo real también tiene nubes",
+      "blocks": [
+        { "type": "paragraph", "text": "Saber que un fenómeno ocurrirá no alcanza: también importa si podremos verlo." },
+        { "type": "paragraph", "text": "Por eso, cuando existe pronóstico disponible, Aquellas Lunas combina la astronomía con información meteorológica y ayuda a reconocer los momentos que parecen más favorables para observar." },
+        { "type": "paragraph", "text": "El pronóstico siempre es orientativo y puede cambiar, pero aporta una información fundamental para decidir si vale la pena preparar una salida o una fotografía." }
+      ],
+      "action": { "kind": "link", "text": "Ver el cielo de hoy", "url": "cielo-de-hoy.php" }
+    },
+    {
+      "id": "calendario",
+      "style": "calendar",
+      "title": "Guardá lo que no querés perderte",
+      "blocks": [
+        { "type": "paragraph", "text": "Muchos eventos pueden agregarse directamente a tu calendario para que no tengas que acordarte de ellos." },
+        { "type": "paragraph", "text": "Aquellas Lunas prepara la fecha, hora y descripción del evento para que puedas incorporarlo fácilmente a aplicaciones de calendario compatibles." },
+        { "type": "paragraph", "text": "Y para algunos fenómenos también podés utilizar los avisos astronómicos de la propia web." }
+      ],
+      "action": { "kind": "link", "text": "Ver eventos para agendar", "url": "eventos.php" }
+    },
+    {
+      "id": "instalacion",
+      "style": "install",
+      "title": "Llevá Aquellas Lunas con vos",
+      "blocks": [
+        { "type": "paragraph", "text": "Aquellas Lunas puede instalarse en dispositivos compatibles y utilizarse desde un icono como cualquier otra aplicación." },
+        { "type": "paragraph", "text": "Sigue siendo la misma web y se mantiene actualizada automáticamente, pero queda mucho más a mano para consultar el cielo o recibir avisos astronómicos desde el celular." }
+      ],
+      "action": { "kind": "install", "text": "Instalar Aquellas Lunas" }
+    }
+  ],
+  "closing": {
+    "title": "Hay muchas formas de mirar la Luna",
+    "paragraphs": [
+      "Aquellas Lunas nació alrededor de la Luna, pero terminó convirtiéndose en un lugar para observar, explorar, aprender, jugar y experimentar con el cielo.",
+      "Podés entrar solamente para saber a qué hora sale la Luna esta noche, preparar una fotografía, seguir un eclipse, buscar un tránsito de la ISS, descubrir el nombre de un cráter, jugar una trivia o explorar qué hacía la Luna en una fecha especial.",
+      "La idea es que detrás de todos los cálculos siempre quede algo sencillo: ayudarte a mirar el cielo con un poco más de información, curiosidad y ganas de descubrir."
+    ]
+  }
+}

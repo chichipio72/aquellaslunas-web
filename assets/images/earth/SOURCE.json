@@ -1,0 +1,30 @@
+{
+  "usage_guidelines": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "day": {
+    "file": "blue-marble-4k.webp",
+    "source": "NASA Visible Earth — The Blue Marble: Land Surface, Ocean Color and Sea Ice",
+    "source_url": "https://visibleearth.nasa.gov/images/57730/the-blue-marble-land-surface-ocean-color-and-sea-ice",
+    "original_asset": "land_ocean_ice_8192.png",
+    "resolution": "4096x2048",
+    "processing": "Resized from the NASA 8192x4096 original and encoded as WebP.",
+    "license": "NASA imagery; generally not subject to copyright in the United States. NASA media usage guidelines apply."
+  },
+  "night": {
+    "file": "black-marble-4k.webp",
+    "source": "NASA Earth Observatory — Earth at Night (Black Marble) 2016 Color Maps",
+    "source_url": "https://visibleearth.nasa.gov/images/144898/earth-at-night-black-marble-2016-color-maps",
+    "original_asset": "BlackMarble_2016_01deg.jpg",
+    "resolution": "4096x2048",
+    "processing": "Resized from the NASA 3600x1800 global JPEG and encoded as WebP.",
+    "license": "NASA Earth Observatory imagery; generally not subject to copyright in the United States. NASA media usage guidelines apply; source credit retained."
+  },
+  "relief": {
+    "file": "topography-4k.webp",
+    "source": "NASA Earth Observatory — Blue Marble: Next Generation Topography",
+    "source_url": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/topography-bathymetry-maps/",
+    "original_asset": "gebco_08_rev_elev_5400x2700.jpg",
+    "resolution": "4096x2048",
+    "processing": "Converted to grayscale, normalized, resized to 4096x2048 and encoded as WebP for bump mapping.",
+    "license": "NASA Earth Observatory imagery; NASA media usage guidelines apply. Source credit retained."
+  }
+}

@@ -49,7 +49,7 @@ try {
 }
 
 $valid = astronomyPushValidateNotificationType($moonrise);
-notificationTypeAssert($valid['title_template'] === 'La Luna sale en {lead_minutes} minutos',
+notificationTypeAssert($valid['title_template'] === 'La Luna sale pronto',
     'Se rechazaron marcadores válidos.');
 foreach ([
     array_replace($moonrise, ['title_template' => 'Aviso {unknown}']),
@@ -85,7 +85,7 @@ $device = ['timezone' => 'America/Argentina/Buenos_Aires', 'location_name' => 'V
 $eventLocal = new DateTimeImmutable('2026-08-04 20:42:00', new DateTimeZone($device['timezone']));
 $moonMessage = astronomyPushRenderNotification($moonrise, ['event_time_local' => $eventLocal], $device,
     ['lead_minutes' => 15]);
-notificationTypeAssert($moonMessage === ['title' => 'La Luna sale en 15 minutos',
+notificationTypeAssert($moonMessage === ['title' => 'La Luna sale pronto',
     'body' => 'Salida prevista a las 20:42 en Vicente López.', 'url' => './sol-y-luna.php'],
     'El render moonrise no coincide con el catálogo.');
 $testMessage = astronomyPushRenderNotification($testType, ['event_time_local' => $eventLocal], $device);

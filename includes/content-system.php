@@ -12,15 +12,29 @@ require_once __DIR__ . '/site-configuration.php';
 const ASTRONOMY_CONTENT_IMAGE_DIRECTORY = __DIR__ . '/../assets/images/tienda/previews/contenido';
 const ASTRONOMY_CONTENT_IMAGE_URL_PREFIX = 'assets/images/tienda/previews/contenido/';
 
-/** @return list<array{scheme:string,host:string,path_prefix:string,title:string}> */
+/** @return list<array{scheme:string,host:string,path_prefix?:string,exact_path?:string,title:string}> */
 function astronomyContentEmbedProviders(): array
 {
-    return [[
-        'scheme' => 'https',
-        'host' => 'chichipiosblog.com.ar',
-        'path_prefix' => '/astronomia/',
-        'title' => 'Simulador astronómico interactivo',
-    ]];
+    return [
+        [
+            'scheme' => 'https',
+            'host' => 'chichipiosblog.com.ar',
+            'path_prefix' => '/astronomia/',
+            'title' => 'Simulador astronómico interactivo',
+        ],
+        [
+            'scheme' => 'https',
+            'host' => 'aquellaslunas.com.ar',
+            'path_prefix' => '/astro/embeds/',
+            'title' => 'Widget lunar interactivo',
+        ],
+        [
+            'scheme' => 'https',
+            'host' => 'aquellaslunas.com.ar',
+            'exact_path' => '/astro/explorador/embed.php',
+            'title' => 'Explorador astronómico',
+        ],
+    ];
 }
 
 /** @return array{url:string,title:string}|null */
@@ -56,7 +70,8 @@ function astronomyContentResolveEmbedUrl(mixed $value): ?array
         if (
             $parts['scheme'] === $provider['scheme']
             && $parts['host'] === $provider['host']
-            && str_starts_with($decodedPath, $provider['path_prefix'])
+            && ((isset($provider['exact_path']) && $decodedPath === $provider['exact_path'])
+                || (isset($provider['path_prefix']) && str_starts_with($decodedPath, $provider['path_prefix'])))
         ) {
             return ['url' => $value, 'title' => $provider['title']];
         }
@@ -76,7 +91,7 @@ function astronomyContentEmbedHtml(array $attributes): string
     return '<div class="content-embed" data-swipe-navigation-ignore>'
         . '<iframe src="' . htmlspecialchars($embed['url'], ENT_QUOTES, 'UTF-8') . '"'
         . ' title="' . htmlspecialchars($embed['title'], ENT_QUOTES, 'UTF-8') . '"'
-        . ' loading="lazy" sandbox="allow-scripts allow-same-origin"'
+        . ' loading="lazy" sandbox="allow-scripts allow-same-origin allow-top-navigation-by-user-activation"'
         . ' referrerpolicy="strict-origin-when-cross-origin"></iframe>'
         . '</div>';
 }
@@ -1010,6 +1025,13 @@ function astronomyContentArticleUrl(string $slug, string $anchor = ''): string
         'contenido.php?slug=' . rawurlencode($slug)
         . ($anchor !== '' ? '#' . rawurlencode($anchor) : '')
     );
+}
+
+function astronomyContentShouldShowRelatedArticles(?array $article): bool
+{
+    return is_array($article)
+        && ($article['valid'] ?? false) === true
+        && ($article['visible'] ?? false) === true;
 }
 
 /** @return list<array<string,mixed>> */

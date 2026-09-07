@@ -12,6 +12,7 @@
     const variablePicker = document.querySelector('.variable-picker');
     const originalCalculate = form?.querySelector('.calculate-button');
     const originalShare = form?.querySelector('#share-configuration');
+    const originalEmbedCode = form?.querySelector('#generate-embed-code');
     const processPanel = form?.querySelector('#process-panel');
     const locationValue = form?.querySelector('#calculation-location-value');
     const changeLocation = form?.querySelector('#change-location');
@@ -150,10 +151,18 @@
     shareButton.type = 'button';
     shareButton.className = 'interface-share-button';
     shareButton.textContent = 'Compartir';
+    const embedCodeButton = originalEmbedCode ? document.createElement('button') : null;
+    if (embedCodeButton) {
+        embedCodeButton.type = 'button';
+        embedCodeButton.className = 'interface-embed-code-button';
+        embedCodeButton.textContent = 'Código para insertar';
+    }
     const initialHelp = document.createElement('p');
     initialHelp.className = 'interface-initial-help';
     initialHelp.textContent = 'Empezá por Preparar gráfico para elegir fechas y variables.';
-    toolbar.append(context, configureButton, calculateButton, processPanel, shareButton, initialHelp);
+    toolbar.append(context, configureButton, calculateButton, processPanel, shareButton);
+    if (embedCodeButton) toolbar.append(embedCodeButton);
+    toolbar.append(initialHelp);
     heading.insertAdjacentElement('afterend', toolbar);
     toolbar.insertAdjacentElement('afterend', chartPanel);
     if (metricsPanel) chartPanel.insertAdjacentElement('afterend', metricsPanel);
@@ -251,6 +260,7 @@
         originalCalculate.click();
     });
     shareButton.addEventListener('click', () => originalShare.click());
+    embedCodeButton?.addEventListener('click', () => originalEmbedCode.click());
     form.addEventListener('submit', () => {
         updateSummary();
         closeConfiguration();
@@ -272,6 +282,9 @@
     });
     document.querySelector('#share-dialog')?.addEventListener('close', () => {
         window.setTimeout(() => shareButton.focus(), 0);
+    });
+    document.querySelector('#embed-code-dialog')?.addEventListener('close', () => {
+        window.setTimeout(() => embedCodeButton?.focus(), 0);
     });
 
     if (changeLocation) {

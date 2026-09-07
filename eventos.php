@@ -18,7 +18,12 @@ require_once __DIR__ . '/includes/event-date-header.php';
 require_once __DIR__ . '/includes/explore-sky.php';
 require_once __DIR__ . '/includes/calendar-event.php';
 require_once __DIR__ . '/includes/eclipse-detail-component.php';
+require_once __DIR__ . '/includes/photography-links.php';
+require_once __DIR__ . '/includes/event-infographic.php';
+require_once __DIR__ . '/includes/store-admin-auth.php';
 sendDynamicNoCacheHeaders();
+
+$showEventInfographicLinks = storeAdminHasValidSessionCookie();
 
 $availableTypes = astronomyEventPublicTypesForSurface(ASTRONOMY_EVENT_SURFACE_EVENTS);
 $availableTypeLabels = array_intersect_key(astronomyEventPublicTypeLabels(), array_flip($availableTypes));
@@ -117,6 +122,7 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
 <?php renderFaviconLinks(); ?>
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/styles.css'), ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/home-v2.css'), ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars(versionedAssetUrl('assets/css/event-infographics.css'), ENT_QUOTES, 'UTF-8') ?>">
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/location.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <script src="<?= htmlspecialchars(versionedAssetUrl('assets/js/events.js'), ENT_QUOTES, 'UTF-8') ?>" defer></script>
     <?php renderAstronomyEditorialFrontendConfiguration(); ?>
@@ -181,13 +187,15 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
                                 $cloudDateTime = $observation['cloud_time'] ?? $observationMoment['date'] ?? $eventDateTime;
                                 $popoverId = 'event-technical-' . substr(md5($key . '-' . $eventIndex . '-' . ($event['datetime'] ?? '')), 0, 12);
                                 $calendarEvent = astronomyCalendarEventData($event, $presentation, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eventos.php'));
+                                $photographyUrl = photographyEventUrl($event, $location, $observation['start'] ?? $observationMoment['date'] ?? $eventDateTime);
+                                $infographicUrl = astronomyEventInfographicIsEligible($event) ? astronomyEventInfographicUrl($event, $timezoneName) : null;
                                 ?>
                                 <article class="event-card event-card--<?= htmlspecialchars((string) ($event['type'] ?? 'unknown')) ?>"<?= $cloudDateTime !== null ? ' data-cloud-cover-event="' . htmlspecialchars($cloudDateTime->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                                     <?php renderAstronomyIcon($event, $latitude, 'event-symbol'); ?>
                                     <div class="event-content">
                                         <div class="event-heading"><h3><?= htmlspecialchars($presentation['title']) ?></h3><?php if ($presentation['show_time']): ?><time><?= htmlspecialchars($presentation['time_label']) ?></time><?php endif; ?></div>
                                         <?php if ($presentation['summary'] !== ''): ?><p><?= htmlspecialchars($presentation['summary']) ?></p><?php endif; ?>
-                                        <?php if ($observation !== null): ?><p class="event-observation-moment"><?= htmlspecialchars($observation['first_label']) ?> · <time datetime="<?= htmlspecialchars($observation['first_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($observation['first_time']->format('H:i')) ?></time> · <?= htmlspecialchars($observation['second_label']) ?> · <time datetime="<?= htmlspecialchars($observation['second_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($observation['second_time']->format('H:i')) ?></time> · Intervalo útil <time><?= htmlspecialchars($observation['start']->format('H:i')) ?>–<?= htmlspecialchars($observation['end']->format('H:i')) ?></time></p><?php endif; ?>
+                                        <?php if ($observation !== null): ?><p class="event-observation-moment"><?= htmlspecialchars($observation['first_label']) ?> · <time datetime="<?= htmlspecialchars($observation['first_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($observation['first_time']->format('H:i')) ?></time> · <?= htmlspecialchars($observation['second_label']) ?> · <time datetime="<?= htmlspecialchars($observation['second_time']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($observation['second_time']->format('H:i')) ?></time></p><?php endif; ?>
                                         <?php if ($observationMoment !== null): ?><p class="event-observation-moment"><?= htmlspecialchars($observationMoment['label']) ?> · <time datetime="<?= htmlspecialchars($observationMoment['date']->format(DateTimeInterface::ATOM), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($observationMoment['date']->format('H:i')) ?></time></p><?php endif; ?>
                                         <?php $cloudPopoverId = 'event-cloud-cover-' . substr(md5($key . '-' . $eventIndex . '-' . ($event['datetime'] ?? '')), 0, 12); ?>
                                         <?php if ($cloudDateTime !== null): ?><p class="event-cloud-cover" data-cloud-cover-value hidden><?php if ($observationMoment !== null || $observation !== null): ?><span class="weather-cloud-icon weather-cloud-icon--compact" data-cloud-cover-inline-icon hidden></span><?php endif; ?><span data-cloud-cover-text></span> <button type="button" class="cloud-cover-info" data-cloud-cover-info popovertarget="<?= $cloudPopoverId ?>" aria-label="Ver detalle de altura de las nubes" hidden><span class="cloud-cover-info__icon" aria-hidden="true"></span><span>Altura de nubes</span></button><span id="<?= $cloudPopoverId ?>" class="cloud-cover-popover" data-cloud-cover-popover popover role="dialog" aria-labelledby="<?= $cloudPopoverId ?>-title"><strong id="<?= $cloudPopoverId ?>-title">Distribución de las nubes</strong><span data-cloud-cover-layers></span><span>Las bajas suelen tapar más el cielo. Las altas pueden ser finas y dejar ver la Luna, aunque con menos contraste. Los porcentajes de las capas no se suman entre sí.</span></span></p><?php endif; ?>
@@ -221,8 +229,8 @@ if (canUseSiteDebugTools() && (string) ($_REQUEST['location_debug'] ?? '') === '
                                                 <dl><?php foreach ($presentation['technical_details'] as $label => $value): ?><div><dt><?= htmlspecialchars((string) $label) ?></dt><dd><?= htmlspecialchars((string) $value) ?></dd></div><?php endforeach; ?></dl>
                                             </div>
                                         <?php endif; ?>
-                                        <?php renderAstronomyCalendarLink($calendarEvent); ?>
-                                        <?php if ($eventType === 'eclipse'): ?><?php renderAstronomyEclipseDetailTrigger($event, 'Datos técnicos'); ?><?php renderAstronomyEclipseDetailTemplate($event, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php')); ?><?php endif; ?>
+                                        <div class="event-actions"><?php renderAstronomyCalendarLink($calendarEvent); ?><?php renderPhotographyEventLink($photographyUrl); ?><?php if ($showEventInfographicLinks && $infographicUrl !== null): ?><a class="event-infographic-link" href="<?= htmlspecialchars($infographicUrl, ENT_QUOTES, 'UTF-8') ?>">Crear infografía</a><?php endif; ?></div>
+                                        <?php if ($eventType === 'eclipse'): ?><?php renderAstronomyEclipseDetailTrigger($event, 'Datos técnicos'); ?><?php renderAstronomyEclipseDetailTemplate($event, $timezoneName, $locationLabel, astronomyCalendarPageUrl('eclipses.php'), null, $location); ?><?php endif; ?>
                                     </div>
                                     <span class="visually-hidden">Tipo: <?= htmlspecialchars($accessibleType) ?></span>
                                 </article>

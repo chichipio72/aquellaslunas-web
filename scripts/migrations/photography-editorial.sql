@@ -1,0 +1,2 @@
+CREATE TABLE photography_scenes (id BIGINT UNSIGNED PRIMARY KEY, scene_key VARCHAR(80) NOT NULL UNIQUE);
+CREATE TABLE photography_scene_variants (id BIGINT UNSIGNED PRIMARY KEY, scene_id BIGINT UNSIGNED NOT NULL, variant_key VARCHAR(80) NOT NULL);

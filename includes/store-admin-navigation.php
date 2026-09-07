@@ -33,7 +33,10 @@ function renderStoreAdminNavigation(string $activeSection, string $title): void
     $sections = [
         'home' => ['label' => 'Inicio', 'href' => './'],
         'contents' => ['label' => 'Contenidos', 'href' => 'contenidos/'],
-        'site_configuration' => ['label' => 'Visibilidad de secciones', 'href' => 'configuracion-sitio/'],
+        'site_configuration' => ['label' => 'Menú y secciones', 'href' => 'configuracion-sitio/'],
+        'home_moon' => ['label' => 'Luna de portada', 'href' => 'luna-portada/'],
+        'lunar_widgets' => ['label' => 'Widgets lunares', 'href' => 'widgets-lunares/'],
+        'photography' => ['label' => 'Fotografía', 'href' => 'fotografia/'],
         'presentation' => ['label' => 'Visibilidad de eventos', 'href' => 'presentacion/'],
         'astronomy_sources' => ['label' => 'Fuentes astronómicas', 'href' => 'fuentes-astronomicas/'],
         'astronomy_trace' => ['label' => 'Trazabilidad astronómica', 'href' => 'trazabilidad-astronomica.php'],

@@ -74,6 +74,15 @@ astronomyPushTest(!astronomyPushIsQuietAt(new DateTimeImmutable('2026-01-02 08:0
 $event = new DateTimeImmutable('2026-01-01 12:00:00', $utc);
 astronomyPushTest(astronomyPushNotificationTime($event, 15)->format('H:i:s') === '11:45:00',
     'El momento nominal no quedó 15 minutos antes.');
+$moonriseTransport = astronomyPushTransportOptions('moonrise', $event, $event->modify('-15 minutes'));
+astronomyPushTest($moonriseTransport === ['TTL' => 900, 'urgency' => 'high'],
+    'Moonrise no conserva el push hasta el instante del evento con urgencia alta.');
+astronomyPushTest(astronomyPushTransportOptions('test', $event, $event->modify('-15 minutes'))
+    === ['TTL' => 300, 'urgency' => 'normal'], 'Los demás tipos no conservaron el transporte predeterminado.');
+astronomyPushTest(astronomyPushTransportOptions('moonrise', $event, $event->modify('-10 seconds'))['TTL'] === 60,
+    'No se aplicó el mínimo defensivo del TTL lunar.');
+astronomyPushTest(astronomyPushTransportOptions('moonrise', $event, $event->modify('-2 hours'))['TTL'] === 1800,
+    'No se aplicó el máximo defensivo del TTL lunar.');
 astronomyPushTest(astronomyPushValidateParametersJson('{"minimum":10}') === ['minimum' => 10],
     'No se validó un objeto JSON futuro.');
 $failed = false;

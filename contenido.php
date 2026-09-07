@@ -44,7 +44,9 @@ $articlePath = $articleIsPublic
     : '/contenido.php';
 $pageSeo = aquellasLunasSeoPage($title . ' | Aquellas Lunas', $summary, $articlePath, $articleIsPublic ? 'article' : 'webpage');
 $pageSeo['robots'] = $articleIsPublic ? 'index, follow' : 'noindex, nofollow';
-$relatedArticles = $articleIsPublic ? astronomyContentRelatedArticles($catalog, $article, 3) : [];
+$relatedArticles = astronomyContentShouldShowRelatedArticles($article)
+    ? astronomyContentRelatedArticles($catalog, $article, 3)
+    : [];
 if ($articleIsPublic) {
     $pageSeo['breadcrumbs'] = [
         ['name' => 'Inicio', 'url' => aquellasLunasCanonicalUrl('/')],

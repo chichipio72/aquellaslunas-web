@@ -1,6 +1,42 @@
 (() => {
   'use strict';
 
+  const copyContentStatus = document.querySelector('[data-copy-content-status]');
+  const copyText = async (source) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(source);
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = source;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) throw new Error('clipboard_unavailable');
+  };
+  document.querySelectorAll('[data-copy-content-url]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      if (copyContentStatus) copyContentStatus.textContent = 'Preparando el contenido completo…';
+      try {
+        const response = await fetch(button.dataset.copyContentUrl, {credentials: 'same-origin', headers: {'Accept': 'application/json'}});
+        if (!response.ok) throw new Error(`export_${response.status}`);
+        const source = await response.text();
+        JSON.parse(source);
+        await copyText(source);
+        if (copyContentStatus) copyContentStatus.textContent = `JSON completo de “${button.dataset.copyContentTitle}” copiado al portapapeles.`;
+      } catch {
+        if (copyContentStatus) copyContentStatus.textContent = 'No se pudo copiar el contenido. Revisá el permiso del portapapeles e intentá nuevamente.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
   const importForm = document.querySelector('[data-package-import]');
   if (importForm) {
     const textarea = importForm.querySelector('[data-package-json]');
@@ -16,6 +52,101 @@
         status.textContent = 'No se pudo acceder al portapapeles. Revisá el permiso del navegador.';
       }
     });
+  }
+
+  const relationSelector = document.querySelector('[data-relation-selector]');
+  if (relationSelector) {
+    const selectedList = relationSelector.querySelector('[data-relation-selected]');
+    const emptyState = relationSelector.querySelector('[data-relation-empty]');
+    const search = relationSelector.querySelector('[data-relation-search]');
+    const noResults = relationSelector.querySelector('[data-relation-no-results]');
+    const optionFor = (slug) => relationSelector.querySelector(`[data-relation-option][data-relation-slug="${CSS.escape(slug)}"]`);
+    const refreshSelected = () => {
+      const items = Array.from(selectedList.querySelectorAll('[data-relation-selected-item]'));
+      emptyState.hidden = items.length !== 0;
+      items.forEach((item, index) => {
+        item.querySelector('[data-relation-move="up"]').disabled = index === 0;
+        item.querySelector('[data-relation-move="down"]').disabled = index === items.length - 1;
+      });
+    };
+    const createSelected = (option) => {
+      const item = document.createElement('li');
+      item.dataset.relationSelectedItem = '';
+      item.dataset.relationSlug = option.dataset.relationSlug;
+      const identity = document.createElement('span');
+      const title = document.createElement('strong');
+      title.textContent = option.dataset.relationTitle;
+      const slug = document.createElement('code');
+      slug.textContent = option.dataset.relationSlug;
+      identity.append(title, slug);
+      if (option.querySelector('small')?.textContent.startsWith('Oculto')) {
+        const hidden = document.createElement('small');
+        hidden.textContent = 'Oculto';
+        identity.append(hidden);
+      }
+      const actions = document.createElement('span');
+      actions.className = 'editor-relations__actions';
+      [['up', '↑', 'Subir'], ['down', '↓', 'Bajar']].forEach(([direction, text, label]) => {
+        const button = document.createElement('button');
+        button.className = 'editor-button editor-button--quiet';
+        button.type = 'button';
+        button.dataset.relationMove = direction;
+        button.textContent = text;
+        button.setAttribute('aria-label', `${label} ${option.dataset.relationTitle}`);
+        actions.append(button);
+      });
+      const remove = document.createElement('button');
+      remove.className = 'editor-button editor-button--danger';
+      remove.type = 'button';
+      remove.dataset.relationRemove = '';
+      remove.textContent = 'Quitar';
+      actions.append(remove);
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'relaciones[]';
+      input.value = option.dataset.relationSlug;
+      item.append(identity, actions, input);
+      return item;
+    };
+    relationSelector.addEventListener('click', (event) => {
+      const option = event.target.closest('[data-relation-option]');
+      if (option && !option.disabled) {
+        selectedList.append(createSelected(option));
+        option.disabled = true;
+        refreshSelected();
+        return;
+      }
+      const remove = event.target.closest('[data-relation-remove]');
+      if (remove) {
+        const item = remove.closest('[data-relation-selected-item]');
+        const relatedOption = optionFor(item.dataset.relationSlug);
+        if (relatedOption && !relatedOption.hasAttribute('data-relation-current')) relatedOption.disabled = false;
+        item.remove();
+        refreshSelected();
+        return;
+      }
+      const move = event.target.closest('[data-relation-move]');
+      if (move && !move.disabled) {
+        const item = move.closest('[data-relation-selected-item]');
+        if (move.dataset.relationMove === 'up' && item.previousElementSibling) {
+          selectedList.insertBefore(item, item.previousElementSibling);
+        } else if (move.dataset.relationMove === 'down' && item.nextElementSibling) {
+          selectedList.insertBefore(item.nextElementSibling, item);
+        }
+        refreshSelected();
+      }
+    });
+    search?.addEventListener('input', () => {
+      const query = search.value.trim().toLocaleLowerCase('es');
+      let visible = 0;
+      relationSelector.querySelectorAll('[data-relation-option]').forEach((option) => {
+        const matches = query === '' || `${option.dataset.relationTitle} ${option.dataset.relationSlug}`.toLocaleLowerCase('es').includes(query);
+        option.hidden = !matches;
+        if (matches) visible++;
+      });
+      noResults.hidden = visible !== 0;
+    });
+    refreshSelected();
   }
 
   const uploadPanel = document.querySelector('[data-photo-upload]');

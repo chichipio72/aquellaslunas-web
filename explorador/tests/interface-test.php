@@ -13,8 +13,8 @@ function renderExplorerInterface(string $file, string $scriptName): string
 
 $mainHtml = renderExplorerInterface('index.php', '/astro/explorador/index.php');
 if ($mainHtml === '') throw new RuntimeException('La interfaz principal no se renderizó.');
-foreach (['interface-test-page', 'assets/pruebas-interfaz.css?v=20260805-3',
-    'assets/pruebas-interfaz.js?v=20260805-3'] as $marker) {
+foreach (['interface-test-page', 'assets/pruebas-interfaz.css?v=20260902-1&amp;layout=13',
+    'assets/pruebas-interfaz.js?v=20260902-1&amp;layout=13'] as $marker) {
     if (!str_contains($mainHtml, $marker)) throw new RuntimeException('Falta la interfaz compacta principal: ' . $marker);
 }
 if (stripos($mainHtml, 'prueba de interfaz') !== false) {
@@ -48,7 +48,8 @@ foreach (['api/series.php?', 'api/series-stream.php?'] as $endpoint) {
 foreach (['IntersectionObserver', 'window.echarts.init', 'grid.left = 38', 'grid.right = 24',
     'interface-clear-selection', 'interface-config-resize-handle', 'astronomyExplorerPanelWidth',
     'maximumPanelViewportRatio = 0.82', 'sharedConfigurationWillAutoExecute',
-    'selectDataAttentionTimer', '3000'] as $behavior) {
+    'selectDataAttentionTimer', '3000', "form?.querySelector('#generate-embed-code')",
+    'interface-embed-code-button', 'originalEmbedCode.click()'] as $behavior) {
     if (!is_string($compactJavascript) || !str_contains($compactJavascript, $behavior)) {
         throw new RuntimeException('Falta comportamiento compacto: ' . $behavior);
     }
@@ -57,7 +58,9 @@ foreach (['width: 100vw', '@media (max-width: 620px)',
     'grid-template-columns: repeat(2, minmax(0, 1fr))', 'container: interface-config / inline-size',
     '@container interface-config (min-width: 900px)', 'prefers-reduced-motion: reduce',
     'interface-select-data-attention 3s', 'interface-select-data-halo 1s ease-out 3',
-    'border-color: #8bd8ff'] as $rule) {
+    'border-color: #8bd8ff', ':has(.interface-embed-code-button)',
+    'grid-template-columns: minmax(0, 1fr) repeat(4, auto)',
+    'grid-template-columns: repeat(2, minmax(0, 1fr))'] as $rule) {
     if (!is_string($compactCss) || !str_contains($compactCss, $rule)) {
         throw new RuntimeException('Falta adaptación móvil compacta: ' . $rule);
     }

@@ -34,9 +34,24 @@ requireStoreAdminAuthentication();
                 <strong>Entrar a Contenidos</strong>
             </a>
             <a class="card store-admin-dashboard__card" href="configuracion-sitio/">
-                <span class="store-admin-dashboard__card-label">Visibilidad de secciones</span>
+                <span class="store-admin-dashboard__card-label">Menú y secciones</span>
                 <span>Activá o desactivá visibilidad de contenidos, entradas del menú principal y tarjetas de portada.</span>
                 <strong>Entrar a Configuración del sitio</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="luna-portada/">
+                <span class="store-admin-dashboard__card-label">Luna de portada</span>
+                <span>Ajustá iluminación, relieve y tratamiento de textura del render Three.js de “El cielo hoy”.</span>
+                <strong>Configurar Luna</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="widgets-lunares/">
+                <span class="store-admin-dashboard__card-label">Widgets lunares</span>
+                <span>Probá los embeds de libración y Luna interactiva y copiá su código iframe.</span>
+                <strong>Abrir generador de widgets</strong>
+            </a>
+            <a class="card store-admin-dashboard__card" href="fotografia/">
+                <span class="store-admin-dashboard__card-label">Fotografía</span>
+                <span>Administrá escenas, variantes y referencias fotográficas.</span>
+                <strong>Entrar a Fotografía</strong>
             </a>
             <a class="card store-admin-dashboard__card" href="presentacion/">
                 <span class="store-admin-dashboard__card-label">Visibilidad de eventos</span>

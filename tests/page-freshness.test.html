@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pruebas de frescura de página</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script>window.siteTimeContext = {simulated: true, now: '2026-08-16T20:00:00-03:00'};</script>
+  <script src="../assets/js/page-freshness.js" defer></script>
+  <script src="page-freshness.test.js" defer></script>
+</head>
+<body>
+  <main class="page"><div class="container public-page-container">
+    <aside class="page-freshness-notice" data-page-freshness data-page-freshness-threshold-seconds="10800" hidden>
+      <div><strong>Estos datos pueden estar desactualizados.</strong><p>Esta página se cargó hace más de 3 horas.</p></div>
+      <button type="button" class="button button-primary" data-page-freshness-reload>Actualizar</button>
+    </aside>
+    <ol id="results"></ol>
+  </div></main>
+</body>
+</html>

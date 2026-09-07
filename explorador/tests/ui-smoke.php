@@ -15,6 +15,9 @@ if ($adminMode) {
     $adminSessionId = session_id();
     session_write_close();
     $_COOKIE['aquellas_lunas_admin'] = $adminSessionId;
+    if (!storeAdminHasValidSessionCookie()) {
+        throw new RuntimeException('El helper oficial no reconoce la sesión administrativa de prueba.');
+    }
 }
 
 ob_start();
@@ -50,13 +53,24 @@ if (substr_count($html, 'id="help-variable-') !== count($catalog->all())
     throw new RuntimeException('Las ayudas contextuales no cubren variables y controles principales.');
 }
 preg_match_all('/<div class="variable-pair(?: variable-pair--single)?">/', $html, $pairMatches);
-if (count($pairMatches[0]) !== 20) {
+if (count($pairMatches[0]) !== 22) {
     throw new RuntimeException('La cantidad de parejas semánticas no coincide con el diseño esperado.');
 }
-foreach (['Ecuación del tiempo', 'Distancia angular Sol–Luna', 'Diámetro aparente de la Luna'] as $newVariableText) {
+foreach (['Ecuación del tiempo', 'Distancia angular Sol–Luna', 'Diámetro aparente de la Luna',
+    'Longitud eclíptica lunar', 'Ángulo Luna–nodo', 'Nodo ascendente medio',
+    'Ángulo Sol–nodo'] as $newVariableText) {
     if (!str_contains($html, $newVariableText)) {
         throw new RuntimeException('Falta la nueva variable instantánea: ' . $newVariableText);
     }
+}
+$lunarSectionStart = strpos($html, '<h2>Luna</h2>');
+$solarSectionStart = strpos($html, '<h2>Sol</h2>');
+$lunarSection = $lunarSectionStart !== false && $solarSectionStart !== false
+    ? substr($html, $lunarSectionStart, $solarSectionStart - $lunarSectionStart) : '';
+if (!str_contains($lunarSection, 'value="sun_node_angle"')
+    || substr_count(substr($html, $solarSectionStart === false ? 0 : $solarSectionStart), 'value="sun_node_angle"') !== 0
+    || $catalog->get('sun_node_angle')['category'] !== 'Ciclos y geometría') {
+    throw new RuntimeException('Ángulo Sol–nodo no quedó agrupado con los ciclos lunares.');
 }
 foreach (['Distancia Tierra–Sol', 'Distancia entre el centro de la Tierra y el Sol en la fecha indicada.'] as $solarDistanceText) {
     if (!str_contains($html, $solarDistanceText)) {
@@ -74,7 +88,7 @@ foreach (['process-panel', 'process-track', 'process-stage', 'process-days', 'pr
 }
 foreach (['share-configuration', 'shared-configuration-status', 'share-dialog', 'share-url',
     'share-dialog-copy', 'share-dialog-close', 'share-dialog-status',
-    'shared-configuration-notice', 'local-time-chart-help'] as $id) {
+    'share-toast', 'shared-configuration-notice', 'local-time-chart-help'] as $id) {
     if (substr_count($html, 'id="' . $id . '"') !== 1) {
         throw new RuntimeException('Control de URL compartible ausente o duplicado: ' . $id);
     }
@@ -84,6 +98,18 @@ foreach (['metrics-title', 'metrics', 'technical-metrics'] as $adminMetricId) {
     if ($count !== ($adminMode ? 1 : 0)) {
         throw new RuntimeException('Visibilidad administrativa incorrecta para: ' . $adminMetricId);
     }
+}
+$adminEmbedFragments = ['id="generate-embed-code"', 'id="embed-code-dialog"',
+    'id="embed-code-height"', 'id="embed-code-title"', 'id="embed-code-output"',
+    'id="embed-code-copy"'];
+foreach ($adminEmbedFragments as $fragment) {
+    $count = substr_count($html, $fragment);
+    if ($count !== ($adminMode ? 1 : 0)) {
+        throw new RuntimeException('Visibilidad administrativa incorrecta para el generador: ' . $fragment);
+    }
+}
+if ($adminMode && !str_contains($html, 'data-embed-base-url="https://aquellaslunas.com.ar/astro/explorador/embed.php"')) {
+    throw new RuntimeException('El generador no usa la URL pública de producción.');
 }
 $formStart = strpos($html, '<form id="explorer-form"');
 $formEnd = $formStart === false ? false : strpos($html, '</form>', $formStart);
@@ -100,9 +126,10 @@ if (substr_count($html, 'name="modo"') !== 2 || substr_count($html, 'name="tipo_
 $css = file_get_contents(dirname(__DIR__) . '/assets/explorador.css');
 $javascript = file_get_contents(dirname(__DIR__) . '/assets/explorador.js');
 $dateTools = file_get_contents(dirname(__DIR__) . '/assets/date-controls.js');
-if (substr_count($html, 'assets/time-series-segments.js?v=1') !== 1
+if (substr_count($html, 'assets/time-series-segments.js?v=2') !== 1
     || !str_contains((string) $javascript, "metadata.scaleGroup === 'local_time'")
     || !str_contains((string) $javascript, 'timeSeriesSegments.splitAtMidnight(values)')
+    || !str_contains((string) $javascript, 'timeSeriesSegments.splitCircular(values)')
     || !str_contains((string) $javascript, "value === null || value === undefined ? 'Sin dato'")) {
     throw new RuntimeException('La segmentación visual de horas locales no está integrada.');
 }
@@ -121,9 +148,14 @@ foreach (['container-type: inline-size', '@container (max-width: 390px)',
 }
 if (str_contains((string) $css, '.context-help-wrap:focus-within .context-help__content')
     || str_contains((string) $css, '.context-help-wrap:hover .context-help__content')
-    || !str_contains((string) $css, '.context-help[aria-expanded="false"] + .context-help__content { display: none !important; }')
+    || !str_contains((string) $css, '.context-help__content[hidden] { display: none !important; }')
+    || !str_contains((string) $css, 'max-width: calc(100vw - 16px)')
+    || !str_contains((string) $css, 'max-height: calc(100vh - 16px)')
+    || !str_contains((string) $javascript, "(button.closest('dialog') || document.body).append(tooltip)")
+    || !str_contains((string) $javascript, 'button.getBoundingClientRect()')
+    || !str_contains((string) $javascript, 'fitsAbove')
     || !str_contains((string) $css, '.explorer-shell .range-button')) {
-    throw new RuntimeException('Las ayudas persistentes o los botones rápidos discretos no quedaron corregidos.');
+    throw new RuntimeException('El portal responsive de ayudas o los botones rápidos no quedaron corregidos.');
 }
 if (!str_contains((string) $css, '.mode-options label > span')
     || str_contains((string) $css, '.mode-options span, .extrema-type-picker span')) {
@@ -196,6 +228,27 @@ if (substr_count($html, 'assets/share-config.js?v=1') !== 1
     || !str_contains((string) $javascript, 'form.requestSubmit()')) {
     throw new RuntimeException('La restauración o copia de URLs compartibles no está integrada.');
 }
+foreach (["showShareToast('Enlace copiado al portapapeles')", '}, 2000);',
+    "openShareDialog(result.url, 'No se pudo copiar automáticamente. Podés copiarlo desde este campo.')",
+    'shareUrlInput.focus();', 'shareUrlInput.select();'] as $shareFeedbackContract) {
+    if (!str_contains((string) $javascript, $shareFeedbackContract)) {
+        throw new RuntimeException('Falta feedback o fallback de Compartir: ' . $shareFeedbackContract);
+    }
+}
+if (!str_contains((string) $css, '.share-toast { position: fixed;')
+    || !str_contains((string) $css, '.share-toast[hidden] { display: none !important; }')) {
+    throw new RuntimeException('El toast de Compartir no está aislado del layout.');
+}
+foreach (['shareTools.build(config, baseUrl)', "embedUrl.searchParams.set('alto'",
+    "embedUrl.searchParams.set('titulo'", 'height < 320 || height > 900',
+    'escapeEmbedAttribute(embedUrl.toString())', 'await copyShareUrl(embedCodeOutput.value)',
+    'embedCodeOutput.focus(); embedCodeOutput.select()', "return '&quot;'",
+    "embedCodeTitle.value.trim().slice(0, 100)",
+    "control.addEventListener('input', refreshEmbedCode)"] as $embedGeneratorContract) {
+    if (!str_contains((string) $javascript, $embedGeneratorContract)) {
+        throw new RuntimeException('Falta el contrato del generador de iframe: ' . $embedGeneratorContract);
+    }
+}
 if (str_contains($html, 'class="share-panel"') || str_contains($html, 'id="share-manual-fallback"')
     || !str_contains($html, 'class="action-bar"')
     || !str_contains($html, '<dialog id="share-dialog"')
@@ -213,7 +266,8 @@ $processPosition = strpos($html, 'id="process-panel"', $actionStart ?: 0);
 $sharePosition = strpos($html, 'id="share-configuration"', $actionStart ?: 0);
 if ($actionStart === false || $calculatePosition === false || $processPosition === false || $sharePosition === false
     || !($calculatePosition < $processPosition && $processPosition < $sharePosition)
-    || !str_contains((string) $css, '.process-panel { grid-column: 1 / -1; grid-row: 2;')) {
+    || !str_contains((string) $css, '.action-bar:not(:has(.embed-code-button)) .process-panel { grid-row: 2; }')
+    || !str_contains((string) $css, '.embed-code-button { grid-column: 1 / -1; grid-row: 2;')) {
     throw new RuntimeException('El orden o la adaptación responsive de la barra de acciones es incorrecto.');
 }
 

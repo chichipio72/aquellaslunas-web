@@ -131,7 +131,9 @@ function load(userAgent, { standalone = false, href = 'https://example.test/astr
 
 const chrome = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36');
 assert(chrome.context.window.aquellasLunasInstallContext.getEmbeddedBrowserContext().embedded === false, 'Chrome Android fue detectado como embebido.');
-assert(chrome.action.textContent === 'Instalar', 'Chrome Android perdió el flujo normal de instalación.');
+assert(chrome.context.window.aquellasLunasInstallContext.getInstallExperienceState().kind === 'shortcut', 'Chrome Android sin prompt no resolvió el estado shortcut.');
+assert(chrome.action.hidden === false && chrome.menuTrigger.hidden === false, 'Chrome Android ocultó el fallback de acceso directo.');
+assert(chrome.action.textContent === 'Agregar acceso directo' && chrome.menuTrigger.textContent === 'Agregar acceso directo', 'Las superficies no comparten la etiqueta de acceso directo.');
 
 const instagramAndroid = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36 Instagram 335.0.0.0.0 Android');
 const instagramContext = instagramAndroid.context.window.aquellasLunasInstallContext.getEmbeddedBrowserContext();
@@ -154,18 +156,19 @@ const facebookAndroid = load('Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36
 assert(facebookAndroid.context.window.aquellasLunasInstallContext.getEmbeddedBrowserContext().provider === 'facebook', 'Facebook Android no fue detectado.');
 
 const instagramIOS = load('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 335.0.0.0.0');
-assert(instagramIOS.action.textContent === 'Ver cómo abrir en Safari', 'Instagram iOS intenta instalar o abrir Safari automáticamente.');
-assert(instagramIOS.copy.textContent.includes('Safari'), 'Instagram iOS no muestra instrucciones específicas.');
+assert(instagramIOS.action.textContent === 'Cómo abrir en Safari', 'Instagram iOS intenta instalar o abrir Safari automáticamente.');
+assert(instagramIOS.help.innerHTML.includes('Safari'), 'Instagram iOS no muestra instrucciones específicas.');
 
 const safari = load('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1');
 assert(safari.context.window.aquellasLunasInstallContext.getEmbeddedBrowserContext().embedded === false, 'Safari normal fue detectado como embebido.');
 assert(safari.action.textContent === 'Agregar a pantalla de inicio', 'Safari perdió su flujo normal.');
+assert(safari.menuTrigger.textContent === safari.action.textContent, 'iOS no usa la misma acción en todas las superficies.');
 const safariMenuTarget = { closest: (selector) => selector === '[data-install-trigger]' ? safari.menuTrigger : null };
 safari.card.hidden = true;
 safari.clickHandler({ target: safariMenuTarget, preventDefault() {} });
 const safariMenuNotice = safari.dynamicSelectors['[data-install-embedded-notice]'];
 assert(safariMenuNotice && safariMenuNotice.hidden === false, 'El menú de iOS no mostró instrucciones cuando la tarjeta estaba oculta.');
-assert(safariMenuNotice.querySelector('[data-install-embedded-copy]').textContent.includes('Agregar a pantalla de inicio'), 'Las instrucciones del menú de iOS no son las correctas.');
+assert(safariMenuNotice.querySelector('[data-install-embedded-help]').textContent.includes('Agregar a pantalla de inicio'), 'Las instrucciones del menú de iOS no son las correctas.');
 
 const installed = load('Mozilla/5.0 (Linux; Android 14) Instagram 335.0.0.0.0', { standalone: true });
 assert(installed.card.hidden === true, 'La PWA instalada conserva una invitación de instalación.');
@@ -202,18 +205,35 @@ chromeIntent.clickHandler({ target: intentActionTarget, preventDefault() {} });
 
 const normalWithoutIntent = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36');
 assert(normalWithoutIntent.timers.length === 0 && !normalWithoutIntent.dynamicSelectors['[data-install-intent-dialog]'], 'Chrome normal activó el flujo install=1.');
+normalWithoutIntent.clickHandler({target: {closest: (selector) => selector === '[data-install-trigger]' ? normalWithoutIntent.menuTrigger : null}, preventDefault() {}});
+const shortcutNotice = normalWithoutIntent.dynamicSelectors['[data-install-embedded-notice]'];
+assert(shortcutNotice && shortcutNotice.querySelector('[data-install-embedded-title]').textContent === 'Agregar un acceso directo', 'Chrome sin prompt no mostró instrucciones explícitas de acceso directo.');
 
 const chromeCard = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36');
 let cardPromptCalls = 0;
 chromeCard.windowHandlers.beforeinstallprompt({preventDefault() {}, prompt() { cardPromptCalls += 1; }, userChoice: Promise.resolve({outcome: 'dismissed'})});
+assert(chromeCard.action.hidden === false && chromeCard.action.textContent === 'Instalar aplicación', 'beforeinstallprompt no mostró la tarjeta como instalación real.');
 chromeCard.clickHandler({target: {closest: (selector) => selector === '[data-install-trigger]' ? chromeCard.action : null}, preventDefault() {}});
 assert(cardPromptCalls === 1, 'Chrome normal no abrió el prompt desde la tarjeta.');
 
 const chromeMenu = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36');
 let menuPromptCalls = 0;
 chromeMenu.windowHandlers.beforeinstallprompt({preventDefault() {}, prompt() { menuPromptCalls += 1; }, userChoice: Promise.resolve({outcome: 'dismissed'})});
+assert(chromeMenu.menuTrigger.hidden === false && chromeMenu.menuTrigger.textContent === 'Instalar aplicación', 'beforeinstallprompt no mostró la instalación del menú.');
 chromeMenu.clickHandler({target: {closest: (selector) => selector === '[data-install-trigger]' ? chromeMenu.menuTrigger : null}, preventDefault() {}});
 assert(menuPromptCalls === 1, 'Chrome normal no abrió el prompt desde el menú.');
+
+const chromeAccepted = load('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36');
+let acceptedPromptCalls = 0;
+chromeAccepted.windowHandlers.beforeinstallprompt({preventDefault() {}, prompt() { acceptedPromptCalls += 1; }, userChoice: Promise.resolve({outcome: 'accepted'})});
+chromeAccepted.clickHandler({target: {closest: (selector) => selector === '[data-install-trigger]' ? chromeAccepted.menuTrigger : null}, preventDefault() {}});
+
+const desktopChrome = load('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36');
+assert(desktopChrome.context.window.aquellasLunasInstallContext.getInstallExperienceState().kind === 'shortcut'
+  && desktopChrome.menuTrigger.textContent === 'Agregar acceso directo', 'Chrome de escritorio no resolvió el fallback shortcut.');
+const desktopFirefox = load('Mozilla/5.0 (X11; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0');
+assert(desktopFirefox.context.window.aquellasLunasInstallContext.getInstallExperienceState().kind === 'unavailable'
+  && desktopFirefox.menuTrigger.hidden === true, 'Un escritorio sin mecanismo conocido mostró un CTA falso.');
 
 const dismissedCard = load(
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36',
@@ -263,5 +283,8 @@ setImmediate(() => {
   assert(promptCalls === 1, 'El botón Instalar no abrió exactamente una vez el prompt nativo.');
   assert(intentDialog.open === false, 'Cancelar no cerró el modal.');
   assert(chromeIntent.context.window.history.cleanUrl === '/astro/cielo.php?foo=bar#hora', 'Cancelar no limpió install=1 o alteró la URL.');
+  assert(chromeCard.action.hidden === false && chromeCard.action.textContent === 'Agregar acceso directo', 'Cancelar no cambió coherentemente al fallback shortcut.');
+  assert(chromeMenu.menuTrigger.hidden === false && chromeMenu.menuTrigger.textContent === 'Agregar acceso directo', 'El menú no cambió al mismo fallback tras cancelar.');
+  assert(acceptedPromptCalls === 1 && chromeAccepted.menuTrigger.hidden === true, 'Aceptar el prompt no ocultó los CTA durante la instalación.');
   console.log('Instalación en navegadores embebidos e intención install=1: OK');
 });

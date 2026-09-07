@@ -61,6 +61,7 @@ final class TonightCalculator
         $encounters=$nightBounds!==null?$this->moonEncounters($samples,$sun,$moon,$observer,$nightBounds):[];
         $result=['date'=>$localDate->format('Y-m-d'),'timezone'=>$observer->timezone->getName(),'location'=>['latitude'=>$observer->latitudeDegrees,'longitude'=>$observer->longitudeDegrees],'detail'=>$detail,'night'=>$night,'generated_at'=>$now->setTimezone($observer->timezone)->setTime((int)$now->setTimezone($observer->timezone)->format('H'),(int)$now->setTimezone($observer->timezone)->format('i'),(int)$now->setTimezone($observer->timezone)->format('s'))->format(DATE_ATOM),'planets'=>$planetResults,'summary'=>['visible_planet_count'=>$count,'has_visible_planets'=>$count>0,'night_available'=>$nightRun!==null]];
         $result['moon_encounters']=$encounters;
+        $result['moon_scenes']=$this->moonScenes($encounters,$observer,$samples,$sun,$moon,$nightBounds,$now);
         if($reason!==null)$result['summary']['reason']=$reason;
         if($detail==='full'){$result['stars']=$stars;$result['deep_sky_objects']=$deep;if($moonResult!==null)$result['moon']=$moonResult;}
         return $result;
@@ -105,6 +106,34 @@ final class TonightCalculator
             $results[]=['id'=>$target->id,'name'=>$names[$target->id]??$target->id,'object_kind'=>$target->kind,'minimum_separation_degrees'=>round($minimum,1),'minimum_separation_at'=>$samples[$best]->setTimezone($observer->timezone)->format(DATE_ATOM),'visibility_start'=>$samples[$visibleIndexes[0]]->setTimezone($observer->timezone)->format(DATE_ATOM),'visibility_end'=>$samples[$visibleIndexes[array_key_last($visibleIndexes)]]->setTimezone($observer->timezone)->format(DATE_ATOM)];
         }
         usort($results,static fn(array $a,array $b):int=>[$a['minimum_separation_at'],$a['minimum_separation_degrees']]<=>[$b['minimum_separation_at'],$b['minimum_separation_degrees']]);return$results;
+    }
+
+    /** @param list<array<string,mixed>> $encounters @return list<array<string,mixed>> */
+    private function moonScenes(array $encounters,AstronomyObserver $observer,array $samples,array $sun,array $moon,?array $nightBounds,DateTimeImmutable $now):array
+    {
+        if($nightBounds===null)return[];
+        $targets=[];foreach(ConjunctionCatalog::targets() as $target)if(in_array($target->kind,['planet','star'],true))$targets[$target->id]=$target;
+        $names=ConjunctionCatalog::names();$scenes=[];
+        foreach($encounters as $anchor){$anchorId=(string)($anchor['id']??'');if(!isset($targets[$anchorId]))continue;
+            try{$minimum=new DateTimeImmutable((string)$anchor['minimum_separation_at']);}catch(\Throwable){continue;}$best=null;$bestScore=[-1,INF];
+            foreach($samples as $i=>$instant){if($instant<$now||$instant<$nightBounds[0]||$instant>$nightBounds[1]||$moon[$i]->altitudeDegrees<10.0)continue;$objects=[];
+                foreach($targets as $target){$equatorial=$target->kind==='planet'?$this->planets->target($target->id,$instant):$this->planets->fixed($target,$instant);$position=$this->horizontal($equatorial,$instant,$observer);$maxSun=$target->kind==='planet'?-6.0:-12.0;
+                    if($position['alt']<10.0||$sun[$i]->altitudeDegrees>$maxSun)continue;$relative=$this->relativeToMoon($moon[$i]->altitudeDegrees,$moon[$i]->azimuthDegrees,$position['alt'],$position['az']);if($relative['separation_degrees']>self::MOON_ENCOUNTER_MAX_SEPARATION_DEGREES)continue;
+                    $objects[]=['id'=>$target->id,'name'=>$names[$target->id]??$target->id,'object_kind'=>$target->kind,'altitude_degrees'=>round($position['alt'],4),'azimuth_degrees'=>round($position['az'],4),'separation_degrees'=>round($relative['separation_degrees'],4),'relative_x_degrees'=>round($relative['x_degrees'],4),'relative_y_degrees'=>round($relative['y_degrees'],4)];}
+                if(!in_array($anchorId,array_column($objects,'id'),true))continue;$score=[count($objects),abs($instant->getTimestamp()-$minimum->getTimestamp())];if($score[0]>$bestScore[0]||($score[0]===$bestScore[0]&&$score[1]<$bestScore[1])){$bestScore=$score;$best=['instant'=>$instant,'moon'=>$moon[$i],'objects'=>$objects];}}
+            if($best===null)continue;usort($best['objects'],static fn(array $a,array $b):int=>$a['separation_degrees']<=>$b['separation_degrees']);$instant=$best['instant'];$moonAtScene=$best['moon'];
+            $scenes[]=['anchor_id'=>$anchorId,'datetime'=>$instant->setTimezone($observer->timezone)->format(DATE_ATOM),'moon'=>['altitude_degrees'=>round($moonAtScene->altitudeDegrees,4),'azimuth_degrees'=>round($moonAtScene->azimuthDegrees,4),'illumination_percent'=>round($moonAtScene->illuminationFraction*100,4),'age_days'=>round($moonAtScene->ageDays,6),'angular_diameter_degrees'=>round($moonAtScene->geocentricApparentDiameterArcminutes()/60,6)],'objects'=>$best['objects']];}
+        return$scenes;
+    }
+
+    /** @return array{separation_degrees:float,x_degrees:float,y_degrees:float} */
+    private function relativeToMoon(float $moonAltitude,float $moonAzimuth,float $targetAltitude,float $targetAzimuth):array
+    {
+        $ma=deg2rad($moonAltitude);$mz=deg2rad($moonAzimuth);$ta=deg2rad($targetAltitude);$tz=deg2rad($targetAzimuth);
+        $moon=[cos($ma)*sin($mz),cos($ma)*cos($mz),sin($ma)];$target=[cos($ta)*sin($tz),cos($ta)*cos($tz),sin($ta)];
+        $east=[cos($mz),-sin($mz),0.0];$up=[-sin($ma)*sin($mz),-sin($ma)*cos($mz),cos($ma)];
+        $dot=static fn(array $a,array $b):float=>$a[0]*$b[0]+$a[1]*$b[1]+$a[2]*$b[2];$center=max(-1.0,min(1.0,$dot($moon,$target)));$separation=acos($center);$position=atan2($dot($target,$east),$dot($target,$up));
+        return['separation_degrees'=>rad2deg($separation),'x_degrees'=>rad2deg($separation)*sin($position),'y_degrees'=>-rad2deg($separation)*cos($position)];
     }
 
     /** @param array<string,int|float|string> $entry */ private function starCoordinates(array $entry,DateTimeImmutable $date):EquatorialCoordinates{$jd=2440587.5+$date->getTimestamp()/86400;$years=2000+($jd-2451545)/365.25-1991.25;$dec=(float)$entry['dec']+(float)$entry['pmDec']*$years/3600000;$cos=max(1e-9,cos(deg2rad($dec)));$ra=(float)$entry['ra']+(float)$entry['pmRa']*$years/(3600000*$cos);return$this->precess(new EquatorialCoordinates($this->norm($ra),$dec),$date);}

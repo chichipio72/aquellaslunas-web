@@ -22,6 +22,7 @@ final class CachedCelesTrakTleProvider implements SatelliteTleProvider
         private readonly int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
         private readonly TleDownloader $downloader = new CelesTrakTleDownloader(),
         ?callable $clock = null,
+        private readonly bool $refreshStale = true,
     ) {
         if ($cachePath === '') throw new RuntimeException('TLE cache path cannot be empty.');
         if ($ttlSeconds < 60 || $ttlSeconds > 604800) throw new RuntimeException('TLE cache TTL must be between 60 seconds and 7 days.');
@@ -47,7 +48,8 @@ final class CachedCelesTrakTleProvider implements SatelliteTleProvider
             $now = ($this->clock)()->setTimezone(new DateTimeZone('UTC'));
             $cache = $this->readCache($handle);
             $cached = $this->cachedEntry($cache[$satellite] ?? null, self::CATALOG[$satellite]);
-            if ($cached !== null && $now->getTimestamp() - $cached['downloaded']->getTimestamp() < $this->ttlSeconds) {
+            if ($cached !== null && (!$this->refreshStale
+                || $now->getTimestamp() - $cached['downloaded']->getTimestamp() < $this->ttlSeconds)) {
                 return $this->result($satellite, $cached['tle'], $cached['downloaded'], 'cache_hit', $now, []);
             }
 
@@ -67,6 +69,45 @@ final class CachedCelesTrakTleProvider implements SatelliteTleProvider
                 return $this->result($satellite, $cached['tle'], $cached['downloaded'], 'fallback', $now,
                     ['TLE download failed; using the last valid cached element set.']);
             }
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+    }
+
+    /** Downloads and validates a fresh TLE before replacing its cached entry. */
+    public function refresh(string $satellite): ResolvedTle
+    {
+        if (!isset(self::CATALOG[$satellite])) throw new RuntimeException('Unsupported satellite: ' . $satellite . '.');
+        $now = ($this->clock)()->setTimezone(new DateTimeZone('UTC'));
+        try {
+            $tle = $this->parseResponse(
+                $this->downloader->download(self::CATALOG[$satellite]),
+                self::CATALOG[$satellite],
+            );
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Could not refresh a valid TLE for ' . $satellite . ': '
+                . $exception->getMessage(), 0, $exception);
+        }
+
+        $directory = dirname($this->cachePath);
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new RuntimeException('Could not create the TLE cache directory.');
+        }
+        $handle = @fopen($this->cachePath, 'c+');
+        if ($handle === false || !flock($handle, LOCK_EX)) {
+            if (is_resource($handle)) fclose($handle);
+            throw new RuntimeException('Could not lock the TLE cache.');
+        }
+        try {
+            $cache = $this->readCache($handle);
+            $cache[$satellite] = [
+                'norad_catalog_number' => $tle->catalogNumber,
+                'downloaded_at_utc' => $now->format('Y-m-d\TH:i:s.uP'),
+                'name' => $tle->name, 'line1' => $tle->line1, 'line2' => $tle->line2,
+            ];
+            $this->writeCache($handle, $cache);
+            return $this->result($satellite, $tle, $now, 'refreshed', $now, []);
         } finally {
             flock($handle, LOCK_UN);
             fclose($handle);
